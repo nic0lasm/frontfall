@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea to discuss
+    url: https://github.com/nic0lasm/frontfall/discussions
+    about: Ask questions and share ideas in Discussions.
+  - name: Security vulnerability
+    url: https://github.com/nic0lasm/frontfall/security/advisories/new
+    about: Report it privately, never in a public issue.

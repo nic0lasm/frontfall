@@ -1,0 +1,15 @@
+{
+  "name": "@frontfall/engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deterministic game simulation shared by every client.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

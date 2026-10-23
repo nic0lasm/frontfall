@@ -1,0 +1,26 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1d2a;
+  font-family: system-ui, sans-serif;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+.status {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 55%);
+  color: #e8eef2;
+  font-size: 13px;
+  pointer-events: none;
+}
