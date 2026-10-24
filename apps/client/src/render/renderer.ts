@@ -1,5 +1,10 @@
-import type { CameraView } from "./camera.ts";
+import { FlatCamera, type CameraView, type ViewCamera } from "./camera.ts";
+import { GlobeCamera } from "./globe-camera.ts";
+import { GlobeView } from "./globe-view.ts";
 import { MapView } from "./map-view.ts";
+
+/** How the map is shown: flat, or on a globe for a map of the whole planet (a prototype, ADR 0005). */
+export type ViewKind = "flat" | "globe";
 
 /** A unit to draw, in tiles, y counted from the north. */
 export interface UnitMark {
@@ -57,6 +62,21 @@ export interface Renderer {
 }
 
 /** The renderer for a map; throws if WebGL 2 is missing or refused. */
-export function createRenderer(options: RendererOptions): Renderer {
-  return new MapView(options);
+export function createRenderer(options: RendererOptions, kind: ViewKind = "flat"): Renderer {
+  return kind === "globe" ? new GlobeView(options) : new MapView(options);
+}
+
+/** The camera that goes with a renderer of the same kind. */
+export function createCamera(
+  map: { readonly width: number; readonly height: number; readonly wrapsX: boolean },
+  kind: ViewKind = "flat",
+): ViewCamera {
+  return kind === "globe"
+    ? new GlobeCamera({ width: map.width, height: map.height })
+    : new FlatCamera({ width: map.width, height: map.height, wrapsX: map.wrapsX });
+}
+
+/** Whether a map can be shown on a globe: it must span every longitude and latitude. */
+export function fitsGlobe(map: { readonly wrapsX: boolean }): boolean {
+  return map.wrapsX;
 }

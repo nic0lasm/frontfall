@@ -39,6 +39,18 @@ export interface Camera {
   readonly viewportHeight: number;
 }
 
+/**
+ * A camera the game screen draws from: besides the contract above, it gives
+ * the renderer its view and tells how close it is.
+ */
+export interface ViewCamera extends Camera {
+  view(): CameraView;
+  /** 1 shows the whole map; larger values close in. */
+  readonly zoom: number;
+  /** Screen pixels per tile at the middle of the screen. */
+  readonly scale: number;
+}
+
 export interface FlatCameraOptions {
   /** Size of the world in tiles. */
   readonly width: number;
@@ -55,7 +67,7 @@ export interface FlatCameraOptions {
  * is kept in [0, width) whatever the pans; on a flat map it is clamped like
  * the centre row, so no edge leaves a gap on screen unless the whole map fits.
  */
-export class FlatCamera implements Camera {
+export class FlatCamera implements ViewCamera {
   readonly minZoom: number;
   readonly maxZoom: number;
   readonly wrapsX: boolean;

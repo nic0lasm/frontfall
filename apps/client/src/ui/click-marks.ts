@@ -11,6 +11,9 @@ const PENDING_MS = 3000;
 /** How long the reason for a refused click stays up. */
 const NOTE_MS = 2500;
 
+/** A ring this far outside the view, in CSS pixels, is hidden rather than moved. */
+const OFF_SCREEN = 64;
+
 const REFUSALS: Partial<Record<ClickOutcome, MessageKey>> = {
   terrain: "click.terrain",
   own: "click.own",
@@ -83,6 +86,12 @@ export class ClickMarks {
     this.pending = this.pending.filter((mark) => now < mark.until);
     for (const mark of this.marks) {
       const { x, y } = camera.tileToScreen(mark.tile);
+      // Behind a globe, a tile is placed far off screen.
+      mark.element.hidden =
+        x < -OFF_SCREEN ||
+        y < -OFF_SCREEN ||
+        x > camera.viewportWidth + OFF_SCREEN ||
+        y > camera.viewportHeight + OFF_SCREEN;
       mark.element.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     }
     if (!this.note.hidden && now > this.noteUntil) this.note.hidden = true;

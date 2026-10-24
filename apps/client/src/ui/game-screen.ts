@@ -8,8 +8,14 @@ import type { ClickMode, GameUpdate, SoloOptions } from "../game/solo-game.ts";
 import { InputController } from "../input/controller.ts";
 import { applyTranslations, onLanguageChange, t, type MessageKey } from "../i18n/index.ts";
 import { playerColor } from "../palette.ts";
-import { FlatCamera, type CameraView } from "../render/camera.ts";
-import { createRenderer, type Renderer } from "../render/renderer.ts";
+import type { CameraView, ViewCamera } from "../render/camera.ts";
+import {
+  createCamera,
+  createRenderer,
+  fitsGlobe,
+  type Renderer,
+  type ViewKind,
+} from "../render/renderer.ts";
 import { endScreen, helpPanel } from "./end-screen.ts";
 import { ClickMarks } from "./click-marks.ts";
 import { Hud } from "./hud.ts";
@@ -39,10 +45,10 @@ export interface GameScreenActions {
 export class GameScreen {
   readonly element: HTMLElement;
   private owners = new Uint16Array(0);
-  private readonly camera: FlatCamera;
+  private camera: ViewCamera;
   private readonly surface: HTMLElement;
   private view: Renderer | undefined;
-  private readonly input: InputController;
+  private input: InputController;
   private readonly hud: Hud;
   private readonly session: LocalSession;
   private readonly cleanups: (() => void)[] = [];
@@ -73,6 +79,12 @@ export class GameScreen {
   private modeSent: ClickMode | undefined;
   /** The structures last drawn, as a key that changes when any of them does. */
   private drawnStructures = "";
+  /** Flat map or globe; G switches when the globe was asked for and the map allows it. */
+  private viewKind: ViewKind;
+  private readonly globeAllowed: boolean;
+  private readonly mapSize: { readonly width: number; readonly height: number };
+  /** What the renderer is made from, kept to make another one when the view switches. */
+  private shown: { map: MapData; you: number; maxPlayer: number } | undefined;
 
   constructor(
     readonly options: SoloOptions,
@@ -80,8 +92,13 @@ export class GameScreen {
     private readonly actions: GameScreenActions,
     /** Online: the connection the game's orders go to; the game then never pauses. */
     private readonly link?: ServerLink,
+    /** The view to start with; "globe" also lets G switch views (a prototype, ADR 0005). */
+    view: ViewKind = "flat",
   ) {
-    this.camera = new FlatCamera({ width: map.width, height: map.height, wrapsX: map.wrapsX });
+    this.globeAllowed = view === "globe" && fitsGlobe(map);
+    this.viewKind = this.globeAllowed ? "globe" : "flat";
+    this.mapSize = { width: map.width, height: map.height };
+    this.camera = createCamera(map, this.viewKind);
     // Input listens on a layer of its own under the HUD, so clicks on panels never reach the map.
     this.surface = document.createElement("div");
     this.surface.className = "map-surface";
@@ -121,11 +138,7 @@ export class GameScreen {
       this.marks.note,
     );
 
-    this.input = new InputController(this.surface, this.camera, {
-      onTileClick: (tile) => {
-        this.click(tile);
-      },
-    });
+    this.input = this.createInput();
 
     this.session = new LocalSession(
       options,
@@ -227,20 +240,39 @@ export class GameScreen {
     this.element.remove();
   }
 
+  private createInput(): InputController {
+    return new InputController(this.surface, this.camera, {
+      onTileClick: (tile) => {
+        this.click(tile);
+      },
+    });
+  }
+
   private showMap(map: MapData, you: number, maxPlayer: number): void {
     this.owners = new Uint16Array(map.width * map.height);
     this.wrapsX = map.wrapsX;
+    this.shown = { map, you, maxPlayer };
+    this.mountRenderer();
+  }
+
+  /** Makes the renderer of the current kind over the owners array, already filled or not. */
+  private mountRenderer(): void {
+    if (!this.shown) return;
+    const { map, you, maxPlayer } = this.shown;
     let view: Renderer;
     try {
-      view = createRenderer({
-        width: map.width,
-        height: map.height,
-        kinds: map.kinds,
-        wrapsX: map.wrapsX,
-        relief: map.relief,
-        owners: this.owners,
-        maxOwner: maxPlayer,
-      });
+      view = createRenderer(
+        {
+          width: map.width,
+          height: map.height,
+          kinds: map.kinds,
+          wrapsX: map.wrapsX,
+          relief: map.relief,
+          owners: this.owners,
+          maxOwner: maxPlayer,
+        },
+        this.viewKind,
+      );
     } catch (error) {
       // Most likely the WebGL context, lost or refused after the check of the menu.
       console.error(error);
@@ -251,12 +283,40 @@ export class GameScreen {
       view.setPlayerColor(id, playerColor(id - 1).hex);
     }
     view.setHighlight(you);
+    // After a switch of view the owners are already there to draw.
+    view.markAllChanged();
     view.canvas.classList.add("map-canvas");
     this.surface.append(view.canvas);
     this.surface.removeAttribute("aria-busy");
     this.view = view;
     this.dirty = true;
+    this.drawnView = undefined;
     this.resize();
+  }
+
+  /**
+   * Flat map to globe and back in a running game: a new camera over the same
+   * tile and zoom, a new renderer over the same owners array, and the input
+   * wired to the new camera.
+   */
+  private switchView(): void {
+    if (!this.globeAllowed) return;
+    const { centerX, centerY } = this.camera.view();
+    const { width, height } = this.mapSize;
+    const centre = Math.min(height - 1, Math.floor(centerY)) * width + Math.floor(centerX);
+    const zoom = this.camera.zoom;
+    this.viewKind = this.viewKind === "globe" ? "flat" : "globe";
+    this.camera = createCamera({ width, height, wrapsX: this.wrapsX }, this.viewKind);
+    this.camera.resize(window.innerWidth, window.innerHeight);
+    this.camera.focus(centre, zoom);
+    this.input.dispose();
+    this.input = this.createInput();
+    if (!this.view) return;
+    this.view.dispose();
+    this.view = undefined;
+    this.mountRenderer();
+    this.drawnStructures = "";
+    if (this.latest) this.placeStructures(this.latest);
   }
 
   /**
@@ -267,7 +327,7 @@ export class GameScreen {
     const view = this.view;
     const ships = this.latest?.boats;
     if (!view || !ships) return;
-    const { width } = this.camera.options;
+    const { width } = this.mapSize;
     const progress = Math.min(1, (now - this.updatedAt) / (1000 / this.ticksPerSecond));
     view.setShips(
       ships.map((ship) => {
@@ -320,7 +380,7 @@ export class GameScreen {
       // on a large map it is a few pixels wide at the zoom that shows it all.
       this.focused = true;
       const start = this.owners.indexOf(update.you);
-      const zoom = (START_TILE_PIXELS * this.camera.options.height) / this.camera.viewportHeight;
+      const zoom = (START_TILE_PIXELS * this.mapSize.height) / this.camera.viewportHeight;
       if (start >= 0) this.camera.focus(start, Math.max(this.camera.zoom, zoom));
     }
     this.placeStructures(update);
@@ -376,7 +436,7 @@ export class GameScreen {
       .join(",");
     if (!this.view || key === this.drawnStructures) return;
     this.drawnStructures = key;
-    const { width } = this.camera.options;
+    const { width } = this.mapSize;
     this.view.setStructures(
       update.structures.map((structure) => ({
         x: structure.tile % width,
@@ -425,6 +485,9 @@ export class GameScreen {
       event.preventDefault();
     } else if (event.code === "KeyP" || event.code === "Escape") {
       this.togglePause();
+      event.preventDefault();
+    } else if (event.code === "KeyG" && this.globeAllowed) {
+      this.switchView();
       event.preventDefault();
     } else if (event.code === "KeyH" || event.key === "?") {
       this.showHelp();

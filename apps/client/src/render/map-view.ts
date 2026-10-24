@@ -170,6 +170,8 @@ export class MapView implements Renderer {
       fill.dispose();
     }
     this.renderer.dispose();
+    // Switching views creates another context; browsers cap how many stay alive.
+    this.renderer.forceContextLoss();
     this.canvas.remove();
   }
 }

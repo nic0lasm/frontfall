@@ -4,6 +4,7 @@ import { fetchMaps, type MapInfo } from "./game/maps.ts";
 import { BUILD } from "./net/build.ts";
 import { forgetSeat, saveSeat, seatIn } from "./net/seat.ts";
 import { OnlineClient, socketUrl, type GameStart, type OnlineEntry } from "./net/online.ts";
+import type { ViewKind } from "./render/renderer.ts";
 import { hasWebGL2 } from "./render/webgl-support.ts";
 import { GameScreen } from "./ui/game-screen.ts";
 import { LobbyScreen, botLimit, onlineMaps } from "./ui/lobby.ts";
@@ -53,6 +54,14 @@ const testing = (() => {
   };
 })();
 
+/**
+ * `?view=globe` shows a map of the whole planet on a globe, and G switches
+ * between globe and flat map: a prototype (ADR 0005). Read once, before the
+ * address bar is rewritten.
+ */
+const startView: ViewKind =
+  new URLSearchParams(location.search).get("view") === "globe" ? "globe" : "flat";
+
 function play(chosen: GameSetup): void {
   setup = chosen;
   saveSetup(setup, storage);
@@ -79,6 +88,8 @@ function play(chosen: GameSetup): void {
         showNotice(key);
       },
     },
+    undefined,
+    startView,
   );
   menu?.dispose();
   menu = undefined;
@@ -327,6 +338,7 @@ function startOnline(start: GameStart, client: OnlineClient): void {
         client.hash(tick, hash);
       },
     },
+    startView,
   );
   document.body.classList.add("playing");
   document.body.prepend(game.element);

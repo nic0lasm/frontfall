@@ -15,6 +15,22 @@ export interface TerritoryLayerOptions {
   readonly relief?: Uint8Array | undefined;
   /** Highest owner id the palette must hold. */
   readonly maxOwner: number;
+  /**
+   * What the map is drawn on: a plane in tiles (the default), or the unit
+   * sphere, for a map whose columns span every longitude from -180 and rows
+   * every latitude from the north pole. The sphere is ray-traced on a quad
+   * that fills the screen, with the camera given by setGlobePose.
+   */
+  readonly surface?: "plane" | "sphere" | undefined;
+}
+
+/** The globe camera, as the territory layer needs it (globe-projection.ts). */
+export interface GlobeRays {
+  readonly position: readonly [number, number, number];
+  /** Ray through the middle of the screen, and its change to the right and top edges. */
+  readonly forward: readonly [number, number, number];
+  readonly right: readonly [number, number, number];
+  readonly up: readonly [number, number, number];
 }
 
 /** Surf along the coast: the brand's secondary text, light against the sea. */
@@ -33,14 +49,27 @@ const CHUNKS_PER_ROW = 32;
 const MIN_CHUNK_WIDTH = 64;
 
 const vertexShader = /* glsl */ `
-  out vec2 vTile;
   uniform vec2 worldSize;
+#ifdef SPHERE
+  out vec3 vRay;
+  uniform vec3 rayForward;
+  uniform vec3 rayRight;
+  uniform vec3 rayUp;
+
+  void main() {
+    // A quad over the whole screen: each pixel casts its own ray at the planet.
+    vRay = rayForward + position.x * rayRight + position.y * rayUp;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+#else
+  out vec2 vTile;
 
   void main() {
     // Local x runs over the copies of the world, local y from south to north.
     vTile = vec2(position.x, worldSize.y - position.y);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
+#endif
 `;
 
 const fragmentShader = /* glsl */ `
@@ -48,7 +77,12 @@ const fragmentShader = /* glsl */ `
   precision highp int;
   precision highp usampler2D;
 
+#ifdef SPHERE
+  in vec3 vRay;
+  uniform vec3 eye;
+#else
   in vec2 vTile;
+#endif
   layout(location = 0) out highp vec4 outColor;
 
   uniform usampler2D owners;
@@ -72,21 +106,45 @@ const fragmentShader = /* glsl */ `
 
   uint ownerAt(ivec2 tile) { return texelFetch(owners, wrapTile(tile), 0).r; }
 
-  /** Distance in tiles from the point to the nearest of the sides marked: east, west, south, north. */
-  float edgeDistance(vec2 f, bvec4 sides) {
+  /**
+   * Distance in tiles from the point to the nearest of the sides marked:
+   * east, west, south, north. A column is columnWidth rows wide, less than
+   * one near the poles of a globe.
+   */
+  float edgeDistance(vec2 f, bvec4 sides, float columnWidth) {
     float d = 2.0;
-    if (sides.x) d = min(d, 1.0 - f.x);
-    if (sides.y) d = min(d, f.x);
+    if (sides.x) d = min(d, (1.0 - f.x) * columnWidth);
+    if (sides.y) d = min(d, f.x * columnWidth);
     if (sides.z) d = min(d, 1.0 - f.y);
     if (sides.w) d = min(d, f.y);
     return d;
   }
 
   void main() {
-    ivec2 tile = wrapTile(ivec2(floor(vTile)));
-    vec2 f = fract(vTile);
+  #ifdef SPHERE
+    // Where the ray meets the unit sphere. Off the planet the root is clamped
+    // rather than skipped, so the derivatives stay defined up to the rim.
+    vec3 ray = normalize(vRay);
+    float b = dot(eye, ray);
+    float hit = b * b - dot(eye, eye) + 1.0;
+    // Pixels clear of the rim stop here; those next to it go on, for derivatives across it.
+    if (hit < -2.0 * fwidth(hit)) discard;
+    vec3 point = normalize(eye + (-b - sqrt(max(hit, 0.0))) * ray);
+    float lat = asin(clamp(point.y, -1.0, 1.0));
+    float lon = atan(-point.z, point.x);
+    vec2 at = vec2((lon / 6.2831853 + 0.5) * worldSize.x, (0.5 - lat / 3.1415927) * worldSize.y);
+    // Rows keep their size on the sphere; columns narrow toward the poles, and
+    // their coordinate jumps across the antimeridian, so only rows give the scale.
+    float pixel = max(fwidth(at.y), 1e-4);
+    float columnWidth = cos(lat) * 2.0 * worldSize.y / worldSize.x;
+  #else
+    vec2 at = vTile;
     // Tiles per screen pixel, for lines that stay sharp and visible at any zoom.
-    float pixel = max(fwidth(vTile.x), 1e-4);
+    float pixel = max(fwidth(at.x), 1e-4);
+    float columnWidth = 1.0;
+  #endif
+    ivec2 tile = wrapTile(ivec2(floor(at)));
+    vec2 f = fract(at);
 
     // Ground colour and coast sides, computed once for the whole map (terrain-colors.ts).
     vec4 groundTexel = texelFetch(ground, tile, 0);
@@ -94,7 +152,7 @@ const fragmentShader = /* glsl */ `
     uint coast = uint(groundTexel.a * 255.0 + 0.5);
     if (coast != 0u) {
       bvec4 land = bvec4((coast & 1u) != 0u, (coast & 2u) != 0u, (coast & 4u) != 0u, (coast & 8u) != 0u);
-      float surf = 1.0 - smoothstep(0.0, max(0.12, 1.2 * pixel), edgeDistance(f, land));
+      float surf = 1.0 - smoothstep(0.0, max(0.12, 1.2 * pixel), edgeDistance(f, land, columnWidth));
       color = mix(color, surfColor, surf * 0.55);
     }
 
@@ -115,13 +173,18 @@ const fragmentShader = /* glsl */ `
       // The player's own land has a wider, whiter rim, to find it on a crowded map.
       bool mine = owner == highlight;
       float width = mine ? max(0.4, 2.5 * pixel) : max(0.22, pixel);
-      float border = 1.0 - smoothstep(width - pixel, width, edgeDistance(f, other));
+      float border = 1.0 - smoothstep(width - pixel, width, edgeDistance(f, other, columnWidth));
       vec3 rimColor = mix(ownerColor, vec3(1.0), mine ? 0.75 : 0.3);
       vec3 owned = mix(fillColor, rimColor, border);
       // A tile taken a moment ago fades in, so fronts creep instead of jumping each tick.
       float age = now - texelFetch(takenAt, tile, 0).r;
       color = mix(color, owned, smoothstep(0.0, fadeSeconds, age));
     }
+  #ifdef SPHERE
+    if (hit < 0.0) discard;
+    // Darker toward the rim, so the planet reads as round.
+    color *= mix(0.45, 1.0, sqrt(max(dot(point, -ray), 0.0)));
+  #endif
     outColor = linearToOutputTexel(vec4(color, 1.0));
   }
 `;
@@ -146,6 +209,13 @@ export class TerritoryLayer {
   /** When each tile last changed hands, in seconds on the layer's clock. */
   readonly takenAtTexture: THREE.DataTexture;
   private readonly takenAt: Float32Array;
+  /** The globe camera's rays, read by the shader on a sphere. */
+  private readonly rays = {
+    eye: new THREE.Vector3(0, 0, 3),
+    rayForward: new THREE.Vector3(0, 0, -1),
+    rayRight: new THREE.Vector3(1, 0, 0),
+    rayUp: new THREE.Vector3(0, 1, 0),
+  };
   private readonly paletteData: Uint8Array;
   private readonly chunkWidth: number;
   private readonly dirtyChunks: Uint32Array;
@@ -212,8 +282,10 @@ export class TerritoryLayer {
       texture.needsUpdate = true;
     }
 
+    const sphere = options.surface === "sphere";
     const material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
+      defines: sphere ? { SPHERE: 1 } : {},
       vertexShader,
       fragmentShader,
       uniforms: {
@@ -229,11 +301,19 @@ export class TerritoryLayer {
         reliefShading: { value: 1 },
         groundLevel: { value: GROUND_LEVEL },
         highlight: { value: 0 },
+        eye: { value: this.rays.eye },
+        rayForward: { value: this.rays.rayForward },
+        rayRight: { value: this.rays.rayRight },
+        rayUp: { value: this.rays.rayUp },
       },
+      // The globe's quad covers the whole screen and must not hide what is drawn over it.
+      depthWrite: !sphere,
     });
-    const geometry = new THREE.PlaneGeometry(wrapsX ? width * 3 : width, height);
+    const geometry = sphere
+      ? new THREE.PlaneGeometry(2, 2)
+      : new THREE.PlaneGeometry(wrapsX ? width * 3 : width, height);
     // Local coordinates: x in [-width, 2 * width) or, on a flat map, [0, width); y in [0, height).
-    geometry.translate(width / 2, height / 2, 0);
+    if (!sphere) geometry.translate(width / 2, height / 2, 0);
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.frustumCulled = false;
 
@@ -258,6 +338,15 @@ export class TerritoryLayer {
   setHighlight(owner: number): void {
     const highlight = this.mesh.material.uniforms.highlight;
     if (highlight) highlight.value = owner;
+  }
+
+  /** Points the rays of a globe at the planet; set once per frame. Ignored on a plane. */
+  setGlobePose(rays: GlobeRays): void {
+    const { eye, rayForward, rayRight, rayUp } = this.rays;
+    eye.set(...rays.position);
+    rayForward.set(...rays.forward);
+    rayRight.set(...rays.right);
+    rayUp.set(...rays.up);
   }
 
   /** Seconds on the clock that fades new tiles in; set once per frame. */
