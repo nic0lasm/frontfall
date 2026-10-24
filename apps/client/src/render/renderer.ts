@@ -1,6 +1,5 @@
 import { FlatCamera, type CameraView, type ViewCamera } from "./camera.ts";
-import { GlobeCamera } from "./globe-camera.ts";
-import { GlobeView } from "./globe-view.ts";
+import type * as Globe from "./globe.ts";
 import { MapView } from "./map-view.ts";
 
 /** How the map is shown: flat, or on a globe for a map of the whole planet (a prototype, ADR 0005). */
@@ -61,9 +60,25 @@ export interface Renderer {
   dispose(): void;
 }
 
-/** The renderer for a map; throws if WebGL 2 is missing or refused. */
+/** The globe's code, once loadGlobe has fetched it. */
+let globe: typeof Globe | undefined;
+
+/**
+ * Fetches the globe's code, kept out of the main bundle since only
+ * `?view=globe` uses it. Until it resolves, every view is flat.
+ */
+export async function loadGlobe(): Promise<void> {
+  globe ??= await import("./globe.ts");
+}
+
+/** Whether loadGlobe has completed, so that a globe can be made. */
+export function globeLoaded(): boolean {
+  return globe !== undefined;
+}
+
+/** The renderer for a map; throws if WebGL 2 is missing or refused. A globe needs loadGlobe first. */
 export function createRenderer(options: RendererOptions, kind: ViewKind = "flat"): Renderer {
-  return kind === "globe" ? new GlobeView(options) : new MapView(options);
+  return kind === "globe" && globe ? new globe.GlobeView(options) : new MapView(options);
 }
 
 /** The camera that goes with a renderer of the same kind. */
@@ -71,8 +86,8 @@ export function createCamera(
   map: { readonly width: number; readonly height: number; readonly wrapsX: boolean },
   kind: ViewKind = "flat",
 ): ViewCamera {
-  return kind === "globe"
-    ? new GlobeCamera({ width: map.width, height: map.height })
+  return kind === "globe" && globe
+    ? new globe.GlobeCamera({ width: map.width, height: map.height })
     : new FlatCamera({ width: map.width, height: map.height, wrapsX: map.wrapsX });
 }
 

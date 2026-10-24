@@ -4,7 +4,7 @@ import { fetchMaps, type MapInfo } from "./game/maps.ts";
 import { BUILD } from "./net/build.ts";
 import { forgetSeat, saveSeat, seatIn } from "./net/seat.ts";
 import { OnlineClient, socketUrl, type GameStart, type OnlineEntry } from "./net/online.ts";
-import type { ViewKind } from "./render/renderer.ts";
+import { loadGlobe, type ViewKind } from "./render/renderer.ts";
 import { hasWebGL2 } from "./render/webgl-support.ts";
 import { GameScreen } from "./ui/game-screen.ts";
 import { LobbyScreen, botLimit, onlineMaps } from "./ui/lobby.ts";
@@ -347,10 +347,18 @@ function startOnline(start: GameStart, client: OnlineClient): void {
 
 const query = new URLSearchParams(location.search);
 const invited = query.get("game");
-const ready = fetchMaps(location.href).then((list) => {
-  maps = list;
-  setup = initialSetup(location.search, storage, maps);
-});
+const ready = Promise.all([
+  fetchMaps(location.href).then((list) => {
+    maps = list;
+    setup = initialSetup(location.search, storage, maps);
+  }),
+  // Without the globe's code, the game shows the flat map.
+  startView === "globe"
+    ? loadGlobe().catch((error: unknown) => {
+        console.error(error);
+      })
+    : undefined,
+]);
 void ready.then(() => {
   // An invitation link joins its game; ?online, the next public one.
   if (invited) {
