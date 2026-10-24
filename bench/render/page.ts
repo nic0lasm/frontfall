@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { playerColor } from "../../apps/client/src/palette.ts";
+import { GLOBE_FOV, globePose, globeRays } from "../../apps/client/src/render/globe-projection.ts";
 import { TerritoryLayer } from "../../apps/client/src/render/territory-layer.ts";
 import { UnitLayer } from "../../apps/client/src/render/unit-layer.ts";
 import { summarize, type Summary } from "../engine/stats.ts";
@@ -39,6 +40,9 @@ const unitCount = number("units", 10_000);
 const frames = number("frames", 120);
 const viewportWidth = number("viewportWidth", 1280);
 const viewportHeight = number("viewportHeight", 720);
+// The globe prototype (ADR 0005): the same layer ray-traced on a sphere, at a zoom where 1 fits the map height.
+const globe = params.get("surface") === "sphere";
+const globeZoom = number("zoom", 2);
 
 function run(): RenderResult {
   const workload = new ExpansionWorkload({
@@ -74,6 +78,7 @@ function run(): RenderResult {
     owners: territory.owners,
     terrain: workload.land,
     maxOwner: players,
+    surface: globe ? "sphere" : "plane",
   });
   for (let player = 1; player <= players; player++) {
     layer.setOwnerColor(player, playerColor(player - 1).hex);
@@ -85,7 +90,8 @@ function run(): RenderResult {
     const tile = borders > 0 ? territory.borderTile(player, (i * 7919) % borders) : i;
     units.set(i, tile % width, Math.floor(tile / width), 0xffffff);
   }
-  units.count = unitCount;
+  // Units are drawn flat only; the globe draws its markers with another layer.
+  units.count = globe ? 0 : unitCount;
 
   const scene = new THREE.Scene();
   scene.add(layer.mesh, units.mesh);
@@ -100,6 +106,16 @@ function run(): RenderResult {
     10,
   );
   camera.position.set(width / 2, height / 2, 5);
+  const halfHeight = height / 2 / globeZoom;
+  const pose = globePose(
+    { centerX: width / 2, centerY: height / 3, halfWidth: halfHeight * aspect, halfHeight },
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+  );
+  layer.setGlobePose(globeRays(pose));
+  const perspective = new THREE.PerspectiveCamera(GLOBE_FOV, aspect, 0.001, 100);
 
   const time = (frame: () => void): number => {
     const start = performance.now();
@@ -110,7 +126,7 @@ function run(): RenderResult {
   const draw = (): void => {
     layer.flush();
     units.update(camera.position.x);
-    renderer.render(scene, camera);
+    renderer.render(scene, globe ? perspective : camera);
   };
 
   const firstFrameMs = time(draw);
@@ -140,7 +156,7 @@ function run(): RenderResult {
         layer.markChanged(changes);
         texels += layer.flush();
         units.update(camera.position.x);
-        renderer.render(scene, camera);
+        renderer.render(scene, globe ? perspective : camera);
       }),
     );
     territory.clearChanges();
@@ -151,7 +167,7 @@ function run(): RenderResult {
 
   const debug = gl.getExtension("WEBGL_debug_renderer_info");
   return {
-    map: `${String(width)}x${String(height)}`,
+    map: `${String(width)}x${String(height)}${globe ? ` globe ×${String(globeZoom)}` : ""}`,
     viewport: `${String(viewportWidth)}x${String(viewportHeight)}`,
     glRenderer: String(gl.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : gl.RENDERER)),
     maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
@@ -164,7 +180,7 @@ function run(): RenderResult {
     rowsPerUpdate: Math.round(rows / frames),
     drawCalls: calls,
     triangles,
-    units: unitCount,
+    units: units.count,
     gpuBytes: layer.gpuBytes() + units.gpuBytes(),
   };
 }

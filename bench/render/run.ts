@@ -12,18 +12,27 @@ const { values } = parseArgs({
     // Use the machine's GPU instead of the SwiftShader software rasteriser.
     gpu: { type: "boolean", default: false },
     quick: { type: "boolean", default: false },
+    // The globe prototype instead of the flat map (ADR 0005).
+    globe: { type: "boolean", default: false },
     // Only serve the page, to open it by hand in any browser or on a phone.
     serve: { type: "boolean", default: false },
     json: { type: "string" },
   },
 });
 
-const cases = [
+const flatCases = [
   { width: 4096, height: 2048, players: 64, units: 10_000, viewport: [1280, 720] },
   { width: 2048, height: 1024, players: 32, units: 2_000, viewport: [1280, 720] },
   // A phone in portrait at a device pixel ratio capped to 2.
   { width: 2048, height: 1024, players: 32, units: 2_000, viewport: [780, 1688] },
 ] as const;
+// The planet whole on screen, then close enough that every pixel is ground.
+const globeCases = [
+  { width: 2048, height: 1024, players: 32, units: 0, viewport: [1280, 720], zoom: 1.5 },
+  { width: 2048, height: 1024, players: 32, units: 0, viewport: [1280, 720], zoom: 8 },
+  { width: 2048, height: 1024, players: 32, units: 0, viewport: [780, 1688], zoom: 8 },
+] as const;
+const cases = values.globe ? globeCases : flatCases;
 const frames = values.quick ? 20 : 120;
 
 const root = fileURLToPath(new URL(".", import.meta.url));
@@ -70,6 +79,10 @@ try {
       viewportWidth: String(viewportWidth),
       viewportHeight: String(viewportHeight),
     });
+    if ("zoom" in c) {
+      query.set("surface", "sphere");
+      query.set("zoom", String(c.zoom));
+    }
     // The benchmark runs during page load; wait for its result, not for the load event.
     await page.goto(`${address}?${query.toString()}`, { waitUntil: "commit" });
     await page.waitForFunction(() => window.benchResult ?? window.benchError, undefined, {
