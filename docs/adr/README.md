@@ -8,6 +8,6 @@ Each record captures one decision that shapes the code: the context, what was de
 | [0002](0002-topology.md)               | All geometry goes through a `Topology`                    | Accepted |
 | [0003](0003-renderer-split.md)         | The simulation never depends on rendering                 | Accepted |
 | [0004](0004-sub-path-hosting.md)       | The game works unchanged under any path prefix            | Accepted |
-| [0005](0005-globe-spike.md)            | The globe ray-traces the same territory layer             | Proposed |
+| [0005](0005-globe-spike.md)            | The globe ray-traces the same territory layer             | Accepted |
 
 To propose a decision, copy the structure of an existing record into the next number, with status `Proposed`, and open a pull request.

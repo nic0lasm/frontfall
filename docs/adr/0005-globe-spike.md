@@ -1,6 +1,6 @@
 # 0005 · Globe rendering: what the spike found
 
-Status: Proposed · Date: 2026-10-24
+Status: Accepted · Date: 2026-10-24
 
 ## Context
 
@@ -31,7 +31,7 @@ The prototype is in the client behind `?view=globe`, for maps that span the whol
 
 ## Measurements
 
-The cloud machines have no GPU: these are from Chromium headless with SwiftShader, the CPU rasteriser, on 4 cores. They compare the two views; they say nothing about frame rates on a real GPU, which have to be measured on a laptop and a phone (`pnpm bench:render -- --gpu --globe`).
+The cloud machines have no GPU: these are from Chromium headless with SwiftShader, the CPU rasteriser, on 4 cores. They compare the two views; frame rates on a real GPU follow below.
 
 `pnpm bench:render -- --globe`, World size (2,048 × 1,024), 32 players, territory only:
 
@@ -44,18 +44,33 @@ The cloud machines have no GPU: these are from Chromium headless with SwiftShade
 
 In the game, paused, turning the World with the arrow keys for five seconds: 21 to 26 frames per second on the globe, 28 to 29 on the flat map. Per pixel, the ray, `asin` and `atan` cost about as much as the flat map's work, and the GPU memory is the same, since the textures are shared.
 
-## Decision (proposed)
+### On a real GPU
+
+`pnpm bench:render -- --gpu --globe`, then without `--globe`, in Chrome on a MacBook Air with an Apple M4 (ANGLE on Metal):
+
+| View                              | Viewport   | Static frame p50 / p95 | Frame with updates p50 / p95 |
+| --------------------------------- | ---------- | ---------------------: | ---------------------------: |
+| Globe, whole planet (zoom 1.5)    | 1280 × 720 |           0.4 / 1.0 ms |               11.8 / 15.2 ms |
+| Globe, close (zoom 8)             | 1280 × 720 |           0.5 / 1.0 ms |               11.8 / 13.5 ms |
+| Globe, close (zoom 8)             | 780 × 1688 |           0.5 / 0.8 ms |               11.9 / 13.3 ms |
+| Flat, World size, 2,000 units     | 1280 × 720 |           0.5 / 1.2 ms |               11.8 / 13.1 ms |
+| Flat, World size, 2,000 units     | 780 × 1688 |           0.5 / 1.1 ms |               11.6 / 13.3 ms |
+| Flat, 4,096 × 2,048, 10,000 units | 1280 × 720 |           1.0 / 1.8 ms |               16.9 / 19.0 ms |
+
+Drawing the globe costs about a millisecond, the same as the flat map: the v0.6 goal of 45 frames per second (22 ms a frame) leaves room for units, labels and effects. The frames with updates take the same time on both views because they are made of the texture upload of the tiles that changed hands, which the two views share; that is the cost M7-04 has to bring down.
+
+## Decision
 
 For v0.6, build the globe on this prototype rather than starting over:
 
 1. Keep the ray-traced sphere and the shared projection module. They remove the seam, the poles and the picking mismatch as classes of bugs.
 2. Keep `Renderer`, `Camera` and `CameraView` as they are. The spike needed one addition only: a `ViewCamera` that also gives its view, zoom and scale, which both cameras implement.
 3. Keep the equirectangular map format. A cube-sphere grid is not needed for drawing. It would only be needed if play near the poles turns out unfair, and the World map has ice caps there.
-4. Plan for what the spike left out: labels over the globe (M6-06), sampling when zoomed out (M7-05), a single WebGL context across switches (M7-07), great-circle trajectories with missiles, and a frame-rate measurement on the reference laptop before v0.6 starts.
+4. Plan for what the spike left out: labels over the globe (M6-06), sampling when zoomed out (M7-05), a single WebGL context across switches (M7-07), great-circle trajectories with missiles, and the same measurement on a phone.
 5. Regional maps (Europe, Africa…) stay flat: they cover part of the planet, and a globe would show them as a patch of land in an empty world.
 
 ## Consequences
 
-- v0.6 issues M6-01 to M6-04 are mostly done in prototype form. The estimate for v0.6 can come down by about a week, if the frame rate on a real GPU confirms the SwiftShader comparison.
+- v0.6 issues M6-01 to M6-04 are mostly done in prototype form. The estimate for v0.6 can come down by about a week: the frame rate on a real GPU confirmed the SwiftShader comparison.
 - The prototype stays behind `?view=globe` until v0.6. It is not in the interface, so players do not find it by chance.
 - Any change to the territory shader now has to keep both paths working. The e2e test `globe.spec.ts` checks the globe starts, picks and switches.
