@@ -76,7 +76,15 @@ export function createCamera(
     : new FlatCamera({ width: map.width, height: map.height, wrapsX: map.wrapsX });
 }
 
-/** Whether a map can be shown on a globe: it must span every longitude and latitude. */
-export function fitsGlobe(map: { readonly wrapsX: boolean }): boolean {
-  return map.wrapsX;
+/**
+ * Whether a map can be shown on a globe: it must span every longitude and
+ * latitude, which a map that wraps east-west with twice as many columns as
+ * rows does (map-format.md: a cylinder spans -180 to 180).
+ */
+export function fitsGlobe(map: {
+  readonly width: number;
+  readonly height: number;
+  readonly wrapsX: boolean;
+}): boolean {
+  return map.wrapsX && map.width === 2 * map.height;
 }

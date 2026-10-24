@@ -127,8 +127,7 @@ const fragmentShader = /* glsl */ `
     vec3 ray = normalize(vRay);
     float b = dot(eye, ray);
     float hit = b * b - dot(eye, eye) + 1.0;
-    // Pixels clear of the rim stop here; those next to it go on, for derivatives across it.
-    if (hit < -2.0 * fwidth(hit)) discard;
+    float rim = 2.0 * fwidth(hit);
     vec3 point = normalize(eye + (-b - sqrt(max(hit, 0.0))) * ray);
     float lat = asin(clamp(point.y, -1.0, 1.0));
     float lon = atan(-point.z, point.x);
@@ -137,6 +136,10 @@ const fragmentShader = /* glsl */ `
     // their coordinate jumps across the antimeridian, so only rows give the scale.
     float pixel = max(fwidth(at.y), 1e-4);
     float columnWidth = cos(lat) * 2.0 * worldSize.y / worldSize.x;
+    // Pixels clear of the rim stop here, once every derivative is taken: after
+    // a discard, derivatives are undefined on some GPUs. Those next to it go
+    // on, so the rim keeps its derivatives.
+    if (hit < -rim) discard;
   #else
     vec2 at = vTile;
     // Tiles per screen pixel, for lines that stay sharp and visible at any zoom.
