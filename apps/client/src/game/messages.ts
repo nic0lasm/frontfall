@@ -16,6 +16,8 @@ export interface GameRules {
   readonly maxDurationTicks: number;
   /** B-RETREAT-PENALTY: share of an attack's troops lost when it is called back, in percent. */
   readonly retreatPenaltyPercent: number;
+  /** B-ALLIANCE-REQUEST-TIMEOUT, in ticks. */
+  readonly allianceRequestTicks: number;
 }
 
 /** From the page to the simulation worker. */

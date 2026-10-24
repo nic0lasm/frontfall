@@ -1168,3 +1168,233 @@ input[type="range"] {
     transform: none;
   }
 }
+
+/* Diplomacy (ui/diplomacy.ts): the menu of a player, alliance requests and
+   a feed of what happened between players. */
+
+.leader-button {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  margin: 0 -4px;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.leader-button:hover,
+.leader-button:focus-visible {
+  background: var(--ff-night-600);
+}
+
+.badge {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.badge[hidden] {
+  display: none;
+}
+
+.badge-ally {
+  background: var(--ff-front);
+}
+
+.badge-traitor {
+  background: var(--ff-danger);
+}
+
+/* At the foot of the leaderboard, under the row it was opened from. */
+.player-menu {
+  position: static;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid var(--ff-night-500);
+  border-radius: 0;
+  background: none;
+}
+
+.player-menu[hidden],
+.requests[hidden] {
+  display: none;
+}
+
+.player-menu-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.player-menu-head h2 {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ff-text);
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-menu .icon-close {
+  width: 24px;
+  height: 24px;
+}
+
+.player-menu-status,
+.player-menu-traitor {
+  margin: 0;
+  color: var(--ff-slate-300);
+}
+
+.player-menu-traitor {
+  color: var(--ff-danger);
+}
+
+.menu-action,
+.request-accept,
+.request-ignore {
+  padding: 6px 10px;
+  border: 1px solid var(--ff-night-500);
+  border-radius: var(--ff-radius);
+  background: var(--ff-night-700);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-action:hover:not(:disabled),
+.menu-action:focus-visible,
+.request-accept:hover,
+.request-accept:focus-visible,
+.request-ignore:hover,
+.request-ignore:focus-visible {
+  border-color: var(--ff-slate-400);
+}
+
+.menu-action:disabled {
+  color: var(--ff-slate-400);
+  cursor: default;
+}
+
+.menu-action.betray {
+  border-color: var(--ff-danger);
+}
+
+.menu-action.danger {
+  background: var(--ff-danger);
+}
+
+/* Under the banner, in the middle: an answer is expected. */
+.requests {
+  top: 60px;
+  left: 50%;
+  display: grid;
+  gap: 6px;
+  width: min(380px, calc(100vw - 24px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px;
+  transform: translateX(-50%);
+  list-style: none;
+}
+
+.request {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+}
+
+.request-time {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ff-night-500);
+}
+
+.request-time-left {
+  display: block;
+  height: 100%;
+  background: var(--ff-front);
+}
+
+.request-accept {
+  border-color: var(--ff-front);
+}
+
+/* What happened between players, under the stats; fades out by itself. */
+.event-feed {
+  position: absolute;
+  top: 80px;
+  left: 12px;
+  display: grid;
+  gap: 4px;
+  max-width: min(320px, calc(100vw - 24px));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
+.event {
+  padding: 4px 8px;
+  border-left: 3px solid var(--ff-front);
+  border-radius: 0 var(--ff-radius) var(--ff-radius) 0;
+  background: rgb(10 19 28 / 80%);
+  font-size: 13px;
+}
+
+.event-betrayed {
+  border-left-color: var(--ff-danger);
+}
+
+.event-ended {
+  border-left-color: var(--ff-slate-400);
+}
+
+/* Phones and short windows: the build row takes the space under the stats. */
+@media (width < 720px), (height < 560px) {
+  .event-feed {
+    top: 240px;
+  }
+
+  .event:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+/* Phones: the requests go under the banner. */
+@media (width < 720px) {
+  .requests {
+    top: 196px;
+  }
+
+  .event-feed {
+    top: 290px;
+  }
+}
+
+.icon-close::before {
+  content: "×";
+  font-size: 18px;
+  line-height: 1;
+}

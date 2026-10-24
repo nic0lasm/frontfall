@@ -147,6 +147,35 @@ describe("SoloGame clicks", () => {
     expect(solo.orderForClick(foreign, 30, "demolish")).toEqual({ refused: "nothing" });
   });
 
+  it("shows alliances, requests and traitors, and tells everyone what happened (R-DIPLO)", () => {
+    const solo = newGame({ ...options, bots: 1 });
+    const land = firstLand(options.map);
+    let update = solo.step([{ type: "spawn", tile: land }]);
+    while (update.phase === "spawn") update = solo.step([]);
+    const bot = 2;
+    const ask = (from: number, to: number) =>
+      solo.playTurns([
+        { tick: solo.game.tick, orders: [{ player: from, order: { type: "ally", target: to } }] },
+      ]);
+    update = ask(bot, HUMAN_ID);
+    expect(update.diplomacy.incoming).toEqual([
+      { from: bot, ticksLeft: solo.game.balance.allianceRequestTicks - 1 },
+    ]);
+    update = solo.step([{ type: "ally", target: bot }]);
+    expect(update.events).toEqual([{ type: "allied", a: HUMAN_ID, b: bot }]);
+    expect(update.diplomacy.allies.map((ally) => ally.id)).toEqual([bot]);
+    expect(update.diplomacy.incoming).toEqual([]);
+    expect(solo.step([]).events).toEqual([]);
+    // The bot's land cannot be attacked while the alliance holds.
+    const theirs = solo.game.territory.owners.indexOf(bot);
+    expect(solo.orderForClick(theirs, 30)).toEqual({ refused: "ally" });
+    update = solo.step([{ type: "betray", target: bot }]);
+    expect(update.events).toEqual([{ type: "betrayed", a: HUMAN_ID, b: bot }]);
+    expect(update.diplomacy.allies).toEqual([]);
+    expect(update.diplomacy.traitors.map((traitor) => traitor.id)).toEqual([HUMAN_ID]);
+    expect(update.diplomacy.waiting).toEqual([bot]);
+  });
+
   it("turns a click into the order the phase allows", () => {
     const solo = newGame(options);
     const land = firstLand(options.map);

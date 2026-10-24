@@ -6,7 +6,11 @@ import {
   createGame,
   BuildError,
   StructureKind,
+  allianceOf,
+  alliesOf,
+  canRenew,
   cityLimit,
+  isAllied,
   installBots,
   isReady,
   orderError,
@@ -99,6 +103,10 @@ export interface GameUpdate {
   structures: StructureView[];
   /** What the player at this screen can build next. */
   build: BuildView;
+  /** Alliances, requests and traitors, as the player at this screen sees them. */
+  diplomacy: DiplomacyView;
+  /** What changed between players since the last update, for every player to read (R-DIPLO-04). */
+  events: DiplomacyEvent[];
   /** Set instead of the change lists when too much changed to list. */
   owners?: Uint16Array;
   winner?: number;
@@ -129,7 +137,9 @@ export type ClickRefusal =
   | "land"
   | "gold"
   /** No structure of the player's near the click to demolish. */
-  | "nothing";
+  | "nothing"
+  /** The land belongs to an ally: betray them first (R-DIPLO-02). */
+  | "ally";
 
 export type ClickResult = { order: Order } | { refused: ClickRefusal };
 
@@ -169,6 +179,34 @@ const BUILD_REFUSALS: Readonly<Record<BuildError, ClickRefusal>> = {
 
 function isBuildError(error: string): error is BuildError {
   return Object.hasOwn(BUILD_REFUSALS, error);
+}
+
+/** Alliances and requests of the player at this screen, and every traitor, with their time left in ticks. */
+export interface DiplomacyView {
+  allies: AllyView[];
+  /** Requests to the player, oldest first. */
+  incoming: { from: number; ticksLeft: number }[];
+  /** Players the player has asked and who have not answered yet. */
+  outgoing: number[];
+  /** Players who may not be asked yet: a request ran out, or the player betrayed them. */
+  waiting: number[];
+  traitors: { id: number; ticksLeft: number }[];
+}
+
+export interface AllyView {
+  id: number;
+  ticksLeft: number;
+  /** In the last part of the alliance, when both may renew it (R-DIPLO-03). */
+  renewable: boolean;
+  /** The player at this screen has asked to renew; the ally has not yet. */
+  renewing: boolean;
+}
+
+/** An alliance formed, run out, or broken by `a`. `a` and `b` are player ids. */
+export interface DiplomacyEvent {
+  type: "allied" | "ended" | "betrayed";
+  a: number;
+  b: number;
 }
 
 /** A transport ship at sea, where it is this tick. */
@@ -234,6 +272,9 @@ export class SoloGame {
   private readonly hashes: { tick: number; local: number }[] = [];
   /** Hashes the server says most players had, where this client's differed. */
   private readonly expected = new Map<number, number | null>();
+  /** Alliances at the last update, as "a:b" with their end, and every player's traitor mark then. */
+  private alliancesSeen = new Map<string, number>();
+  private traitorMarks = new Map<number, number>();
 
   constructor(
     readonly options: SoloOptions,
@@ -290,6 +331,13 @@ export class SoloGame {
     }
     if (mode === "demolish") return this.demolishNear(tile);
     if (!terrain.isOwnable(tile)) return { refused: "terrain" };
+    if (
+      game.phase === "play" &&
+      isAllied(game, this.you, territory.ownerOf(tile)) &&
+      mode === "attack"
+    ) {
+      return { refused: "ally" };
+    }
     if (mode === "city" || mode === "fort") {
       const order: Order = { type: "build", structure: STRUCTURE_KINDS[mode], tile };
       const error = orderError(game, human, order);
@@ -419,6 +467,67 @@ export class SoloGame {
     };
   }
 
+  private diplomacy(): DiplomacyView {
+    const { game, you } = this;
+    const tick = game.tick;
+    return {
+      allies: alliesOf(game, you).map((id) => {
+        const alliance = allianceOf(game, you, id);
+        const until = alliance?.until ?? tick;
+        return {
+          id,
+          ticksLeft: until - tick,
+          renewable: alliance !== undefined && canRenew(game, alliance),
+          renewing:
+            alliance !== undefined && (you === alliance.a ? alliance.renewA : alliance.renewB),
+        };
+      }),
+      incoming: game.allianceRequests
+        .filter((request) => request.to === you && tick < request.expiresAt)
+        .map((request) => ({ from: request.from, ticksLeft: request.expiresAt - tick })),
+      outgoing: game.allianceRequests
+        .filter((request) => request.from === you && tick < request.expiresAt)
+        .map((request) => request.to),
+      waiting: game.requestCooldowns
+        .filter((cooldown) => cooldown.from === you && tick < cooldown.until)
+        .map((cooldown) => cooldown.to),
+      traitors: game
+        .players()
+        .filter((player) => player.alive && tick < player.traitorUntil)
+        .map((player) => ({ id: player.id, ticksLeft: player.traitorUntil - tick })),
+    };
+  }
+
+  /** Alliances formed and gone since the last update; one gone with a new traitor mark was betrayed. */
+  private diplomacyEvents(): DiplomacyEvent[] {
+    const { game } = this;
+    const events: DiplomacyEvent[] = [];
+    const now = new Map<string, number>();
+    for (const { a, b, until } of game.alliances) {
+      if (game.tick < until) now.set(`${String(a)}:${String(b)}`, until);
+    }
+    for (const key of now.keys()) {
+      if (this.alliancesSeen.has(key)) continue;
+      const [a, b] = key.split(":").map(Number) as [number, number];
+      events.push({ type: "allied", a, b });
+    }
+    const marked = (id: number): boolean =>
+      (game.player(id)?.traitorUntil ?? 0) !== (this.traitorMarks.get(id) ?? 0);
+    for (const [key, until] of this.alliancesSeen) {
+      if (now.has(key)) continue;
+      const [a, b] = key.split(":").map(Number) as [number, number];
+      // An alliance with a player who fell ends with them, unremarked.
+      if (!game.player(a)?.alive || !game.player(b)?.alive) continue;
+      if (game.tick >= until) events.push({ type: "ended", a, b });
+      else if (marked(a)) events.push({ type: "betrayed", a, b });
+      else if (marked(b)) events.push({ type: "betrayed", a: b, b: a });
+      else events.push({ type: "ended", a, b });
+    }
+    this.alliancesSeen = now;
+    this.traitorMarks = new Map(game.players().map((player) => [player.id, player.traitorUntil]));
+    return events;
+  }
+
   private update(): GameUpdate {
     const { game } = this;
     const territory = game.territory;
@@ -462,6 +571,8 @@ export class SoloGame {
         cities: structureCount(game, this.you, StructureKind.City),
         cityLimit: cityLimit(game, this.you),
       },
+      diplomacy: this.diplomacy(),
+      events: this.diplomacyEvents(),
     };
     if (territory.changesOverflowed) {
       update.owners = territory.owners.slice();

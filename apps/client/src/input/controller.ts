@@ -1,12 +1,18 @@
 import type { Camera } from "../render/camera.ts";
-import { type MapCallbacks, PointerGestures, wheelZoomFactor } from "./gestures.ts";
+import {
+  type MapCallbacks,
+  PointerGestures,
+  type PointerSample,
+  wheelZoomFactor,
+} from "./gestures.ts";
 import { KeyboardCamera, isTextEntry } from "./keyboard.ts";
 
 export type { MapCallbacks } from "./gestures.ts";
 
 /**
  * Wires the map element and the keyboard to a camera: drag or one finger to
- * pan, wheel or pinch to zoom, a press without a drag to pick a tile, arrows,
+ * pan, wheel or pinch to zoom, a press without a drag to pick a tile, a long
+ * press or a right click for the tile's menu, arrows,
  * WASD and +/- for the keyboard. Call update() once per frame for held keys.
  */
 export class InputController {
@@ -43,6 +49,12 @@ export class InputController {
     });
     this.listen(element, "pointerup", (event) => {
       this.gestures.up(this.sample(event as PointerEvent));
+    });
+    // The browser's own menu is kept off the map only, never off the panels.
+    this.listen(element, "contextmenu", (event) => {
+      event.preventDefault();
+      const { x, y } = this.position(event as MouseEvent);
+      this.gestures.menu(x, y);
     });
     this.listen(element, "pointercancel", (event) => {
       this.gestures.cancel((event as PointerEvent).pointerId);
@@ -109,7 +121,13 @@ export class InputController {
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
 
-  private sample(event: PointerEvent): { id: number; x: number; y: number } {
-    return { id: event.pointerId, ...this.position(event) };
+  /** A mouse opens menus with its right button: only fingers and pens time their presses. */
+  private sample(event: PointerEvent): PointerSample {
+    const time = event.pointerType === "mouse" ? undefined : event.timeStamp;
+    return {
+      id: event.pointerId,
+      ...this.position(event),
+      ...(time === undefined ? {} : { time }),
+    };
   }
 }

@@ -101,7 +101,10 @@ const fragmentShader = /* glsl */ `
     uint owner = ownerAt(tile);
     if (owner != 0u) {
       ivec2 entry = ivec2(int(owner % ${String(PALETTE_WIDTH)}u), int(owner / ${String(PALETTE_WIDTH)}u));
-      vec3 ownerColor = texelFetch(palette, entry, 0).rgb;
+      vec4 paletteTexel = texelFetch(palette, entry, 0);
+      vec3 ownerColor = paletteTexel.rgb;
+      // Allies of the player are flagged in the palette's alpha (setAllies).
+      bool allied = paletteTexel.a < 0.75;
       // Borders are found here rather than in the simulation: no border data to upload.
       bvec4 other = bvec4(ownerAt(tile + ivec2(1, 0)) != owner, ownerAt(tile - ivec2(1, 0)) != owner,
         ownerAt(tile + ivec2(0, 1)) != owner, ownerAt(tile - ivec2(0, 1)) != owner);
@@ -114,9 +117,11 @@ const fragmentShader = /* glsl */ `
       vec3 fillColor = ownerColor * mix(mix(1.0, relief, reliefShading), 1.0, zoomedOut);
       // The player's own land has a wider, whiter rim, to find it on a crowded map.
       bool mine = owner == highlight;
-      float width = mine ? max(0.4, 2.5 * pixel) : max(0.22, pixel);
+      float width = mine || allied ? max(0.4, 2.5 * pixel) : max(0.22, pixel);
       float border = 1.0 - smoothstep(width - pixel, width, edgeDistance(f, other));
-      vec3 rimColor = mix(ownerColor, vec3(1.0), mine ? 0.75 : 0.3);
+      // An ally's rim is as wide, in dashes about eight pixels long.
+      if (allied) border *= step(0.5, fract((vTile.x + vTile.y) / (16.0 * pixel)));
+      vec3 rimColor = mix(ownerColor, vec3(1.0), mine || allied ? 0.75 : 0.3);
       vec3 owned = mix(fillColor, rimColor, border);
       // A tile taken a moment ago fades in, so fronts creep instead of jumping each tick.
       float age = now - texelFetch(takenAt, tile, 0).r;
@@ -251,6 +256,15 @@ export class TerritoryLayer {
       [Math.round(rgb.r * 255), Math.round(rgb.g * 255), Math.round(rgb.b * 255), 255],
       owner * 4,
     );
+    this.paletteTexture.needsUpdate = true;
+  }
+
+  /** Owners whose land gets a dashed wide rim: the allies of the player at this screen. */
+  setAllies(allies: readonly number[]): void {
+    const flagged = new Set(allies);
+    for (let owner = 1; owner <= this.options.maxOwner; owner++) {
+      this.paletteData[owner * 4 + 3] = flagged.has(owner) ? 128 : 255;
+    }
     this.paletteTexture.needsUpdate = true;
   }
 

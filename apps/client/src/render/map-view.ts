@@ -93,6 +93,10 @@ export class MapView implements Renderer {
   }
 
   /** The player whose land gets the wide rim. */
+  setAllies(ids: readonly number[]): void {
+    this.territory.setAllies(ids);
+  }
+
   setHighlight(id: number): void {
     this.territory.setHighlight(id);
   }

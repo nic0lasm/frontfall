@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PointerGestures, wheelZoomFactor } from "../src/input/gestures.ts";
+import { LONG_PRESS_MS, PointerGestures, wheelZoomFactor } from "../src/input/gestures.ts";
 import { FlatCamera } from "../src/render/camera.ts";
 
 const WIDTH = 512;
@@ -24,6 +24,31 @@ describe("PointerGestures", () => {
     expect(onTileClick).toHaveBeenCalledExactlyOnceWith(expected);
     expect(camera.view().centerX).toBe(256);
     expect(gestures.active).toBe(0);
+  });
+
+  it("opens the tile's menu after a long press held still, or a right click", () => {
+    const camera = new FlatCamera({ width: WIDTH, height: 256 });
+    camera.resize(1200, 800);
+    const onTileClick = vi.fn<(tile: number) => void>();
+    const onTileHold = vi.fn<(tile: number) => void>();
+    const gestures = new PointerGestures(camera, { onTileClick, onTileHold });
+    const tile = camera.screenToTile(300, 200);
+    gestures.down({ id: 1, x: 300, y: 200, time: 1000 });
+    gestures.up({ id: 1, x: 302, y: 201, time: 1000 + LONG_PRESS_MS });
+    expect(onTileHold).toHaveBeenCalledExactlyOnceWith(tile);
+    // A short press clicks; a long one that moved is a drag.
+    gestures.down({ id: 1, x: 300, y: 200, time: 2000 });
+    gestures.up({ id: 1, x: 300, y: 200, time: 2100 });
+    gestures.down({ id: 2, x: 300, y: 200, time: 3000 });
+    gestures.move({ id: 2, x: 340, y: 200, time: 3200 });
+    gestures.up({ id: 2, x: 340, y: 200, time: 4000 });
+    expect(onTileClick).toHaveBeenCalledExactlyOnceWith(tile);
+    gestures.menu(300, 200);
+    expect(onTileHold).toHaveBeenCalledTimes(2);
+    // A mouse press carries no time: it clicks however long it is held.
+    gestures.down({ id: 3, x: 300, y: 200 });
+    gestures.up({ id: 3, x: 300, y: 200 });
+    expect(onTileClick).toHaveBeenCalledTimes(2);
   });
 
   it("pans past the drag threshold, and then never clicks", () => {

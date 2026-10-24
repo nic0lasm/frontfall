@@ -82,6 +82,7 @@ const HELP_KEYS = [
   "help.click",
   "help.ships",
   "help.build",
+  "help.diplomacy",
   "help.drag",
   "help.zoom",
   "help.keys",

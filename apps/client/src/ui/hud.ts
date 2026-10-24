@@ -21,6 +21,8 @@ export interface HudActions {
   onRetreat(attack: number): void;
   /** A build button was pressed: what clicks on the map do next. */
   onMode(mode: ClickMode): void;
+  /** A row of the leaderboard was picked: the menu of that player. */
+  onPlayer(player: number): void;
 }
 
 const MODE_BANNERS = {
@@ -52,6 +54,8 @@ export class Hud {
     t("game.loading"),
   );
   private readonly leaders = h("ol", { class: "leaderboard-list" });
+  /** The leaderboard panel: the menu of a player picked in it opens at its foot. */
+  readonly leaderboard: HTMLElement;
   private readonly ratioInput = h("input", {
     id: "attack-ratio",
     type: "range",
@@ -75,6 +79,9 @@ export class Hud {
   /** One row per attack under way, kept across renders so a button under the pointer stays put. */
   private readonly attackRows = new Map<number, { row: HTMLElement; text: HTMLElement }>();
   private readonly onRetreat: (attack: number) => void;
+  private readonly onPlayer: (player: number) => void;
+  /** Leaderboard rows by player id, kept across renders so focus stays on a picked row. */
+  private readonly leaderRows = new Map<number, LeaderRow>();
   private readonly buildButtons = new Map<ClickMode, HTMLButtonElement>();
   private readonly cityCost = h("span", { class: "build-cost" });
   private readonly fortCost = h("span", { class: "build-cost" });
@@ -86,12 +93,16 @@ export class Hud {
     winSharePercent: 100,
     maxDurationTicks: Infinity,
     retreatPenaltyPercent: 0,
+    allianceRequestTicks: 200,
   };
 
   /** `pausable`: false online, where the game runs for everyone. */
   constructor(actions: HudActions, { pausable = true }: { pausable?: boolean } = {}) {
     this.onRetreat = (attack) => {
       actions.onRetreat(attack);
+    };
+    this.onPlayer = (player) => {
+      actions.onPlayer(player);
     };
     this.ratioInput.addEventListener("input", () => {
       this.setRatio(Number(this.ratioInput.value));
@@ -161,6 +172,20 @@ export class Hud {
       }),
     );
 
+    this.leaderboard = h(
+      "section",
+      { class: "panel leaderboard", "aria-labelledby": "leaderboard-title" },
+      h("h2", { id: "leaderboard-title", "data-i18n": "hud.leaderboard" }),
+      this.leaders,
+      h(
+        "div",
+        { class: "goal" },
+        this.goal,
+        // Both bars run from 0 to the winning share; the leader's is drawn under yours.
+        h("div", { class: "goal-bar", "aria-hidden": "true" }, this.goalLeader, this.goalYou),
+        this.clock,
+      ),
+    );
     this.element = h(
       "div",
       { class: "hud", id: "hud" },
@@ -172,20 +197,7 @@ export class Hud {
         stat("hud.land", this.land),
       ),
       this.banner,
-      h(
-        "section",
-        { class: "panel leaderboard", "aria-labelledby": "leaderboard-title" },
-        h("h2", { id: "leaderboard-title", "data-i18n": "hud.leaderboard" }),
-        this.leaders,
-        h(
-          "div",
-          { class: "goal" },
-          this.goal,
-          // Both bars run from 0 to the winning share; the leader's is drawn under yours.
-          h("div", { class: "goal-bar", "aria-hidden": "true" }, this.goalLeader, this.goalYou),
-          this.clock,
-        ),
-      ),
+      this.leaderboard,
       h(
         "div",
         { class: "panel ratio" },
@@ -254,7 +266,7 @@ export class Hud {
       this.renderBuild(update, human);
     }
     this.banner.textContent = this.bannerText(update, human);
-    this.renderLeaders(update.players, update.you);
+    this.renderLeaders(update);
     this.renderGoal(update, human);
     this.renderAttacks(update);
   }
@@ -354,24 +366,89 @@ export class Hud {
     return t("hud.playHint");
   }
 
-  private renderLeaders(players: readonly PlayerView[], you: number): void {
+  /**
+   * The leading players, and the player at this screen if lower. Every other
+   * player's row is a button that opens their menu; allies and traitors are
+   * marked. Rows are reused, so a row with focus keeps it.
+   */
+  private renderLeaders(update: GameUpdate): void {
+    const { players, you, diplomacy } = update;
     const ranked = players
       .filter((player) => player.alive)
       .sort((a, b) => b.tiles - a.tiles || a.id - b.id);
     const shown = ranked.slice(0, LEADERBOARD_SIZE);
     const humanRank = ranked.findIndex((player) => player.id === you);
     if (humanRank >= LEADERBOARD_SIZE) shown.push(ranked[humanRank] as PlayerView);
-    this.leaders.replaceChildren(
-      ...shown.map((player) => {
-        const rank = ranked.indexOf(player) + 1;
-        return h(
-          "li",
-          { class: player.id === you ? "leader you" : "leader", value: rank },
-          swatch(playerColor(player.id - 1).hex),
-          h("span", { class: "leader-name" }, player.name),
-          h("span", { class: "leader-land" }, this.share(player.tiles)),
-        );
-      }),
-    );
+    const allies = new Set(diplomacy.allies.map((ally) => ally.id));
+    const traitors = new Set(diplomacy.traitors.map((traitor) => traitor.id));
+    const rows = shown.map((player) => {
+      let row = this.leaderRows.get(player.id);
+      if (!row) {
+        row = leaderRow(player, player.id === you, this.onPlayer);
+        this.leaderRows.set(player.id, row);
+      }
+      row.item.value = ranked.indexOf(player) + 1;
+      row.name.textContent = player.name;
+      row.land.textContent = this.share(player.tiles);
+      row.ally.hidden = !allies.has(player.id);
+      row.traitor.hidden = !traitors.has(player.id);
+      return row.item;
+    });
+    for (const [id, row] of this.leaderRows) {
+      if (!shown.some((player) => player.id === id)) {
+        row.item.remove();
+        this.leaderRows.delete(id);
+      }
+    }
+    const order = [...this.leaders.children];
+    if (rows.length !== order.length || rows.some((row, i) => row !== order[i])) {
+      // Moving a row drops its focus: give it back.
+      const focused = document.activeElement;
+      this.leaders.replaceChildren(...rows);
+      if (focused instanceof HTMLElement && this.leaders.contains(focused)) focused.focus();
+    }
   }
+}
+
+interface LeaderRow {
+  item: HTMLLIElement;
+  name: HTMLElement;
+  land: HTMLElement;
+  ally: HTMLElement;
+  traitor: HTMLElement;
+}
+
+function leaderRow(player: PlayerView, you: boolean, onPick: (player: number) => void): LeaderRow {
+  const name = h("span", { class: "leader-name" });
+  const land = h("span", { class: "leader-land" });
+  const ally = h("span", {
+    class: "badge badge-ally",
+    "data-i18n": "diplo.allyBadge",
+    hidden: true,
+  });
+  const traitor = h("span", {
+    class: "badge badge-traitor",
+    "data-i18n": "diplo.traitorBadge",
+    hidden: true,
+  });
+  ally.textContent = t("diplo.allyBadge");
+  traitor.textContent = t("diplo.traitorBadge");
+  const content = [swatch(playerColor(player.id - 1).hex), name, ally, traitor, land];
+  if (you) {
+    return { item: h("li", { class: "leader you" }, ...content), name, land, ally, traitor };
+  }
+  const button = h(
+    "button",
+    {
+      type: "button",
+      class: "leader-button",
+      "data-player": player.id,
+      "aria-label": t("diplo.playerMenu", { name: player.name }),
+    },
+    ...content,
+  );
+  button.addEventListener("click", () => {
+    onPick(player.id);
+  });
+  return { item: h("li", { class: "leader" }, button), name, land, ally, traitor };
 }

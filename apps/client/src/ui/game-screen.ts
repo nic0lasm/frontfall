@@ -12,6 +12,7 @@ import { FlatCamera, type CameraView } from "../render/camera.ts";
 import { createRenderer, type Renderer } from "../render/renderer.ts";
 import { endScreen, helpPanel } from "./end-screen.ts";
 import { ClickMarks } from "./click-marks.ts";
+import { DiplomacyPanel } from "./diplomacy.ts";
 import { Hud } from "./hud.ts";
 import { PlayerLabels } from "./labels.ts";
 
@@ -73,6 +74,9 @@ export class GameScreen {
   private modeSent: ClickMode | undefined;
   /** The structures last drawn, as a key that changes when any of them does. */
   private drawnStructures = "";
+  private readonly diplomacy: DiplomacyPanel;
+  /** The allies last marked on the map. */
+  private drawnAllies = "";
 
   constructor(
     readonly options: SoloOptions,
@@ -108,9 +112,22 @@ export class GameScreen {
         onMode: (mode) => {
           this.setMode(mode);
         },
+        onPlayer: (player) => {
+          this.diplomacy.pick(player);
+        },
       },
       { pausable: link === undefined },
     );
+    this.diplomacy = new DiplomacyPanel({
+      onAlly: (player) => {
+        this.diplomaticOrder("ally", player);
+      },
+      onBetray: (player) => {
+        this.diplomaticOrder("betray", player);
+      },
+    });
+    this.hud.leaderboard.append(this.diplomacy.menu);
+    this.hud.element.append(this.diplomacy.requests, this.diplomacy.feed);
     this.element = document.createElement("div");
     this.element.className = "game";
     this.element.append(
@@ -125,6 +142,9 @@ export class GameScreen {
       onTileClick: (tile) => {
         this.click(tile);
       },
+      onTileHold: (tile) => {
+        this.diplomacy.pick(this.owners[tile] ?? 0);
+      },
     });
 
     this.session = new LocalSession(
@@ -136,6 +156,7 @@ export class GameScreen {
           this.ticksPerSecond = info.rules.ticksPerSecond;
           this.ownableTiles = info.rules.ownableTiles;
           this.hud.setRules(info.rules);
+          this.diplomacy.setRules(info.rules);
         },
         onUpdate: (update) => {
           this.apply(update);
@@ -187,6 +208,7 @@ export class GameScreen {
       onLanguageChange(() => {
         applyTranslations(this.surface);
         this.hud.refresh();
+        this.diplomacy.refresh();
       }),
     );
   }
@@ -324,9 +346,11 @@ export class GameScreen {
       if (start >= 0) this.camera.focus(start, Math.max(this.camera.zoom, zoom));
     }
     this.placeStructures(update);
+    this.placeAllies(update);
     this.latest = update;
     this.labels.update(update.players, update.labels);
     this.hud.update(update, performance.now());
+    this.diplomacy.update(update, performance.now());
     // The panels grow and shrink with their content: measured once per update.
     this.labels.avoid(
       [...this.hud.element.children]
@@ -388,6 +412,21 @@ export class GameScreen {
     this.dirty = true;
   }
 
+  private placeAllies(update: GameUpdate): void {
+    const allies = update.diplomacy.allies.map((ally) => ally.id);
+    const key = allies.join(",");
+    if (!this.view || key === this.drawnAllies) return;
+    this.drawnAllies = key;
+    this.view.setAllies(allies);
+    this.dirty = true;
+  }
+
+  private diplomaticOrder(type: "ally" | "betray", target: number): void {
+    const update = this.latest;
+    if (!update || update.winner !== undefined) return;
+    this.session.sendOrder({ type, target });
+  }
+
   private retreat(attack: number): void {
     const update = this.latest;
     if (!update || this.paused || update.winner !== undefined) return;
@@ -402,7 +441,12 @@ export class GameScreen {
       event.preventDefault();
       return;
     }
-    // Esc first drops a build mode, before it pauses the game.
+    // Then the player menu, then a build mode, before Esc pauses the game.
+    if (event.code === "Escape" && this.diplomacy.open) {
+      this.diplomacy.close();
+      event.preventDefault();
+      return;
+    }
     if (event.code === "Escape" && this.mode !== "attack") {
       this.setMode("attack");
       event.preventDefault();

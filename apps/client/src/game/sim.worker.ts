@@ -42,8 +42,13 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
   online = request.online === true;
   const map = await fetchMapData(request.map);
   game = new SoloGame(request.options, map);
-  const { ticksPerSecond, winSharePercent, maxDurationTicks, retreatPenaltyPercent } =
-    game.game.balance;
+  const {
+    ticksPerSecond,
+    winSharePercent,
+    maxDurationTicks,
+    retreatPenaltyPercent,
+    allianceRequestTicks,
+  } = game.game.balance;
   // The page draws the terrain too: it gets its own copy of the kinds, and
   // the relief, which only drawing uses.
   const view = { ...map, kinds: map.kinds.slice() };
@@ -59,6 +64,7 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
         winSharePercent,
         maxDurationTicks,
         retreatPenaltyPercent,
+        allianceRequestTicks,
       },
     },
     [view.kinds.buffer, view.relief.buffer],

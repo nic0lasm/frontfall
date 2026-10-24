@@ -5,17 +5,24 @@ export interface PointerSample {
   readonly id: number;
   readonly x: number;
   readonly y: number;
+  /** When the sample was taken, in milliseconds; tells a long press from a click. */
+  readonly time?: number;
 }
 
 export interface MapCallbacks {
   /** A press released without moving: the player picked this tile. */
   readonly onTileClick?: (tile: number) => void;
+  /** A press held still for LONG_PRESS_MS, or a right click: the player wants the menu of this tile. */
+  readonly onTileHold?: (tile: number) => void;
   /** The tile under a hovering mouse changed; undefined off the map or when it left. */
   readonly onHover?: (tile: number | undefined) => void;
 }
 
 /** Farther than this from where it started, a press becomes a drag and never a click. */
 export const DRAG_THRESHOLD_PX = 6;
+
+/** Held still at least this long, a press opens the tile's menu instead of clicking it. */
+export const LONG_PRESS_MS = 500;
 
 type Mode = "idle" | "press" | "pan" | "pinch";
 
@@ -39,6 +46,7 @@ export class PointerGestures {
   private mode: Mode = "idle";
   private pressX = 0;
   private pressY = 0;
+  private pressTime: number | undefined;
   private pinch: Pinch | undefined;
   private hovered: number | undefined;
 
@@ -58,6 +66,7 @@ export class PointerGestures {
       this.mode = "press";
       this.pressX = sample.x;
       this.pressY = sample.y;
+      this.pressTime = sample.time;
     } else {
       this.mode = "pinch";
       this.pinch = this.measurePinch();
@@ -96,10 +105,22 @@ export class PointerGestures {
       this.mode === "press" &&
       this.pointers.size === 1 &&
       Math.hypot(sample.x - this.pressX, sample.y - this.pressY) <= DRAG_THRESHOLD_PX;
+    const held =
+      sample.time !== undefined &&
+      this.pressTime !== undefined &&
+      sample.time - this.pressTime >= LONG_PRESS_MS;
     this.release(sample.id);
     if (!click) return;
     const tile = this.camera.screenToTile(sample.x, sample.y);
-    if (tile !== undefined) this.callbacks.onTileClick?.(tile);
+    if (tile === undefined) return;
+    if (held) this.callbacks.onTileHold?.(tile);
+    else this.callbacks.onTileClick?.(tile);
+  }
+
+  /** A right click: the menu of the tile under the pointer, never a click. */
+  menu(x: number, y: number): void {
+    const tile = this.camera.screenToTile(x, y);
+    if (tile !== undefined) this.callbacks.onTileHold?.(tile);
   }
 
   /** The pointer was taken away by the browser: forget it without a click. */

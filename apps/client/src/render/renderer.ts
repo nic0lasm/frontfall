@@ -43,6 +43,8 @@ export interface Renderer {
   setPlayerColor(id: number, color: string): void;
   /** The player whose land is marked out, usually the one at this screen. */
   setHighlight(id: number): void;
+  /** Allies of that player, whose land is marked out too, with dashes. */
+  setAllies(ids: readonly number[]): void;
   /** Tiles whose owner changed in the shared array; they fade in. */
   markChanged(tiles: ArrayLike<number>): void;
   /** Every tile changed at once, after a full resynchronisation. */

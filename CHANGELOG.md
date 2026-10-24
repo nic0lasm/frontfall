@@ -8,6 +8,7 @@ All notable changes to Frontfall are documented here. The format follows [Keep a
 
 - Build cities and forts in a game: a panel above the toolbar, or C, F and X, picks what the next click builds or demolishes, with the cost of each and the cities your land supports. Structures show on the map, faded while being built.
 - Engine: cities and forts ([docs/rules.md](docs/rules.md#6-structures)). Gold now buys structures: a city adds a twentieth of what the land holds to the population cap, a fort makes nearby land dearer to take and cheaper to lose, and both change hands with their tile. Players may own one city plus one more for every 10,000 tiles of land (40,000 on World), structures keep their distance, and bots build cities near their start. Protocol version 5 carries the new `build` and `demolish` orders.
+- Ally and betray in a game: a right click, a long press or a leaderboard row opens a player's menu to ask for an alliance, accept, renew or betray. Requests wait under the banner with a countdown, allies are marked in the leaderboard and outlined on the map, and a feed tells everyone who allied and who betrayed whom.
 - Engine: alliances and betrayal ([docs/rules.md](docs/rules.md#5-diplomacy)). Players ask each other for an alliance of 5 minutes, renewable in its last minute; allies cannot attack each other, and breaking an alliance marks the betrayer, whose land is half price for 30 seconds. Bots accept an alliance from a smaller player they are not fighting, one ally at most, and never betray.
 
 ## [0.2.0] - 2026-10-24

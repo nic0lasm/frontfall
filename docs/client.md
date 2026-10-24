@@ -125,20 +125,23 @@ visuals will still change. Vite passes the version to the page
 
 ## Controls
 
-| Input                     | Action                                                                                   |
-| ------------------------- | ---------------------------------------------------------------------------------------- |
-| Click or tap              | Pick a start, then expand or attack                                                      |
-| Click a coast over water  | Send a ship with the attack ratio of the troops                                          |
-| Drag, one finger          | Move the map                                                                             |
-| Wheel, pinch, `+` and `-` | Zoom, towards the cursor or between the fingers                                          |
-| Arrows or `WASD`          | Move the map, at the same speed at any frame rate                                        |
-| `1` to `9`, `0`           | Attack with 10 % to 90 % of the troops, `0` for all                                      |
-| `C`, `F`, `X`             | Build a city, build a fort, demolish: then click your land; the next click attacks again |
-| `Esc`                     | Leave a build mode                                                                       |
-| `P` or `Esc`              | Pause and resume                                                                         |
-| `H` or `?`                | Show the controls                                                                        |
+| Input                                         | Action                                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Click or tap                                  | Pick a start, then expand or attack                                                      |
+| Click a coast over water                      | Send a ship with the attack ratio of the troops                                          |
+| Drag, one finger                              | Move the map                                                                             |
+| Wheel, pinch, `+` and `-`                     | Zoom, towards the cursor or between the fingers                                          |
+| Arrows or `WASD`                              | Move the map, at the same speed at any frame rate                                        |
+| `1` to `9`, `0`                               | Attack with 10 % to 90 % of the troops, `0` for all                                      |
+| `C`, `F`, `X`                                 | Build a city, build a fort, demolish: then click your land; the next click attacks again |
+| Right click, long press, or a leaderboard row | Open that player's menu: ask for an alliance, accept, renew or betray                    |
+| `Esc`                                         | Close the player menu, or leave a build mode                                             |
+| `P` or `Esc`                                  | Pause and resume                                                                         |
+| `H` or `?`                                    | Show the controls                                                                        |
 
 The build panel above the toolbar (a row of icons under the stats on phones and short windows) has the same three modes as buttons, with the cost of the next city and fort, and the cities owned against the most the land supports (`R-BUILD-07`). Structures are drawn as light diamonds (cities) and triangles (forts) on a dark outline, greyed while being built.
+
+The player menu opens at the foot of the leaderboard (`R-DIPLO`). It says whether the player is an ally and for how long, and offers the one order that fits: ask, accept their request, renew in the last minute of an alliance, or betray, which asks for a second click. Requests to the player wait under the banner with a bar that empties until they run out; Ignore hides one without an answer. Allies are marked in the leaderboard and their land has a dashed white rim, drawn by the territory shader from a flag in its palette. Traitors carry a badge while the mark lasts, and a feed under the stats tells every player who allied, whose alliance ended and who betrayed whom, in a polite live region. A click that would attack an ally is refused and says to betray first. A long press opens the menu only for a finger or a pen held still for 500 ms; a mouse uses its right button.
 
 While attacks are under way, a panel at the bottom left lists each one, its
 target and its troops, with a Retreat button that calls it back
