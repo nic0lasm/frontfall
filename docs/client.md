@@ -46,6 +46,9 @@ covers the conventions that are not obvious from the code.
 - The setup lives in the query string (`?map=pangaea&bots=8&difficulty=hard`),
   so a link starts the same game, and the last one is remembered in
   `localStorage` when storage is available.
+- `?view=globe` shows a map of the whole planet on a globe, and G switches
+  between the globe and the flat map during the game. It is a prototype for
+  v0.6, kept out of the menu; see [ADR 0005](adr/0005-globe-spike.md).
 
 ## Playing online
 
