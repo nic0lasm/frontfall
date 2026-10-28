@@ -55,8 +55,15 @@ async function landShare(page: Page): Promise<number> {
  * Starts a solo game on the skirmish map against `bots` bots and spawns near
  * the middle; returns the point of the page where the player spawned.
  */
-async function startGame(page: Page, bots = 2, extra = ""): Promise<{ x: number; y: number }> {
-  await page.goto(`./?map=skirmish&bots=${String(bots)}&difficulty=easy&nations=0&speed=5${extra}`);
+async function startGame(
+  page: Page,
+  bots = 2,
+  extra = "",
+  speed = 5,
+): Promise<{ x: number; y: number }> {
+  await page.goto(
+    `./?map=skirmish&bots=${String(bots)}&difficulty=easy&nations=0&speed=${String(speed)}${extra}`,
+  );
   await page.locator("#play").click();
   // A game that cannot start says why in a notice: the failure then names it.
   await expect(page.locator("#map, .notice").first()).toBeVisible();
@@ -94,7 +101,9 @@ test("asks a bot for an alliance from the leaderboard, then betrays it (R-DIPLO)
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
   // One bot, which grows while the player stays put: it accepts a smaller player (R-BOT-10).
-  await startGame(page, 1);
+  // It also wins within half a minute at ×5 (the betrayal is disabled once a game is won), which
+  // a loaded runner takes to the end: ×2 leaves it more than a minute.
+  await startGame(page, 1, "", 2);
   const menu = page.locator("#player-menu");
   const ally = page.locator(".leader-button .badge-ally");
   await page.locator(".leader-button").click();
