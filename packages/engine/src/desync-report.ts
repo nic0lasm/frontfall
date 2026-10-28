@@ -5,6 +5,7 @@ import {
   DISABLE_ALL,
   MAX_TEAMS,
   type Game,
+  type GameRules,
   type Order,
   type PlayerSetup,
   type Turn,
@@ -38,6 +39,8 @@ export interface DesyncReport {
   teams?: number;
   /** `Disable` bits of what the game left out (R-MODE-03); absent when it left nothing out. */
   disabled?: number;
+  /** Special rules the game was played with (R-MODE-08); absent when it had none. */
+  rules?: Partial<GameRules>;
   /** The player whose client wrote the report. */
   you: number;
   /** Ticks the client had run; turns and hashes come from ticks below this. */
@@ -60,6 +63,7 @@ export function recreateGame(recorded: RecordedGame, terrain: Terrain): Game {
     balance: recorded.balance,
     ...(recorded.teams === undefined ? {} : { teams: recorded.teams }),
     ...(recorded.disabled === undefined ? {} : { disabled: recorded.disabled }),
+    ...(recorded.rules === undefined ? {} : { rules: recorded.rules }),
   });
   installBots(game, recorded.bots.ids, recorded.bots.difficulty);
   installNations(game, recorded.nations ?? [], recorded.bots.difficulty);
@@ -174,6 +178,7 @@ export function readGame(report: Record<string, unknown>): RecordedGame {
       : { nations: readList(report.nations, "nations").map((id) => readInteger(id, "nation id")) }),
     ...(report.teams === undefined ? {} : { teams: readTeams(report.teams) }),
     ...(report.disabled === undefined ? {} : { disabled: readDisabled(report.disabled) }),
+    ...(report.rules === undefined ? {} : { rules: readRules(report.rules) }),
     you: readInteger(report.you, "you"),
     ticks: readInteger(report.ticks, "ticks"),
     turns: readList(report.turns, "turns").map((entry, i) => {
@@ -217,6 +222,19 @@ function readDisabled(value: unknown): number {
   const disabled = readInteger(value, "disabled");
   if (disabled < 0 || disabled > DISABLE_ALL) throw new DesyncReportError("invalid disabled set");
   return disabled;
+}
+
+/** Special rules by name, each on or off (R-MODE-08); a name this build does not know is refused. */
+function readRules(value: unknown): Partial<GameRules> {
+  const rules = readObject(value, "rules");
+  const known: { -readonly [Name in keyof GameRules]?: boolean } = {};
+  for (const [name, on] of Object.entries(rules)) {
+    if (name !== "collapsingFronts" || typeof on !== "boolean") {
+      throw new DesyncReportError(`invalid rule ${name}`);
+    }
+    known[name] = on;
+  }
+  return known;
 }
 
 export class DesyncReportError extends Error {

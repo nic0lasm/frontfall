@@ -93,4 +93,20 @@ describe("game setup", () => {
   it("cleans player names", () => {
     expect(cleanName("  Ada\u0000 Lovelace the Countess of Code ")).toBe("Ada Lovelace the Cou");
   });
+
+  it("plays with the default special rules, and remembers the player's choice (R-MODE-08)", () => {
+    expect(defaultSetup(maps).rules).toEqual({ collapsingFronts: true });
+    const items = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => void items.set(key, value),
+    } as unknown as Storage;
+    const off = { ...defaultSetup(maps), rules: { collapsingFronts: false } };
+    saveSetup(off, storage);
+    expect(initialSetup("", storage, maps).rules).toEqual({ collapsingFronts: false });
+    // Nonsense falls back to what was there.
+    expect(sanitizeSetup({ rules: { collapsingFronts: "no" } }, off, maps).rules).toEqual({
+      collapsingFronts: false,
+    });
+  });
 });

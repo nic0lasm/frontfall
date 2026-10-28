@@ -45,7 +45,8 @@ export interface DiplomacyEvent {
    * ("captured"), launched a missile at `b`'s land ("missile"), or stopped a
    * missile of `b` with an air defense ("stopped"), sent `b` troops or
    * gold ("gift"), or sent `b` the quick message `phrase` ("quick"), which
-   * only those two are shown.
+   * only those two are shown. "collapsed": a front of `b` gave way before
+   * an attack of `a` around `tile` (R-ATTACK-10).
    */
   readonly type:
     | "allied"
@@ -57,11 +58,14 @@ export interface DiplomacyEvent {
     | "missile"
     | "stopped"
     | "gift"
-    | "quick";
+    | "quick"
+    | "collapsed";
   readonly a: number;
   readonly b: number;
   /** A "quick" event's message, by number (R-DIPLO-07). */
   readonly phrase?: number;
+  /** Where a "collapsed" front broke: the tile its attacker took closest to the aim. */
+  readonly tile?: number;
 }
 
 /** Refusals of diplomacy orders, so that interfaces can tell them apart without parsing text. */

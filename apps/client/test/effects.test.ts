@@ -174,6 +174,42 @@ describe("EffectTracker, land taken", () => {
   });
 });
 
+describe("EffectTracker collapsed fronts (R-ATTACK-10)", () => {
+  const tile = 25 * 100 + 50;
+
+  it("rings the collapse in ember with a few sparks", () => {
+    const { tracker: t, particles } = tracker();
+    t.collapsed(tile, 2);
+    const rings = particles.filter((p) => p.shape === "ring");
+    expect(rings).toHaveLength(1);
+    expect(rings[0]?.color).toBe("#F25C2A");
+    expect(rings[0]?.life).toBeLessThanOrEqual(1.2);
+    expect(particles.length - rings.length).toBe(6);
+  });
+
+  it("holds still as a single fading ring", () => {
+    const { tracker: t, particles } = tracker(false);
+    t.collapsed(tile, 2);
+    expect(particles.map((p) => p.shape)).toEqual(["ring"]);
+    expect(particles[0]?.size0).toBe(particles[0]?.size1);
+  });
+
+  it("caps the bursts alive at once, and frees them as they end", () => {
+    const { tracker: t, particles } = tracker(false);
+    for (let i = 0; i < 20; i++) t.collapsed(tile, 2);
+    expect(particles).toHaveLength(8);
+    t.collapsed(tile, 4);
+    expect(particles).toHaveLength(9);
+  });
+
+  it("starts nothing out of view", () => {
+    const { tracker: t, particles } = tracker();
+    t.setView({ centerX: 10, centerY: 5, halfWidth: 3, halfHeight: 3 }, 0.1);
+    t.collapsed(tile, 2);
+    expect(particles).toEqual([]);
+  });
+});
+
 describe("EffectsLayer", () => {
   const create = (): EffectsLayer =>
     new EffectsLayer({

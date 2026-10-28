@@ -61,6 +61,16 @@ Spawn values are set for a map of 2^19 tiles (1024 × 512) (`R-SPAWN-06`). On a 
 | `B-ENCIRCLE-MAX`     |          4000 | tiles                       | `R-ATTACK-08` | Larger pockets must be conquered            |
 | `B-RETREAT-PENALTY`  |            25 | % of returning troops       | `R-ATTACK-06` |                                             |
 
+## Collapsing fronts
+
+| Key                  | Value | Unit                             | Used by       | Notes                                                       |
+| -------------------- | ----: | -------------------------------- | ------------- | ----------------------------------------------------------- |
+| `B-COLLAPSE-ODDS`    |   3.0 | × the garrison facing the attack | `R-ATTACK-10` | Garrison: defender's soldiers per tile × tiles on the front |
+| `B-COLLAPSE-BUILDUP` |     3 | s of overwhelming advance        | `R-ATTACK-10` | Before a front gives way, then again                        |
+| `B-COLLAPSE-DEPTH`   |     5 | tiles                            | `R-ATTACK-10` | On a map of 2^19 tiles, 10 on World                         |
+| `B-COLLAPSE-COST`    |    50 | % of the usual price per tile    | `R-ATTACK-10` | The defender still loses their troops per tile              |
+| `B-SPECIAL-RULES`    |    on | collapsing fronts                | `R-MODE-08`   | In public games and quick play                              |
+
 ## Ships
 
 | Key            | Value | Unit             | Used by     | Notes                                             |

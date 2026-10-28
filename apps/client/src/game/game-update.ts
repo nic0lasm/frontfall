@@ -83,11 +83,12 @@ function diplomacy(game: Game, you: number): DiplomacyView {
 
 /** What the engine logged between players since the last update, in order (R-DIPLO-04). */
 function diplomacyEvents(game: Game): DiplomacyEvent[] {
-  return game.diplomacyEvents
-    .splice(0)
-    .map(({ type, a, b, phrase }) =>
-      phrase === undefined ? { type, a, b } : { type, a, b, phrase },
-    );
+  return game.diplomacyEvents.splice(0).map(({ type, a, b, phrase, tile }) => {
+    const event: DiplomacyEvent = { type, a, b };
+    if (phrase !== undefined) event.phrase = phrase;
+    if (tile !== undefined) event.tile = tile;
+    return event;
+  });
 }
 
 /**

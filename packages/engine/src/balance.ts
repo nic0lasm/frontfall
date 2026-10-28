@@ -45,6 +45,14 @@ export interface Balance {
   retreatPenaltyPercent: number;
   /** B-ENCIRCLE-MAX, largest pocket in tiles captured at once by encirclement */
   encircleMaxTiles: number;
+  /** B-COLLAPSE-ODDS, in tenths: an attack overwhelms a front when its troops are this many times the garrison facing it */
+  collapseOddsTenths: number;
+  /** B-COLLAPSE-BUILDUP, in ticks of overwhelming advance before a front gives way */
+  collapseBuildupTicks: number;
+  /** B-COLLAPSE-DEPTH, in tiles on a map of 2^19 tiles: how far behind its tip a front gives way */
+  collapseDepth: number;
+  /** B-COLLAPSE-COST, percent of the usual price the attacker pays for land that gives way */
+  collapseCostPercent: number;
   /** B-BOAT-SPEED, water tiles a transport ship moves per tick */
   boatSpeed: number;
   /** B-BOAT-MAX, transport ships a player may have at sea at once */
@@ -165,6 +173,10 @@ export const DEFAULT_BALANCE: Balance = {
   defenseDensityTenths: 10,
   retreatPenaltyPercent: 25,
   encircleMaxTiles: 4000,
+  collapseOddsTenths: 30,
+  collapseBuildupTicks: 3 * 10,
+  collapseDepth: 5,
+  collapseCostPercent: 50,
   boatSpeed: 2,
   boatMax: 3,
   boatRange: 1000,

@@ -1,4 +1,5 @@
 import { Disable, leftOut } from "@frontfall/engine";
+import { DEFAULT_RULES } from "@frontfall/protocol";
 import { suggestedBots, type MapInfo } from "../game/maps.ts";
 import { MAX_BOTS, type Difficulty, type SoloOptions } from "../game/solo-game.ts";
 
@@ -29,6 +30,7 @@ export function defaultSetup(maps: readonly MapInfo[]): GameSetup {
     bots: suggestedBots(map, true),
     difficulty: "normal",
     nations: true,
+    rules: { ...DEFAULT_RULES },
     playerName: "",
   };
 }
@@ -63,6 +65,16 @@ export function sanitizeSetup(
     setup.disabled = leftOut(
       LEFT_OUT.reduce((bits, { name, bit }) => bits | (names.includes(name) ? bit : 0), 0),
     );
+  }
+  // Special rules (R-MODE-08): stored as an object, each one on or off; never in a link.
+  const stored = input.rules;
+  if (typeof stored === "object" && stored !== null) {
+    const rules = { ...DEFAULT_RULES, ...setup.rules };
+    for (const name of Object.keys(DEFAULT_RULES) as (keyof typeof DEFAULT_RULES)[]) {
+      const value = (stored as Record<string, unknown>)[name];
+      if (typeof value === "boolean") rules[name] = value;
+    }
+    setup.rules = rules;
   }
   if (typeof input.name === "string") setup.playerName = cleanName(input.name);
   if (typeof input.playerName === "string") setup.playerName = cleanName(input.playerName);

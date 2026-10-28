@@ -173,6 +173,7 @@ export class Hud {
     growthFloorPercent: 100,
     teams: [],
     disabled: 0,
+    special: { collapsingFronts: false },
   };
 
   /** `pausable`: false online, where the game runs for everyone. */

@@ -204,6 +204,11 @@ export class EffectsLayer {
     this.tracker.fronts(tiles, this.options.map.owners, now);
   }
 
+  /** A front gave way around `tile` (R-ATTACK-10): an ember shock ring and sparks. */
+  collapsed(tile: number, now: number): void {
+    this.tracker.collapsed(tile, now);
+  }
+
   /** Starts one mark, over the oldest if the buffer is full. */
   spawn(particle: Particle): void {
     const i = this.next;

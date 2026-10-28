@@ -7,6 +7,7 @@ import {
   type Difficulty,
   type ErrorCode,
   type GameSpeed,
+  type GameRules,
   type Frame,
   type GameOptions,
   type Order,
@@ -44,6 +45,8 @@ export interface RoomSettings {
   disabled: number;
   /** Turns closed at each tick of the server (R-MODE-07); 1 in a public game. */
   speed: GameSpeed;
+  /** Special rules every client plays with (R-MODE-08); the defaults in a public game. */
+  rules: GameRules;
   /** Players needed before the host can start, and before the countdown runs. */
   minPlayers: number;
   /** Wait after reaching minPlayers before starting on its own; 0 waits for the host. */
@@ -690,6 +693,7 @@ export class Room {
       capacity: this.settings.capacity,
       autoStart: this.settings.autoStart,
       speed: this.settings.speed,
+      rules: this.settings.rules,
       minPlayers: this.settings.minPlayers,
       players,
       you: seat.id,
@@ -714,6 +718,7 @@ export class Room {
       disabled: this.settings.disabled,
       tickRate: TICK_RATE,
       speed: this.settings.speed,
+      rules: this.settings.rules,
       players: this.players(),
       you: seat.id,
       token: seat.token,

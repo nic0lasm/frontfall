@@ -21,6 +21,8 @@ export type LandLost = ReadonlyMap<number, number>;
 
 /** Ticks before the same player is reported again as taking your land. */
 const ATTACK_QUIET_TICKS = 150;
+/** Ticks before the same pair is told of another collapsed front, about 5 s (R-ATTACK-10). */
+const COLLAPSE_QUIET_TICKS = 50;
 
 const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
   allied: "diplo.eventAllied",
@@ -33,6 +35,7 @@ const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
   stopped: "diplo.eventStopped",
   gift: "diplo.eventGift",
   quick: "diplo.eventQuick",
+  collapsed: "diplo.eventCollapsed",
 };
 
 const STRUCTURE_TEXT: Readonly<Record<StructureType, MessageKey>> = {
@@ -74,6 +77,7 @@ export class FeedWatcher {
   private requests = new Set<number>();
   private structures = new Map<number, { type: StructureType; tile: number }>();
   private readonly attackedAt = new Map<number, number>();
+  private readonly collapsedAt = new Map<string, number>();
   private readonly alliances = new Set<string>();
 
   /** `personal` is false in a replay, where nobody is the player. */
@@ -99,6 +103,8 @@ export class FeedWatcher {
     const name = (id: number): string => update.players.find((p) => p.id === id)?.name ?? "";
     for (const event of update.events) {
       this.track(event);
+      if (event.type === "collapsed" && !this.collapseNews(event, update.tick, update.you))
+        continue;
       const entry = this.eventEntry(event, update.you, name);
       if (entry) entries.push(entry);
     }
@@ -148,6 +154,19 @@ export class FeedWatcher {
     return entries;
   }
 
+  /**
+   * Whether a collapsed front is worth a line: only those of the player, and
+   * one per attacker and defender every COLLAPSE_QUIET_TICKS.
+   */
+  private collapseNews(event: DiplomacyEvent, tick: number, you: number): boolean {
+    if (!this.personal || (event.a !== you && event.b !== you)) return false;
+    const key = `${String(event.a)}:${String(event.b)}`;
+    const last = this.collapsedAt.get(key);
+    if (last !== undefined && tick - last < COLLAPSE_QUIET_TICKS) return false;
+    this.collapsedAt.set(key, tick);
+    return true;
+  }
+
   private track(event: DiplomacyEvent): void {
     const key = pair(event.a, event.b);
     if (event.type === "allied") this.alliances.add(key);
@@ -168,6 +187,8 @@ export class FeedWatcher {
       case "betrayed":
       case "embargo":
       case "captured":
+      case "collapsed":
+        return target ? "bad" : "good";
       case "missile":
         return target ? "bad" : "info";
       case "ended":
@@ -186,7 +207,12 @@ export class FeedWatcher {
     const mine = this.personal && (event.a === you || event.b === you);
     const other = event.a === you ? event.b : event.a;
     const tone = mine ? this.tone(event, you) : "info";
-    const text = t(EVENT_TEXT[event.type], {
+    // Told from the player's side: the attacker's front gave way, or the player's own did.
+    const key: MessageKey =
+      event.type === "collapsed" && event.b === you
+        ? "feed.collapsedYours"
+        : EVENT_TEXT[event.type];
+    const text = t(key, {
       a: name(event.a),
       b: name(event.b),
       phrase: event.phrase === undefined ? "" : t(`quick.${String(event.phrase)}` as MessageKey),
@@ -195,6 +221,7 @@ export class FeedWatcher {
       key: `${event.type}:${String(event.a)}:${String(event.b)}:${String(event.phrase ?? "")}`,
       tone,
       text,
+      ...(event.tile === undefined ? {} : { tile: event.tile }),
       player: mine ? other : event.a,
       mine,
     };

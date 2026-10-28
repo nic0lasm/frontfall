@@ -56,6 +56,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
     capacity: 16,
     autoStart: true,
     speed: 1,
+    rules: { collapsingFronts: true },
     minPlayers: 2,
     players: [
       { id: 1, name: "Nico" },
@@ -80,6 +81,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
     disabled: 32,
     tickRate: 10,
     speed: 2,
+    rules: { collapsingFronts: false },
     players: [{ id: 1, name: "Nico" }],
     you: 1,
     token: "0123456789abcdefABCDEF",
@@ -179,6 +181,27 @@ describe("client messages", () => {
       false,
       false,
     ]);
+  });
+
+  it("takes special rules by name only, each on or off, or none (R-MODE-08)", () => {
+    const options = {
+      map: "world",
+      bots: 0,
+      difficulty: "easy",
+      nations: true,
+      teams: 0,
+      disabled: 0,
+      capacity: 16,
+      autoStart: true,
+    };
+    const configure = (rules?: unknown) =>
+      parseClientMessage(JSON.stringify({ type: "configure", options: { ...options, rules } }));
+    expect(configure(undefined).ok).toBe(true);
+    expect(configure({ collapsingFronts: true }).ok).toBe(true);
+    expect(configure({ collapsingFronts: false }).ok).toBe(true);
+    expect(configure({}).ok).toBe(false);
+    expect(configure({ collapsingFronts: 1 }).ok).toBe(false);
+    expect(configure({ collapsingFronts: true, doctrines: true }).ok).toBe(false);
   });
 
   it("keeps seats between 2 and 16 and names of a sane size", () => {

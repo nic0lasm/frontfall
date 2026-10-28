@@ -15,7 +15,7 @@ import { Order, PlayerNumber, type Turn } from "./orders.ts";
  * turn frames, so it bumps this version too; a test pins the order kinds of
  * the current version.
  */
-export const PROTOCOL_VERSION = 20;
+export const PROTOCOL_VERSION = 22;
 
 /** Ticks per second of the simulation at speed 1. The server closes one turn per tick. */
 export const TICK_RATE = 10;
@@ -87,6 +87,25 @@ export type Teams = z.infer<typeof Teams>;
 /** What a private game leaves out (R-MODE-03): the engine's `Disable` bits, 0 for nothing. */
 export const Disabled = z.number().int().min(0).max(0x3f);
 
+/**
+ * Special rules of a game (R-MODE-08), the engine's `GameRules`: each one is
+ * on or off for the whole game, chosen by the host before the start.
+ */
+export const GameRules = z
+  .object({
+    /** R-ATTACK-10: outnumbered fronts give way by stretches. */
+    collapsingFronts: z.boolean(),
+  })
+  .strict();
+export type GameRules = z.infer<typeof GameRules>;
+
+/** The rules of public games and quick play, chosen by the balance pass (R-MODE-08). */
+export const DEFAULT_RULES: Readonly<GameRules> = { collapsingFronts: true };
+
+export function isDefaultRules(rules: GameRules): boolean {
+  return rules.collapsingFronts === DEFAULT_RULES.collapsingFronts;
+}
+
 /** Why a player reports another (R-MODE-06): no free text, so a report carries nothing else. */
 export const ReportReason = z.enum(["abuse", "name", "cheating", "other"]);
 export type ReportReason = z.infer<typeof ReportReason>;
@@ -121,6 +140,8 @@ export const GameOptions = z
     autoStart: z.boolean(),
     /** Pace of a private game (R-MODE-07); left out, it stays as it was, 1 at first. */
     speed: GameSpeed.optional(),
+    /** Special rules (R-MODE-08); left out, they stay as they were. */
+    rules: GameRules.optional(),
   })
   .strict();
 export type GameOptions = z.infer<typeof GameOptions>;
@@ -205,6 +226,8 @@ export const ServerMessage = z.discriminatedUnion("type", [
     autoStart: z.boolean(),
     /** Ticks per beat (R-MODE-07): always 1 in a public game. */
     speed: GameSpeed,
+    /** Special rules the game will play with (R-MODE-08). */
+    rules: GameRules,
     /** Players the host needs before starting. */
     minPlayers: z.number().int().positive(),
     players: z.array(PlayerInfo),
@@ -239,6 +262,8 @@ export const ServerMessage = z.discriminatedUnion("type", [
     tickRate: z.number().int().positive(),
     /** Ticks per beat (R-MODE-07): turns come `tickRate` × `speed` per second. */
     speed: GameSpeed,
+    /** Special rules every client plays with (R-MODE-08). */
+    rules: GameRules,
     players: z.array(PlayerInfo),
     you: PlayerNumber,
     /** Secret that lets this player rejoin after a dropped connection. */

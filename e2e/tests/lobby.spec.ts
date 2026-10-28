@@ -46,4 +46,7 @@ test("keeps the host's choices when the lobby answers late", async ({ browser, b
     "World · 0 bots · nations · Hard · starts when full · speed ×2 · left out: Silo",
     { timeout: 15_000 },
   );
+  // The special rules (R-MODE-08) are a line of their own for the guest, and a switch for the host.
+  await expect(guest.locator("#lobby-rules-line")).toHaveText("Special rules: Collapsing fronts");
+  await expect(page.locator("#lobby-collapsingFronts")).toBeChecked();
 });

@@ -1,8 +1,9 @@
 import type { Game, Player } from "./game.ts";
 import { divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
-import { isAllied, isTraitor } from "./diplomacy.ts";
+import { isAllied, isTraitor, logEvent } from "./diplomacy.ts";
 import { soldiers } from "./economy.ts";
-import { fortified } from "./structures.ts";
+import { spawnSettings } from "./spawn.ts";
+import { fortRadius, fortified, isReady, StructureKind } from "./structures.ts";
 import { TileKind } from "./terrain.ts";
 import { BoundedFloodFill } from "./territory/bounded-flood-fill.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
@@ -16,6 +17,11 @@ export interface Attack {
   /** Tile the player aimed at; the front advances towards it first. */
   aim: number;
   troops: number;
+  /**
+   * Ticks in a row this attack has overwhelmed the front it pushes on
+   * (R-ATTACK-10); always 0 in a game without collapsing fronts.
+   */
+  pressure: number;
 }
 
 /**
@@ -46,6 +52,12 @@ export function installAttacks(game: Game): void {
   const fronts: number[][] = [];
   const frontPriorities: number[][] = [];
   const speeds: number[] = [];
+  // R-ATTACK-10: tiles of its target each attack touches, and whether it overwhelms them.
+  const frontLengths: number[] = [];
+  const overwhelming: boolean[] = [];
+  const collapsing = game.rules.collapsingFronts;
+  const collapseFill = new BoundedFloodFill(topology);
+  const nearForts: number[] = [];
   const attacksOf = new Map<number, number[]>();
   const ownAround = new Int32Array(4);
 
@@ -62,6 +74,7 @@ export function installAttacks(game: Game): void {
       const attack = attacks[a] as Attack;
       (fronts[a] ??= []).length = 0;
       (frontPriorities[a] ??= []).length = 0;
+      frontLengths[a] = 0;
       const alive = game.player(attack.player)?.alive === true;
       speeds[a] =
         alive && attack.troops > 0
@@ -86,10 +99,26 @@ export function installAttacks(game: Game): void {
           const a = own.find((index) => (attacks[index] as Attack).target === owner);
           if (a === undefined) continue;
           seen[tile] = scan;
+          frontLengths[a] = (frontLengths[a] as number) + 1;
           shortlist(a, tile, priority(player, tile, (attacks[a] as Attack).aim));
         }
       }
     }
+    if (collapsing) for (let a = 0; a < attacks.length; a++) overwhelming[a] = overwhelms(a);
+  }
+
+  /**
+   * R-ATTACK-10: whether an attack's troops are at least B-COLLAPSE-ODDS
+   * times the garrison facing it, the defender's soldiers per tile over every
+   * tile of theirs the attacker touches. Judged before any attack moves.
+   */
+  function overwhelms(a: number): boolean {
+    const attack = attacks[a] as Attack;
+    if (attack.target === NEUTRAL || speeds[a] === 0) return false;
+    const defender = game.player(attack.target);
+    if (!defender?.alive) return false;
+    const garrison = defensePerTile(game, defender) * (frontLengths[a] as number);
+    return attack.troops * 10 >= balance.collapseOddsTenths * Math.max(1, garrison);
   }
 
   /**
@@ -165,6 +194,7 @@ export function installAttacks(game: Game): void {
       target,
       aim: order.target,
       troops: 0,
+      pressure: 0,
     };
     // R-ATTACK-09: without a shared border, only ships can reach the target.
     if (!touches(player.id, target)) return false;
@@ -182,7 +212,9 @@ export function installAttacks(game: Game): void {
     if (game.phase !== "play") return;
     cancelOpposingAttacks(attacks);
     planFronts();
-    for (let a = 0; a < attacks.length; a++) advance(attacks[a] as Attack, fronts[a] as number[]);
+    for (let a = 0; a < attacks.length; a++) {
+      advance(attacks[a] as Attack, fronts[a] as number[], overwhelming[a] === true);
+    }
     // Troops of a finished attack went back to its player in finish(); a fallen player's are lost.
     for (let i = attacks.length - 1; i >= 0; i--) {
       const attack = attacks[i] as Attack;
@@ -191,7 +223,7 @@ export function installAttacks(game: Game): void {
   });
 
   /** Takes the tiles planned for this tick; an attack that cannot go on is marked done. */
-  function advance(attack: Attack, tiles: readonly number[]): void {
+  function advance(attack: Attack, tiles: readonly number[], overwhelms: boolean): void {
     const attacker = game.player(attack.player);
     const defender = attack.target === NEUTRAL ? undefined : game.player(attack.target);
     if (!attacker?.alive || attack.troops <= 0) return;
@@ -213,7 +245,85 @@ export function installAttacks(game: Game): void {
       territory.setOwner(tile, attack.player);
       captured.push(tile);
     }
+    if (collapsing && defender) {
+      attack.pressure = overwhelms && captured.length > 0 ? attack.pressure + 1 : 0;
+      if (attack.pressure >= balance.collapseBuildupTicks) {
+        attack.pressure = 0;
+        collapse(attack, defender);
+      }
+    }
     captureEnclosedPockets(attack.player);
+  }
+
+  /**
+   * R-ATTACK-10: the front breaks behind the tile taken this tick closest to
+   * the aim. The defender's land joined to it, within B-COLLAPSE-DEPTH of
+   * that tip and out of reach of their forts, falls at once, nearest first,
+   * for B-COLLAPSE-COST of its usual price, as long as the attack can pay.
+   * Land cut off by the breach then falls by encirclement (R-ATTACK-08).
+   */
+  function collapse(attack: Attack, defender: Player): void {
+    const depth = collapseDepth(game);
+    for (const tip of captured) {
+      const count = topology.neighborsInto(tip, around);
+      let start = -1;
+      for (let j = 0; j < count && start < 0; j++) {
+        const tile = around[j] as number;
+        if (territory.ownerOf(tile) === defender.id && game.usable(tile)) start = tile;
+      }
+      if (start < 0) continue;
+      // Forts close enough to cover some of the stretch; the others cannot.
+      // The stretch is a disc, but forts reach in steps along the grid: its corners are √2 × depth away.
+      const reach = isqrt(2 * depth * depth) + 1 + fortRadius(game);
+      nearForts.length = 0;
+      for (const structure of game.structures) {
+        if (
+          structure.kind === StructureKind.Fort &&
+          structure.player === defender.id &&
+          territory.ownerOf(structure.tile) === defender.id &&
+          isReady(game, structure) &&
+          topology.distance(structure.tile, tip) <= reach
+        ) {
+          nearForts.push(structure.tile);
+        }
+      }
+      const radius = fortRadius(game);
+      const holds = (tile: number): boolean =>
+        nearForts.some((fort) => topology.distance(fort, tile) <= radius);
+      const limit = (2 * depth + 1) * (2 * depth + 1);
+      const size = collapseFill.fill(
+        start,
+        (tile) =>
+          territory.ownerOf(tile) === defender.id &&
+          game.usable(tile) &&
+          topology.squaredDistance(tile, tip) <= depth * depth &&
+          !holds(tile),
+        limit,
+      );
+      if (size <= 0) continue;
+      const first = captured.length;
+      for (const tile of collapseFill.tiles()) {
+        const cost = Math.max(
+          1,
+          mulDiv(tileCost(tile, defender), balance.collapseCostPercent, 100),
+        );
+        if (attack.troops < cost) break;
+        attack.troops -= cost;
+        defender.troops -= defenderLoss(game, tile, defender);
+        territory.setOwner(tile, attack.player);
+        captured.push(tile);
+      }
+      if (captured.length > first) {
+        logEvent(game, {
+          tick: game.tick,
+          type: "collapsed",
+          a: attack.player,
+          b: defender.id,
+          tile: tip,
+        });
+      }
+      return;
+    }
   }
 
   /**
@@ -285,6 +395,12 @@ export function installAttacks(game: Game): void {
     if (player?.alive) player.troops += attack.troops;
     attack.troops = 0;
   }
+}
+
+/** B-COLLAPSE-DEPTH on this map: a length on a map of 2^19 tiles, grown with the side like the spawn radius. */
+export function collapseDepth(game: Game): number {
+  const { collapseDepth: depth, spawnRadius } = game.balance;
+  return Math.max(depth, mulDiv(depth, spawnSettings(game).radius, spawnRadius));
 }
 
 /** R-ATTACK-07: two attacks between the same players in opposite directions fight each other first. */
