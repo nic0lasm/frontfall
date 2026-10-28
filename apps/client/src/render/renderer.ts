@@ -93,7 +93,7 @@ let lazy: typeof Lazy | undefined;
 /**
  * Fetches the code the first visit leaves out: the territory layer and its
  * shaders, the globe, used only by `?view=globe`, and the pieces of the flat
- * map. The page waits for it before the menu shows, so no game starts
+ * map. The game screen waits for it (main.ts, loadGame), so no game starts
  * without it.
  */
 export async function loadGlobe(): Promise<void> {

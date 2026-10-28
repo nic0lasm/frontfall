@@ -328,11 +328,18 @@ and 71 forts.
 
 | Files                                       | Raw       | Sent (gzip) | Brotli   | Budget   |
 | ------------------------------------------- | --------- | ----------- | -------- | -------- |
-| First visit: page, code, styles, Latin font | 823.0 kB  | 254.3 kB    | 234.9 kB | 275.0 kB |
+| First visit: page, code, styles, Latin font | 270.6 kB  | 117.1 kB    | 112.9 kB | 275.0 kB |
 | Simulation worker                           | 73.8 kB   | 23.5 kB     | 22.5 kB  | 50.0 kB  |
 | World map                                   | 2103.5 kB | 150.0 kB    | 137.1 kB | 175.0 kB |
 | Every map                                   | 7194.7 kB | 442.2 kB    | 390.4 kB | 520.0 kB |
 | Whole build but maps                        | 1356.2 kB | 730.0 kB    | 709.3 kB | 850.0 kB |
+
+The game screen, the renderer (Three.js) and the territory layer are no longer
+part of the first visit (2026-10-28): the menu loads without them, and the page
+fetches them once it is idle, or on Play if it was not yet. The first visit went from
+273.7 kB to 117.1 kB sent; the whole build is the same size. An online game
+fetches them as the lobby opens, and holds the turns that come in before the
+screen exists.
 
 Each language's texts are a file of their own since 2026-10-27: a page
 downloads the catalogue of the language it shows, and another one only when

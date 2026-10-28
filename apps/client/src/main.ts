@@ -25,11 +25,11 @@ import {
   type GameStart,
   type OnlineEntry,
 } from "./net/online.ts";
-import { loadGlobe, type ViewKind } from "./render/renderer.ts";
+import type { ViewKind } from "./render/renderer.ts";
 import { FEATURE_LABELS, missingFeatures } from "./compat.ts";
 import { hasWebGL2 } from "./render/webgl-support.ts";
 import { loadAccessibility } from "./ui/accessibility.ts";
-import { GameScreen, loadGameStyles, loadReplayBar } from "./ui/game-screen.ts";
+import type { GameScreen } from "./ui/game-screen.ts";
 import { LobbyScreen, botLimit, onlineMaps, seatLimit } from "./ui/lobby.ts";
 import { h } from "./ui/dom.ts";
 import { JoinScreen } from "./ui/join.ts";
@@ -53,6 +53,52 @@ const storage = safeStorage();
 let maps: readonly MapInfo[] = [];
 let menu: Menu | undefined;
 let game: GameScreen | undefined;
+
+type GameModule = typeof import("./ui/game-screen.ts");
+let gameModule: Promise<GameModule> | undefined;
+/** The game screen's code, once loadGame has fetched it. */
+let gameCode: GameModule | undefined;
+
+/**
+ * Fetches the game screen, with the renderer and the interface it draws: the menu does
+ * not need them, so a first visit leaves them to a game that is about to start.
+ */
+function loadGame(): Promise<GameModule> {
+  gameModule ??= Promise.all([
+    import("./ui/game-screen.ts"),
+    // The territory layer, the pieces and the globe: without them no game can be drawn.
+    import("./render/renderer.ts").then(({ loadGlobe }) => loadGlobe()),
+  ]).then(
+    ([loaded]) => {
+      gameCode = loaded;
+      return loaded;
+    },
+    (error: unknown) => {
+      gameModule = undefined;
+      throw error;
+    },
+  );
+  return gameModule;
+}
+
+/** The game screen and its styles, for a game about to start. */
+async function loadGameWithStyles(): Promise<GameModule> {
+  const loaded = await loadGame();
+  await loaded.loadGameStyles();
+  return loaded;
+}
+
+/**
+ * Fetches the game's code once the menu is up and the browser has nothing else to do, so
+ * that Play finds it in the cache; the menu itself never waits for it.
+ */
+function prefetchGame(): void {
+  const fetch = (): void => {
+    loadGameWithStyles().catch(() => undefined);
+  };
+  if ("requestIdleCallback" in window) window.requestIdleCallback(fetch, { timeout: 3000 });
+  else setTimeout(fetch, 1000);
+}
 let setup: GameSetup;
 
 /** The profile, loaded with its code when first needed: not part of the first download. */
@@ -81,8 +127,8 @@ window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => 
 });
 
 function showMenu(): void {
-  // Ready before Play, so the game opens already styled.
-  loadGameStyles().catch(() => undefined);
+  // Ready before Play, so the game opens already built and styled.
+  prefetchGame();
   goOffline();
   game?.dispose();
   game = undefined;
@@ -163,9 +209,9 @@ function play(chosen: GameSetup): void {
   const map = maps.find((candidate) => candidate.id === setup.map);
   if (!map) return;
   // Your colour is yours alone: online, every page shows the colours the game gives.
-  void Promise.all([localProfile(), loadGameStyles()]).then(([profile]) => {
+  void Promise.all([localProfile(), loadGameWithStyles()]).then(([profile, code]) => {
     preferColor(HUMAN_ID, profile.read().color);
-    begin(map);
+    begin(map, code);
   }, failedToLoad);
 }
 
@@ -174,10 +220,10 @@ function failedToLoad(error: unknown): void {
   showNotice("game.failed");
 }
 
-function begin(map: MapInfo): void {
+function begin(map: MapInfo, code: GameModule): void {
   game?.dispose();
   const seed = Math.floor(Math.random() * 0x7fffffff);
-  game = new GameScreen(
+  game = new code.GameScreen(
     { ...setup, playerName: setup.playerName || t("menu.namePlaceholder"), seed, ...testing },
     map,
     {
@@ -253,8 +299,10 @@ async function watch(file: File): Promise<void> {
     showNotice("webgl.missing");
     return;
   }
+  let code: GameModule;
   try {
-    await Promise.all([loadReplayBar(), loadGameStyles()]);
+    code = await loadGameWithStyles();
+    await code.loadReplayBar();
   } catch (error) {
     console.error(error);
     showNotice("game.failed");
@@ -262,7 +310,7 @@ async function watch(file: File): Promise<void> {
   }
   game?.dispose();
   preferColor(HUMAN_ID, undefined);
-  game = new GameScreen(
+  game = new code.GameScreen(
     { ...setup, map: map.id, seed: record.seed, record },
     map,
     {
@@ -436,6 +484,9 @@ function askName(invited: string): void {
 /** Whether snapshots of the online game are kept for a reload: not once it no longer matches the others'. */
 let keepSnapshots = true;
 
+/** Turns that came before the game screen did, which has still to be fetched. */
+let heldTurns: Parameters<GameScreen["pushTurns"]>[0][] | undefined;
+
 /** Leaves the online game, if any, and closes the connection. */
 function goOffline(): void {
   showMaintenance(null);
@@ -462,6 +513,8 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
     showNotice("webgl.missing");
     return;
   }
+  // The lobby lasts longer than the fetch of the screen it leads to.
+  loadGame().catch(() => undefined);
   menu?.dispose();
   menu = undefined;
   game?.dispose();
@@ -545,7 +598,8 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
         );
       },
       turns(turns) {
-        game?.pushTurns(turns);
+        if (game) game.pushTurns(turns);
+        else heldTurns?.push(turns);
       },
       maintenance(inMs) {
         showMaintenance(inMs);
@@ -618,8 +672,27 @@ function startOnline(
   visibility: "public" | "private",
   snapshot: StoredSnapshot | undefined,
 ): void {
+  const code = gameCode;
+  if (!code) {
+    // The code is still on its way, after a lobby shorter than the fetch: the turns that come
+    // in meanwhile wait for the screen.
+    heldTurns = [];
+    loadGame().then(
+      () => {
+        startOnline(start, client, visibility, snapshot);
+      },
+      (error: unknown) => {
+        console.error(error);
+        heldTurns = undefined;
+        client.leave();
+        showMenu();
+        showNotice("game.failed");
+      },
+    );
+    return;
+  }
   // The turns come in at once: the screen cannot wait for its styles, which the menu has begun to fetch.
-  loadGameStyles().catch(() => undefined);
+  code.loadGameStyles().catch(() => undefined);
   const map = maps.find((candidate) => candidate.id === start.map);
   if (!map) {
     // A map this page does not list: leave the seat rather than hold it unplayed.
@@ -662,7 +735,7 @@ function startOnline(
     );
   };
   preferColor(HUMAN_ID, undefined);
-  game = new GameScreen(
+  game = new code.GameScreen(
     {
       map: start.map,
       seed: start.seed,
@@ -722,6 +795,8 @@ function startOnline(
   document.body.classList.add("playing");
   document.body.prepend(game.element);
   game.start();
+  for (const turns of heldTurns ?? []) game.pushTurns(turns);
+  heldTurns = undefined;
 }
 
 const query = new URLSearchParams(location.search);
@@ -732,10 +807,6 @@ const ready = Promise.all([
   fetchMaps(location.href).then((list) => {
     maps = list;
     setup = initialSetup(location.search, storage, maps);
-  }),
-  // The territory layer, the pieces and the globe: without them no game can be drawn.
-  loadGlobe().catch((error: unknown) => {
-    console.error(error);
   }),
 ]);
 void ready.then(() => {
