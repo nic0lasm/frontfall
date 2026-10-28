@@ -120,11 +120,12 @@ A proxy that closes quiet connections must allow at least 30 seconds: the server
 
 ## Is it working?
 
-| Address    | Answer                                                                                                   |
-| ---------- | -------------------------------------------------------------------------------------------------------- |
-| `/healthz` | `ok`, with the build in `X-Frontfall-Version`; `503` when the server is stuck or stopping                |
-| `/status`  | A page with the players online, the games running and the version                                        |
-| `/metrics` | Prometheus metrics, only from the host: `docker compose exec frontfall wget -qO- localhost:8080/metrics` |
+| Address       | Answer                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `/healthz`    | `ok`, with the build in `X-Frontfall-Version`; `503` when the server is stuck or stopping                |
+| `/status`     | A page with the players online, the games running and the version                                        |
+| `/stats.html` | Charts of the games played: per day, by map and by length, from `/api/stats`                             |
+| `/metrics`    | Prometheus metrics, only from the host: `docker compose exec frontfall wget -qO- localhost:8080/metrics` |
 
 Players can report each other from their menu. Read the reports and ban an abusive player's network, without a restart, as [server.md](server.md#reports-and-bans) shows; reports and bans are kept in the data volume.
 

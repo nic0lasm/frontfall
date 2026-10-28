@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frontfall statistics</title>
+    <meta
+      name="description"
+      content="Games played on a Frontfall server, by day, map and length. Counts only, nothing about any player."
+    />
+    <meta name="theme-color" content="#0A131C" />
+    <link rel="icon" href="./favicon.svg?v=2" type="image/svg+xml" sizes="any" />
+    <link rel="stylesheet" href="./about.css" />
+    <script type="module" src="./src/stats/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a href="./"><img src="./logo-horizontal-on-dark.svg" alt="Frontfall" /></a>
+        <nav>
+          <a href="./">Play</a>
+          <a href="./about.html">About</a>
+          <a href="./privacy.html">Privacy</a>
+        </nav>
+      </header>
+
+      <h1>Statistics</h1>
+      <p class="lead">
+        Games played on this server, by day, map and length, as each player's page reports them at
+        the end of a game: a game of four players counts four times, and players whose browser asks
+        not to be tracked are not counted. Nothing about any player is kept; the
+        <a href="./privacy.html">privacy policy</a> says what is. The same figures are published as
+        <a href="./api/stats">JSON</a>.
+      </p>
+      <p id="status" role="status">Loading the figures…</p>
+      <input id="saved" type="file" accept="application/json,.json" hidden />
+      <div id="charts"></div>
+    </main>
+  </body>
+</html>

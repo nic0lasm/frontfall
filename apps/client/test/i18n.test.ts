@@ -251,12 +251,16 @@ describe("applyTranslations", () => {
 });
 
 describe("hard-coded text", () => {
-  // The catalogues themselves are not interface text.
-  const sources = import.meta.glob<string>(["../src/**/*.ts", "!../src/i18n/**"], {
-    query: "?raw",
-    import: "default",
-    eager: true,
-  });
+  // The catalogues themselves are not interface text. The statistics page is in
+  // English only, like the side pages in public/ (#144), and loads no catalogue.
+  const sources = import.meta.glob<string>(
+    ["../src/**/*.ts", "!../src/i18n/**", "!../src/stats/**"],
+    {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    },
+  );
 
   // A string or template literal written straight into the page. Translated text
   // goes through t(), so these patterns only match text that skipped the catalogues.
