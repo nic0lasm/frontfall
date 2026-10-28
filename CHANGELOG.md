@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **Small effects for attacks, landings and missiles.** A pale dotted arc follows a missile and fades after it lands, where a flash, a ring and a few sparks mark the impact; a ship leaves a short wake; troops landing from a boat make a ring and a few drops on the shore; a trade ship rings the port it leaves and the one it reaches; and tiles that change hands along an attack spark for a moment. They are drawn only where you are looking, and they cost nothing in the first download. With "Reduce motion" on, or when your system asks for less motion, the trails stay and each impact becomes a single disc that fades without growing. Flat map only for now; the globe gets them later.
+
 ### Changed
 
 - **A raised, lit look for the interface.** Panels, the build dock, the menu and the end screen now sit above the map like raised pieces: a soft gradient, a light edge on top and a shadow, with rounder corners. The main button is a lit ember, your own row in the leaderboard and the build tool you picked are highlighted, gold is yellow, the buttons at the bottom right are round, and the end screen has a glow (ember for a win, blue for a defeat) and its figures in a recessed box. Nothing moves and every setting for interface size and contrast still applies.

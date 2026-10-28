@@ -9,6 +9,8 @@ export type ViewKind = "flat" | "globe";
 
 /** A unit to draw, in tiles, y counted from the north. */
 export interface UnitMark {
+  /** Tells a unit from one frame to the next, for the effects that follow it; unique among all units. */
+  readonly id?: number;
   readonly x: number;
   readonly y: number;
   readonly color: string;
@@ -72,6 +74,8 @@ export interface Renderer {
   setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean;
   /** Every structure on the map, replacing the previous ones. */
   setStructures(structures: readonly StructureMark[]): void;
+  /** Whether effects are still playing, which keeps frames coming; a renderer without effects leaves it out. */
+  animating?(): boolean;
   resize(width: number, height: number): void;
   render(view: CameraView): void;
   dispose(): void;

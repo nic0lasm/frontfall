@@ -79,9 +79,15 @@ describe("ship motion", () => {
       (p) => `c${String(p)}`,
     );
     // From x 9 to x 2 on a map 10 wide: east across the seam, not 7 tiles west.
-    expect(marks[0]).toEqual({ x: 10.5, y: 1, color: "c2" });
-    expect(marks[1]).toEqual({ x: 0, y: 2, color: "c3", kind: "trade" });
-    expect(marks[2]).toEqual({ x: 5, y: 0, color: MISSILE_COLOR, kind: "heavyMissile" });
+    expect(marks[0]).toEqual({ id: 1, x: 10.5, y: 1, color: "c2" });
+    expect(marks[1]).toEqual({ id: -1, x: 0, y: 2, color: "c3", kind: "trade" });
+    expect(marks[2]).toEqual({
+      id: 2 ** 41 + 1,
+      x: 5,
+      y: 0,
+      color: MISSILE_COLOR,
+      kind: "heavyMissile",
+    });
   });
 });
 

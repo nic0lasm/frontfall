@@ -72,6 +72,7 @@ export function shipMarks(
     const fromY = Math.floor(from / width);
     const toY = Math.floor(to / width);
     return {
+      id: ship.id,
       x: fromX + dx * progress,
       y: fromY + (toY - fromY) * progress,
       // Missiles in one bright colour, readable over any land.
