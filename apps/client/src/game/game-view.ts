@@ -1,4 +1,4 @@
-import type { GameRecord, Order, Phase, Turn } from "@frontfall/engine";
+import type { GameRecord, GameRules, Order, Phase, Turn } from "@frontfall/engine";
 import type { LabelAnchor } from "./label-anchors.ts";
 
 /*
@@ -33,6 +33,8 @@ export interface SoloOptions {
   teams?: number | undefined;
   /** What the game leaves out (R-MODE-03), as the engine's `Disable` bits; nothing when left out. */
   disabled?: number | undefined;
+  /** Special rules the game plays with (R-MODE-08); each one left out is off. */
+  rules?: Partial<GameRules> | undefined;
   playerName: string;
   /**
    * For tests that play a game to its end: ticks run per beat of the clock
@@ -287,9 +289,12 @@ export interface DiplomacyEvent {
     | "missile"
     | "stopped"
     | "gift"
-    | "quick";
+    | "quick"
+    | "collapsed";
   a: number;
   b: number;
+  /** Where a front collapsed, for "collapsed" (R-ATTACK-10). */
+  tile?: number;
   /** A quick message, by number (R-DIPLO-07). */
   phrase?: number;
 }

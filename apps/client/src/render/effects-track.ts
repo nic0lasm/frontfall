@@ -46,6 +46,13 @@ const REFERENCE_TILES = 2 ** 19;
 const FOAM = "#CFE8F5";
 const FLASH = "#FFE2A8";
 const GOLD = "#F2C14E";
+/** The ember of an active front (territory-layer.ts). */
+const EMBER = "#F25C2A";
+/** Tiles of depth a collapse takes on a 2^19-tile map, scaled like the blasts (R-ATTACK-10). */
+const COLLAPSE_DEPTH = 5;
+const COLLAPSE_LIFE = 1;
+/** Most collapse bursts alive at once. */
+const BURST_CAP = 8;
 
 /** Spacing of the dots of a trail on screen, in CSS pixels. */
 const TRAIL_PIXELS = 8;
@@ -86,6 +93,8 @@ export class EffectTracker {
   private readonly owners = new Set<number>();
   private seed = 0x9e3779b9;
   private readonly blast: number;
+  /** When the bursts of collapsed fronts still running end, in the layer's seconds. */
+  private readonly bursts: number[] = [];
 
   constructor(
     private readonly emit: (particle: Particle) => void,
@@ -209,6 +218,51 @@ export class EffectTracker {
     if (owners[tile] === 0 || !this.visible(x, y)) return;
     this.pulsedAt = now;
     this.emit(disc(x, y, now, 0.9, 5, 9, FLASH, 0.22, 14));
+  }
+
+  /**
+   * An ember shock ring that grows to the radius of a collapsed front, with a
+   * few sparks (R-ATTACK-10). Held still it is one ring that only fades. A
+   * burst is skipped outside the view, and at most BURST_CAP run at once, so a
+   * replay that jumps ahead is not a firework.
+   */
+  collapsed(tile: number, now: number): void {
+    const { width } = this.options;
+    const x = (tile % width) + 0.5;
+    const y = Math.floor(tile / width) + 0.5;
+    if (!this.visible(x, y)) return;
+    // Bursts whose life has run out make room for new ones.
+    let live = 0;
+    for (let i = 0; i < this.bursts.length; i++) {
+      if ((this.bursts[i] as number) > now) this.bursts[live++] = this.bursts[i] as number;
+    }
+    this.bursts.length = live;
+    if (live >= BURST_CAP) return;
+    this.bursts.push(now + COLLAPSE_LIFE);
+    const radius = COLLAPSE_DEPTH * this.blast;
+    if (!this.moving) {
+      this.emit({ ...ringOf(x, y, now, radius * 2, radius * 2), alpha: 0.7, life: 1 });
+      return;
+    }
+    this.emit(ringOf(x, y, now, radius * 0.4, radius * 2));
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + this.random() * 0.8;
+      const speed = radius * (0.7 + this.random() * 0.5);
+      this.emit({
+        x,
+        y,
+        dx: Math.cos(angle) * speed,
+        dy: Math.sin(angle) * speed,
+        birth: now,
+        life: 0.6 + this.random() * 0.3,
+        size0: 1.2,
+        size1: 0.3,
+        minPixels: 3,
+        color: i % 2 === 0 ? EMBER : FLASH,
+        alpha: 0.9,
+        shape: "dot",
+      });
+    }
   }
 
   private appeared(unit: Seen, now: number): void {
@@ -432,5 +486,22 @@ function disc(
     color,
     alpha,
     shape: "dot",
+  };
+}
+
+function ringOf(x: number, y: number, now: number, size0: number, size1: number): Particle {
+  return {
+    x,
+    y,
+    dx: 0,
+    dy: 0,
+    birth: now,
+    life: COLLAPSE_LIFE,
+    size0,
+    size1,
+    minPixels: 10,
+    color: EMBER,
+    alpha: 0.95,
+    shape: "ring",
   };
 }

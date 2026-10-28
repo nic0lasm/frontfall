@@ -22,6 +22,7 @@ import { achievementsPanel, earnedCount } from "./achievements.ts";
 import { feedbackLinks } from "./feedback.ts";
 import { h, present } from "./dom.ts";
 import type { ProfileControl } from "./profile-panel.ts";
+import { defaultRules, rulesFieldset } from "./rules-fieldset.ts";
 import { MAX_NAME_LENGTH, TEAM_CHOICES, cleanName, type GameSetup } from "./setup.ts";
 
 /** Sent on the document once the profile is erased, so that what shows it can change. */
@@ -190,6 +191,11 @@ export class Menu {
       mode.append(h("label", {}, input, h("span", { "data-i18n": `mode.${String(teams)}` })));
     }
 
+    // Special rules (R-MODE-08), apart from the other options and remembered with them.
+    const rules = rulesFieldset("menu", { ...defaultRules(), ...this.setup.rules }, (chosen) => {
+      this.setup.rules = chosen;
+    });
+
     const language = h("select", { id: "language", "data-i18n-attr": "aria-label:menu.language" });
     for (const { id, label } of LANGUAGES) {
       const option = h("option", { value: id, lang: id }, label);
@@ -277,6 +283,7 @@ export class Menu {
             h("span", { id: "mode-label", class: "field-label", "data-i18n": "menu.mode" }),
             mode,
           ),
+          rules.element,
         ),
       ),
       h("button", { type: "submit", class: "primary", id: "play", "data-i18n": "menu.play" }),

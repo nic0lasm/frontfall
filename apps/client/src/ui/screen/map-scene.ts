@@ -301,6 +301,10 @@ export class MapScene {
       this.fadingUntil = performance.now() + FADE_MS;
       this.frontsOffAt = performance.now() + FRONT_MS;
     }
+    for (const event of update.events) {
+      if (event.type === "collapsed" && event.tile !== undefined)
+        this.view?.collapsed?.(event.tile);
+    }
     this.lightHovered();
     this.placeStructures(update);
     this.placeFallout(update);

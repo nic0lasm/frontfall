@@ -4,6 +4,7 @@ import {
   Terrain,
   WorldGrid,
   loadSnapshot,
+  ruleBits,
   saveSnapshot,
   type DesyncReport,
   type Game,
@@ -79,10 +80,11 @@ export class SoloGame {
     const seed = options.record?.seed ?? options.seed;
     const teams = options.record ? (options.record.teams ?? 0) : (options.teams ?? 0);
     const disabled = options.record ? (options.record.disabled ?? 0) : (options.disabled ?? 0);
+    const rules = (options.record ? options.record.rules : options.rules) ?? {};
     const difficulty = options.record?.bots.difficulty ?? options.difficulty;
     const create = (): Game =>
       createSimulation(
-        { terrain, seed, players, balance, teams, disabled },
+        { terrain, seed, players, balance, teams, disabled, rules },
         botIds,
         nationIds,
         difficulty,
@@ -226,6 +228,7 @@ export class SoloGame {
       ...(this.nationIds.length > 0 ? { nations: this.nationIds } : {}),
       ...(this.game.teams > 0 ? { teams: this.game.teams } : {}),
       ...(this.game.disabled > 0 ? { disabled: this.game.disabled } : {}),
+      ...(ruleBits(this.game.rules) !== 0 ? { rules: { ...this.game.rules } } : {}),
       you: this.you,
       ticks: this.game.tick,
       turns: this.history,
@@ -258,6 +261,7 @@ export class SoloGame {
       ...(this.nationIds.length > 0 ? { nations: this.nationIds } : {}),
       ...(this.game.teams > 0 ? { teams: this.game.teams } : {}),
       ...(this.game.disabled > 0 ? { disabled: this.game.disabled } : {}),
+      ...(ruleBits(this.game.rules) !== 0 ? { rules: { ...this.game.rules } } : {}),
       you: this.you,
       ticks: this.game.tick,
       turns: this.history,

@@ -9,6 +9,7 @@ import { h, present } from "./dom.ts";
 import { feedbackBlock } from "./vote.ts";
 import { formatDuration, formatPercent } from "./format.ts";
 import type { StatsHistory } from "./screen/stats-history.ts";
+import { activeRuleNames } from "./rules-fieldset.ts";
 import { statsChart } from "./stats-chart.ts";
 
 export interface EndScreenActions {
@@ -39,6 +40,8 @@ export interface GameSummary {
   winShare: number;
   /** Colour of a player on the map. */
   color: (player: number) => string;
+  /** Special rules the game was played with (R-MODE-08); none shows nothing. */
+  special?: Readonly<Record<string, boolean>>;
   /** Where the game was played: the first button plays it again or goes back to the lobby. */
   kind: "solo" | "online" | "replay";
 }
@@ -78,6 +81,7 @@ export function endScreen(
     h("dd", {}, value),
   ];
 
+  const played = activeRuleNames(summary.special);
   const dialog = h(
     "section",
     {
@@ -110,6 +114,9 @@ export function endScreen(
         h("span", { class: "end-hero-label", "data-i18n": "end.peak" }),
       ),
       h("dl", { class: "end-stats" }, ...row("end.duration", formatDuration(seconds))),
+      ...(played.length > 0
+        ? [h("p", { class: "end-rules" }, t("setup.rules.played", { rules: played.join(", ") }))]
+        : []),
       ...present(
         statsChart({
           history: summary.stats,

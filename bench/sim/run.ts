@@ -21,6 +21,8 @@ const { values } = parseArgs({
     budget: { type: "string" },
     // A desync report to play again instead of a scripted game.
     replay: { type: "string" },
+    // Special rules to play with (R-MODE-08), by name: --rule collapsingFronts.
+    rule: { type: "string", multiple: true, default: [] },
   },
 });
 
@@ -56,6 +58,7 @@ const sim = new Simulation({
   players: integer("players"),
   seed: integer("seed"),
   orderInterval: integer("interval"),
+  ...(values.rule.length ? { rules: Object.fromEntries(values.rule.map((r) => [r, true])) } : {}),
 });
 const { game } = sim;
 console.log(

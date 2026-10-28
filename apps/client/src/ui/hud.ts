@@ -173,6 +173,7 @@ export class Hud {
     growthFloorPercent: 100,
     teams: [],
     disabled: 0,
+    special: { collapsingFronts: false },
   };
 
   private readonly touch: () => boolean;

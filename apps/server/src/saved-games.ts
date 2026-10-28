@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { GameOptions, GameSpeed, MAX_NAME_LENGTH } from "@frontfall/protocol";
+import { GameOptions, GameRules, GameSpeed, MAX_NAME_LENGTH } from "@frontfall/protocol";
 import { z } from "zod";
 import type { RoomSettings, SavedRoom } from "./room.ts";
 
@@ -40,6 +40,7 @@ const SETTINGS_KEYS = [
   "teams",
   "disabled",
   "speed",
+  "rules",
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 export type SavedSettings = Pick<RoomSettings, (typeof SETTINGS_KEYS)[number]>;
@@ -62,6 +63,8 @@ const SavedFile = z
           name: z.string().max(64).nullable(),
           // Saved before the speeds of R-MODE-07: such a game ran at 1.
           speed: GameSpeed.default(1),
+          // Saved before the special rules of R-MODE-08: such a game had none.
+          rules: GameRules.default({ collapsingFronts: false }),
         }),
         elapsedMs: z.number().min(0),
         seats: z

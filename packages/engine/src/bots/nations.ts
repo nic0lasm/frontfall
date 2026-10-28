@@ -88,6 +88,10 @@ export function installNations(
   const graceTicks = graceSeconds * balance.ticksPerSecond;
   const pileTicks = NATION_PILE_SECONDS * balance.ticksPerSecond;
   const reservePercent = nationParams.reservePercent;
+  const topology = game.terrain.topology;
+  // R-BOT-16: soldiers' reach along each neighbour's front, reused every decision.
+  const facing = new Map<number, number>();
+  const around = new Int32Array(4);
   const nations = [...new Set(ids)].sort((a, b) => a - b);
   const nationSet = new Set(nations);
   for (const id of nations) {
@@ -169,7 +173,12 @@ export function installNations(
     // Troops past the cap would be wasted: a full army takes the odds a bot would.
     const full = nation.troops * 100 >= cap * NATION_FULL_PERCENT;
     // R-BOT-15: at work while full and at peace.
-    work(nation, attacker === NEUTRAL && full && enemies.size === 0 ? NATION_WORK_PERCENT : 0);
+    work(
+      nation,
+      attacker === NEUTRAL && full && enemies.size === 0 && !exposedAtWork(nation)
+        ? NATION_WORK_PERCENT
+        : 0,
+    );
     const reserve = percentOf(cap, reservePercent);
     // R-ECO-07: only soldiers leave; workers count towards the reserve at home.
     const sendable = (): number =>
@@ -197,6 +206,8 @@ export function installNations(
     }
     // Less than the price of one tile would come straight back.
     if (troops < balance.neutralCost) return;
+    // R-BOT-16: a front about to give way gets everything the nation can send.
+    if (game.rules.collapsingFronts && press(nation, armed)) return;
 
     // R-BOT-09: early on, free land only; an attacker is still answered above (R-BOT-08).
     // So is a nation whose attacker holds no land along its border yet, as when a ship has not landed.
@@ -222,6 +233,64 @@ export function installNations(
       const sent = target === enemy ? armed() : troops;
       game.apply(nation.id, { type: "attack", target, troops: sent });
     } else sail(game, nation, troops, odds, seaCooldowns, retryTicks, accept);
+  }
+
+  /**
+   * R-BOT-16: with collapsing fronts (R-ATTACK-10), whether putting
+   * B-NATION-WORK of its troops to work would leave a front that half the
+   * soldiers of the player across it could overwhelm.
+   */
+  function exposedAtWork(nation: Player): boolean {
+    if (!game.rules.collapsingFronts) return false;
+    const tiles = territory.tileCount(nation.id);
+    const perTile = divFloor(nation.troops - percentOf(nation.troops, NATION_WORK_PERCENT), tiles);
+    facing.clear();
+    // Each of the nation's tiles counts once per neighbour, as R-ATTACK-10 counts the front.
+    const borders = territory.borderCount(nation.id);
+    for (let i = 0; i < borders; i++) {
+      const count = topology.neighborsInto(territory.borderTile(nation.id, i), around);
+      for (let j = 0; j < count; j++) {
+        const owner = territory.ownerOf(around[j] as number);
+        if (owner === nation.id || owner === NEUTRAL) continue;
+        let seen = false;
+        for (let k = 0; k < j && !seen; k++)
+          seen = territory.ownerOf(around[k] as number) === owner;
+        if (!seen) facing.set(owner, (facing.get(owner) ?? 0) + 1);
+      }
+    }
+    for (const [owner, front] of facing) {
+      const neighbour = game.player(owner);
+      if (!neighbour?.alive || isAllied(game, nation.id, owner)) continue;
+      const threat = percentOf(soldiers(neighbour), 50);
+      if (threat * 10 >= balance.collapseOddsTenths * Math.max(1, perTile * front)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * R-BOT-16: with collapsing fronts (R-ATTACK-10), feeds its attack on a
+   * player that is building pressure, so the front breaks before the odds
+   * turn. Whether it sent anything.
+   */
+  function press(nation: Player, armed: () => number): boolean {
+    const own = territory.tileCount(nation.id);
+    const pushing = game.attacks.find(
+      (attack) =>
+        attack.player === nation.id &&
+        attack.target !== NEUTRAL &&
+        attack.pressure > 0 &&
+        territory.tileCount(attack.target) > own,
+    );
+    if (!pushing) return false;
+    const target = pushing.target;
+    const aim =
+      territory.ownerOf(pushing.aim) === target
+        ? pushing.aim
+        : scanBorder(game, nation, (owner) => owner === target).enemy;
+    if (aim < 0) return false;
+    const troops = armed();
+    if (troops < balance.neutralCost) return false;
+    return game.apply(nation.id, { type: "attack", target: aim, troops });
   }
 
   /**

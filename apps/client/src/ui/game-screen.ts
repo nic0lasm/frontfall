@@ -96,6 +96,8 @@ export class GameScreen {
   /** What the game leaves out (R-MODE-03): its build keys do nothing. */
   private disabled = 0;
   private ownableTiles = 1;
+  /** Special rules of the game (R-MODE-08), for the end screen. */
+  private special: Readonly<Record<string, boolean>> = {};
   private peakTiles = 0;
   private winShare = 100;
   private stats = new StatsRecorder(10);
@@ -293,6 +295,7 @@ export class GameScreen {
           this.winShare = info.rules.winSharePercent;
           this.stats = new StatsRecorder(info.rules.ticksPerSecond);
           this.ownableTiles = info.rules.ownableTiles;
+          this.special = { ...info.rules.special };
           if (!options.record) {
             this.achievements.start(info.rules, link ? undefined : options.difficulty);
             // Without it the game goes on in silence.
@@ -768,6 +771,7 @@ export class GameScreen {
           // Only a published map can be pinned in a record.
           canRecord: this.published,
           teams: this.teams,
+          special: this.special,
           details: `${this.options.map}, ${usage().device().device}`,
           kind: this.link ? "online" : this.options.record ? "replay" : "solo",
         },

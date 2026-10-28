@@ -8,6 +8,7 @@ import {
   TurnClock,
   WorldGrid,
   type Game,
+  type GameRules,
 } from "@frontfall/engine";
 
 export interface SimulationOptions {
@@ -19,6 +20,8 @@ export interface SimulationOptions {
   readonly terrain?: Terrain;
   /** Ticks each player waits between two attack orders. */
   readonly orderInterval: number;
+  /** Special rules to play with (R-MODE-08); none when left out. */
+  readonly rules?: Partial<GameRules>;
 }
 
 /**
@@ -81,6 +84,7 @@ export class Simulation {
         id: i + 1,
         name: `Player ${String(i + 1)}`,
       })),
+      ...(options.rules ? { rules: options.rules } : {}),
     });
     this.clock = new TurnClock(this.game);
     // Separate from the game's generator, so the script does not shift the rules' draws.

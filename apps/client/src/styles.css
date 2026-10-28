@@ -1459,3 +1459,42 @@ input::placeholder {
     padding-block: 14px;
   }
 }
+
+/* Special rules (R-MODE-08): a fieldset of its own, apart from the other options. */
+.rules-set {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--ff-night-500);
+  border-radius: var(--ff-radius);
+}
+
+.rules-set legend {
+  padding: 0 6px;
+  color: var(--ff-slate-300);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rules-set .toggle {
+  min-height: 40px;
+}
+
+.rules-set .hint {
+  text-align: left;
+}
+
+.lobby-settings > .rules-set {
+  grid-column: 1 / -1;
+}
+
+.end-rules {
+  margin: 0;
+  color: var(--ff-slate-300);
+  font-size: 13px;
+}

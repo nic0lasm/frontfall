@@ -1,4 +1,10 @@
-import type { DesyncReport, GameRecord, Order, Turn } from "@frontfall/engine";
+import type {
+  DesyncReport,
+  GameRecord,
+  GameRules as SpecialRules,
+  Order,
+  Turn,
+} from "@frontfall/engine";
 import type { MapManifest } from "@frontfall/protocol";
 import type { MapInfo } from "./maps.ts";
 import type { StartInfo } from "./session.ts";
@@ -35,6 +41,8 @@ export interface GameRules {
   readonly teams: readonly number[];
   /** What the game leaves out (R-MODE-03), as the engine's `Disable` bits. */
   readonly disabled: number;
+  /** Special rules of the game (R-MODE-08). */
+  readonly special: SpecialRules;
 }
 
 /** From the page to the simulation worker. */
