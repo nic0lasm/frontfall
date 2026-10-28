@@ -83,7 +83,7 @@ The player menu of an online game has **Report this player**, with four reasons 
 }
 ```
 
-Each counter is one dimension, such as `games` by mode or `map` by map, never a combination that could narrow down to one player. The same totals are in `/metrics` as `frontfall_usage_total{dimension, value}`. With `FRONTFALL_DATA` set, the server keeps the counters in `usage/usage.json` under that directory, readable by its own user only, so that they survive a restart.
+The [statistics page](https://nclsmgr.com/frontfall/stats.html) draws some of them: games per day, maps and game length. Each counter is one dimension, such as `games` by mode or `map` by map, never a combination that could narrow down to one player. The same totals are in `/metrics` as `frontfall_usage_total{dimension, value}`. With `FRONTFALL_DATA` set, the server keeps the counters in `usage/usage.json` under that directory, readable by its own user only, so that they survive a restart.
 
 ## Ideas and bugs
 
