@@ -26,6 +26,7 @@ export default defineConfig({
         "packages/**/index.ts",
         "apps/server/src/main.ts",
         "apps/client/src/render/map-view.ts",
+        "apps/client/src/render/minimap.ts",
         "apps/client/src/game/local-session.ts",
         "apps/client/src/game/sim.worker.ts",
       ],

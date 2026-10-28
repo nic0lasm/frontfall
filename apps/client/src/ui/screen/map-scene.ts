@@ -5,6 +5,7 @@ import { colorOf } from "../../palette.ts";
 import type { CameraView, ViewCamera } from "../../render/camera.ts";
 import {
   createCamera,
+  createMinimap,
   createRenderer,
   fitsGlobe,
   FRONT_SECONDS,
@@ -12,8 +13,10 @@ import {
   type Renderer,
   type ViewKind,
 } from "../../render/renderer.ts";
+import type { Minimap } from "../../render/minimap.ts";
 import { usage } from "../../usage.ts";
 import { accessibility, motionReduced } from "../accessibility.ts";
+import { safeStorage } from "../setup.ts";
 import { sailing, shipMarks, shipTiles } from "./ship-motion.ts";
 
 /** Matches the fade of the territory layer, with a frame to spare. */
@@ -48,6 +51,8 @@ export class MapScene {
   private owners = new Uint16Array(0);
   private cam: ViewCamera;
   private view: Renderer | undefined;
+  /** The overview in a corner, once the code it comes with has arrived. */
+  private minimap: Minimap | undefined;
   /** Stops reporting the context of the current renderer as lost, ahead of freeing it. */
   private unwatchContext: (() => void) | undefined;
   private latest: GameUpdate | undefined;
@@ -103,6 +108,11 @@ export class MapScene {
     return this.viewKind;
   }
 
+  /** The minimap's element, for the screen to put in its HUD; none while its code is missing. */
+  get minimapElement(): HTMLElement | undefined {
+    return this.minimap?.element;
+  }
+
   /** Who owns the tile, 0 for nobody. */
   ownerAt(tile: number): number {
     return this.owners[tile] ?? 0;
@@ -112,6 +122,8 @@ export class MapScene {
   dispose(): void {
     this.unwatchContext?.();
     this.unwatchContext = undefined;
+    this.minimap?.dispose();
+    this.minimap = undefined;
     this.view?.dispose();
     this.view = undefined;
   }
@@ -135,7 +147,34 @@ export class MapScene {
     this.owners = new Uint16Array(start.map.width * start.map.height);
     this.wrapsX = start.map.wrapsX;
     this.shown = start;
-    this.mount();
+    const view = this.mount();
+    if (view) this.addMinimap(start, view);
+  }
+
+  /** The minimap of a game: over the ground the renderer baked, in the players' colours. */
+  private addMinimap(start: SceneStart, view: Renderer): void {
+    const { map, you, maxPlayer, firstNation, teams } = start;
+    this.minimap = createMinimap({
+      source: {
+        width: map.width,
+        height: map.height,
+        kinds: map.kinds,
+        wrapsX: map.wrapsX,
+        ground: view.ground?.(),
+      },
+      owners: this.owners,
+      maxOwner: maxPlayer,
+      you,
+      camera: () => this.cam,
+      onMove: (tile) => {
+        this.cam.focus(tile);
+      },
+      compact: window.matchMedia("(width < 720px), (height < 560px)").matches,
+      storage: safeStorage(),
+    });
+    for (let id = 1; id <= maxPlayer; id++) {
+      this.minimap?.setColor(id, colorOf(id, firstNation, teams));
+    }
   }
 
   /** Makes the renderer of the current kind over the owners array, already filled or not. */
@@ -234,12 +273,17 @@ export class MapScene {
     this.updatedAt = performance.now();
     if (update.owners) {
       this.owners.set(update.owners);
+      this.minimap?.noteAll();
       this.view?.markAllChanged();
       this.dirty = true;
     } else if (update.changedTiles.length > 0) {
       const { changedTiles, changedOwners } = update;
+      const now = performance.now();
       for (let i = 0; i < changedTiles.length; i++) {
-        this.owners[changedTiles[i] as number] = changedOwners[i] as number;
+        const tile = changedTiles[i] as number;
+        const owner = changedOwners[i] as number;
+        this.minimap?.noteChange(tile, this.owners[tile] as number, owner, now);
+        this.owners[tile] = owner;
       }
       this.view?.markChanged(changedTiles);
       this.dirty = true;
@@ -268,6 +312,7 @@ export class MapScene {
    * while nothing moves, during a pause above all.
    */
   draw(now: number): void {
+    this.minimap?.tick(now);
     const view = this.cam.view();
     const moved = !sameView(view, this.drawnView);
     const moving = sailing(this.latest);

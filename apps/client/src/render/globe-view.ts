@@ -181,6 +181,10 @@ export class GlobeView implements Renderer {
     }
   }
 
+  ground(): Uint8Array {
+    return this.territory.groundTexture.image.data as Uint8Array;
+  }
+
   resize(width: number, height: number): void {
     this.renderer.setSize(width, height, false);
     this.cssWidth = Math.max(1, width);

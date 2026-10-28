@@ -1134,3 +1134,135 @@
     bottom: 96px;
   }
 }
+
+/* The mini-map (render/minimap.ts): bottom right, over the tools (docs/hud-layout.md). Up to
+   200 by 130 as a panel with its title and a button to fold it; folded, only a round button stays. */
+.minimap {
+  right: 12px;
+  bottom: 64px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 6px;
+}
+
+.minimap-title {
+  margin: 0 0 0 4px;
+  color: var(--ff-slate-300);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.minimap-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--ff-slate-300);
+  cursor: pointer;
+}
+
+.minimap-toggle:hover {
+  border-color: var(--ff-slate-400);
+  color: var(--ff-text);
+}
+
+.minimap-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.minimap-map {
+  position: relative;
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+  /* Up to 188 by 90 inside the panel, in the map's own proportions. */
+  width: min(188px, calc(90px * var(--minimap-aspect, 2)));
+  aspect-ratio: var(--minimap-aspect, 2);
+  justify-self: end;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 10%);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.minimap-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* What the camera shows: a paper frame with a dark edge on both sides, readable over any colour. */
+.minimap-view {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--ff-text);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgb(6 12 18 / 75%),
+    inset 0 0 0 1px rgb(6 12 18 / 75%);
+  pointer-events: none;
+}
+
+.minimap-view[data-seam-left] {
+  border-left-width: 0;
+}
+
+.minimap-view[data-seam-right] {
+  border-right-width: 0;
+}
+
+/* Folded: the panel gives way to a round button like the tools. */
+.minimap:not([data-open]) {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.minimap:not([data-open]) .minimap-toggle {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--ff-night-500);
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--ff-night-500), var(--ff-night-600));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+  color: var(--ff-text);
+}
+
+.minimap:not([data-open]) .minimap-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.minimap-toggle:focus-visible,
+.minimap-map:focus-visible {
+  outline: 2px solid var(--ff-text);
+  outline-offset: 2px;
+}
+
+/* Phones: the bottom right belongs to the leaderboard chip, so the mini-map takes the top right,
+   beside the figures, folded until it is asked for. Other panels draw over it. */
+@media (width < 720px) {
+  .minimap {
+    top: 12px;
+    right: 12px;
+    bottom: auto;
+  }
+
+  .minimap-map {
+    width: min(150px, max(96px, calc(100vw - 252px)), calc(70px * var(--minimap-aspect, 2)));
+  }
+
+  .minimap:not([data-open]) .minimap-toggle {
+    width: 36px;
+    height: 36px;
+  }
+}

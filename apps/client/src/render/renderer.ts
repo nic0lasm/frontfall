@@ -80,6 +80,8 @@ export interface Renderer {
   setStructures(structures: readonly StructureMark[]): void;
   /** Whether effects are still playing, which keeps frames coming; a renderer without effects leaves it out. */
   animating?(): boolean;
+  /** The baked colours of the ground, with the distance to the coast in alpha, for the minimap to reuse. */
+  ground?(): Uint8Array | undefined;
   resize(width: number, height: number): void;
   render(view: CameraView): void;
   dispose(): void;
@@ -110,6 +112,11 @@ export function globeLoaded(): boolean {
 export function createRenderer(options: RendererOptions, kind: ViewKind = "flat"): Renderer {
   if (!lazy) throw new Error("the map's drawing code is not loaded (loadGlobe)");
   return kind === "globe" ? new lazy.GlobeView(options) : new MapView(options, lazy, lazy);
+}
+
+/** The minimap of a game, once the chunk is there; none before, and the game goes on without it. */
+export function createMinimap(options: Lazy.MinimapOptions): Lazy.Minimap | undefined {
+  return lazy ? new lazy.Minimap(options) : undefined;
 }
 
 /** The camera that goes with a renderer of the same kind. */
