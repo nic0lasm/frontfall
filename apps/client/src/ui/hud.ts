@@ -298,24 +298,30 @@ export class Hud {
     this.element = h(
       "div",
       { class: "hud", id: "hud" },
+      // On a wide screen these three make one bar at the foot of the map; elsewhere they
+      // keep their own corners (the bar then has no box of its own, see game.css).
       h(
-        "section",
-        { class: "panel stats", "data-i18n-attr": "aria-label:hud.yourEmpire" },
-        stat("hud.troops", this.troops, this.troopsCap),
-        stat("hud.gold", this.gold),
-        stat("hud.land", this.land),
+        "div",
+        { class: "bar" },
+        h(
+          "section",
+          { class: "panel stats", "data-i18n-attr": "aria-label:hud.yourEmpire" },
+          stat("hud.troops", this.troops, this.troopsCap),
+          stat("hud.gold", this.gold),
+          stat("hud.land", this.land),
+        ),
+        h(
+          "div",
+          { class: "panel ratio" },
+          h("label", { for: "attack-ratio", "data-i18n": "hud.ratio" }),
+          this.ratioInput,
+          this.ratioValue,
+        ),
+        buildPanel,
       ),
       this.banner,
       this.leaderboard,
-      h(
-        "div",
-        { class: "panel ratio" },
-        h("label", { for: "attack-ratio", "data-i18n": "hud.ratio" }),
-        this.ratioInput,
-        this.ratioValue,
-      ),
       this.attackPanel,
-      buildPanel,
       this.tip,
       h("div", { class: "toolbar" }, this.buildToggle, help, ...(pausable ? [pause] : []), menu),
     );

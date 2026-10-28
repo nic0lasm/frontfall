@@ -1082,3 +1082,55 @@
     background: rgb(10 19 28 / 90%);
   }
 }
+
+/* One bar at the foot of the map on a wide screen: your figures, the share of
+   troops an attack takes and the buildings, side by side. Narrower, the three keep
+   their own corners and the bar has no box of its own. */
+.bar {
+  display: contents;
+}
+
+@media (width >= 1240px) and (height >= 560px) {
+  .bar {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    padding: 6px;
+    border: 1px solid var(--ff-night-500);
+    border-radius: 14px;
+    background: var(--ff-raised);
+    box-shadow: var(--ff-lift);
+  }
+
+  .bar > .panel {
+    position: static;
+    align-items: center;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .bar > .panel + .panel {
+    padding-left: 14px;
+    border-left: 1px solid var(--ff-night-500);
+  }
+
+  .bar .ratio {
+    width: 240px;
+  }
+
+  .game .click-note,
+  .build-tip {
+    bottom: 96px;
+  }
+
+  .attacks {
+    bottom: 96px;
+  }
+}

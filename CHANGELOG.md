@@ -17,6 +17,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **A coloured build dock, with the price in sight.** Each building has its colour (blue for the economy, green for defence, ember for arms) and its price sits under its icon, so you no longer hover to read it. The name and key still show on hover.
 - **On a phone, a lighter screen.** The leaderboard folds into a one-line chip with your own row (tap the arrow for the whole list), and the first steps become a banner above the bottom bar instead of a card over the map.
 - **A high point on the end screen.** The most land you held at once is now the big figure, in a larger display face fetched only when a game ends, and the thumbs up and down are drawn instead of system emoji.
+- **One bar at the foot of the map on a wide screen.** Your troops, gold and land, the share of troops an attack takes and the buildings now sit side by side in a single bar at the bottom left, so what you use in a game is in one place and the top left is clear for the first steps. Narrower windows and phones keep their layout.
 
 ### For self-hosters and contributors
 
