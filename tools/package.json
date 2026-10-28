@@ -7,7 +7,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "maps": "tsx src/mapgen/cli.ts"
+    "maps": "tsx src/mapgen/cli.ts",
+    "announce": "tsx src/announce-cli.ts"
   },
   "dependencies": {
     "@frontfall/engine": "workspace:*",
