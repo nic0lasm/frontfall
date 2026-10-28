@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { MAP_COLORS, STRUCTURE_COLORS } from "../palette.ts";
 import type { CameraView } from "./camera.ts";
+import type { EffectsLayer } from "./effects-layer.ts";
 import { applyView } from "./orthographic.ts";
 import type { Renderer, RendererOptions, StructureMark, UnitMark } from "./renderer.ts";
 import { TerritoryLayer } from "./territory-layer.ts";
@@ -68,6 +69,10 @@ export class MapView implements Renderer {
   private readonly heavyMissiles: UnitLayer;
   private readonly structures: Record<StructureMark["type"], StructureLayers>;
   private readonly startedAt = performance.now();
+  /** Combat effects, once their code has arrived; they are not in the first bundle. */
+  private effects: EffectsLayer | undefined;
+  private moving = true;
+  private disposed = false;
   /** Width of the canvas in CSS pixels, to keep structures readable when zoomed out. */
   private cssWidth = 1;
 
@@ -163,6 +168,30 @@ export class MapView implements Renderer {
       airDefense: layers(12, 4),
     };
     this.camera.position.z = 10;
+    this.loadEffects();
+  }
+
+  private loadEffects(): void {
+    void import("./effects-layer.ts").then(
+      ({ EffectsLayer }) => {
+        if (this.disposed) return;
+        this.effects = new EffectsLayer({
+          three: [
+            THREE.Mesh,
+            THREE.ShaderMaterial,
+            THREE.InstancedBufferGeometry,
+            THREE.InstancedBufferAttribute,
+            THREE.BufferAttribute,
+          ],
+          map: this.options,
+          scene: this.scene,
+          anchor: this.territory.mesh.position,
+          moving: this.moving,
+        });
+      },
+      // The map is as playable without them.
+      () => undefined,
+    );
   }
 
   setPlayerColor(id: number, color: string): void {
@@ -183,12 +212,15 @@ export class MapView implements Renderer {
   }
 
   setMotion(moving: boolean): void {
+    this.moving = moving;
+    this.effects?.setMotion(moving);
     this.territory.setMotion(moving);
   }
 
   /** Tiles whose owner changed in the shared array since the last frame; they fade in. */
   markChanged(tiles: ArrayLike<number>): void {
     this.territory.markChanged(tiles, this.clock());
+    this.effects?.changed(tiles, this.clock());
   }
 
   markAllChanged(): void {
@@ -220,6 +252,11 @@ export class MapView implements Renderer {
     this.warships.count = warships;
     this.missiles.count = missiles;
     this.heavyMissiles.count = heavy;
+    this.effects?.ships(ships, this.clock());
+  }
+
+  animating(): boolean {
+    return this.effects?.alive(this.clock()) ?? false;
   }
 
   setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean {
@@ -273,6 +310,7 @@ export class MapView implements Renderer {
       outline.update(this.camera.position.x);
       fill.update(this.camera.position.x);
     }
+    this.effects?.update(this.clock(), this.camera.position.x, view, tilesPerPixel);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -282,6 +320,8 @@ export class MapView implements Renderer {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.effects?.dispose();
     this.territory.dispose();
     this.ships.dispose();
     this.tradeShips.dispose();

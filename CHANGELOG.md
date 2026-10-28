@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **Small effects for attacks, landings and missiles.** A pale dotted arc follows a missile and fades after it lands, where a flash, a ring and a few sparks mark the impact; a ship leaves a short wake; troops landing from a boat make a ring and a few drops on the shore; a trade ship rings the port it leaves and the one it reaches; and tiles that change hands along an attack spark for a moment. They are drawn only where you are looking, and they cost nothing in the first download. With "Reduce motion" on, or when your system asks for less motion, the trails stay and each impact becomes a single disc that fades without growing. Flat map only for now; the globe gets them later.
+
 ## [0.6.3] - 2026-10-28
 
 A privacy policy and terms of use for the public server.

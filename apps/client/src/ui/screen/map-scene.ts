@@ -272,7 +272,10 @@ export class MapScene {
     const fading = now < this.fadingUntil;
     const frontsOff = this.frontsOffAt > 0 && now >= this.frontsOffAt;
     if (frontsOff) this.frontsOffAt = 0;
-    if (this.view && (moved || this.dirty || moving || fading || frontsOff)) {
+    if (
+      this.view &&
+      (moved || this.dirty || moving || fading || frontsOff || this.view.animating?.())
+    ) {
       this.placeShips(now);
       this.view.render(view);
       this.drawnView = view;
