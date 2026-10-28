@@ -50,6 +50,28 @@ describe("landLost", () => {
 });
 
 describe("FeedWatcher", () => {
+  it("warns once when a front reaches the player's capital, and tells of a capital taken (R-CAP)", () => {
+    const watcher = new FeedWatcher(true);
+    const capitals = (threat: number) => ({ falls: [], threat, standsIn: 0 });
+    const players = update().players.map((p) => (p.id === 1 ? { ...p, capital: 42 } : p));
+    watcher.observe(update({ players, capitals: capitals(0) }), new Map(), mine);
+    const warned = watcher.observe(update({ players, capitals: capitals(2) }), new Map(), mine);
+    expect(warned).toEqual([
+      expect.objectContaining({ key: "siege:2", tone: "bad", tile: 42, player: 2, mine: true }),
+    ]);
+    expect(warned[0]?.text).toContain("Bo");
+    expect(watcher.observe(update({ players, capitals: capitals(2) }), new Map(), mine)).toEqual(
+      [],
+    );
+    const taken = watcher.observe(
+      update({ events: [{ type: "capital", a: 1, b: 3 }], capitals: capitals(0) }),
+      new Map(),
+      mine,
+    );
+    expect(taken).toEqual([expect.objectContaining({ tone: "good", player: 3, mine: true })]);
+    expect(taken[0]?.text).toContain("Cy");
+  });
+
   it("says nothing about what was already there at the first update", () => {
     const watcher = new FeedWatcher(true);
     const first = update({

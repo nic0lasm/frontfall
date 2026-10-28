@@ -8,6 +8,15 @@ export {
   type Attack,
 } from "./attacks.ts";
 export { DEFAULT_BALANCE, type Balance } from "./balance.ts";
+export {
+  capitalAim,
+  capitalAlertDistance,
+  capitalRadius,
+  capitalThreat,
+  capitalsStand,
+  guardedByCapital,
+  installCapitals,
+} from "./capitals.ts";
 export { installBoats, reachableCoasts, seaRoute, type Boat, type SeaRoute } from "./boats.ts";
 export { createGame } from "./create-game.ts";
 export {
@@ -84,6 +93,8 @@ export {
   Game,
   MAX_TEAMS,
   ruleBits,
+  NO_RULES,
+  type CapitalFall,
   type GameRules,
   type GameSetup,
   type Order,

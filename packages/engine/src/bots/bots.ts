@@ -1,3 +1,4 @@
+import { capitalAim } from "../capitals.ts";
 import { populationCap } from "../economy.ts";
 import { allianceOf, alliesOf, canRenew, isTraitor, sameTeam } from "../diplomacy.ts";
 import type { Game, Player } from "../game.ts";
@@ -84,7 +85,9 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
     // Free land is cheaper than a fight: while some is in reach, only a much weaker neighbour is worth attacking.
     const muchWeaker = weak && enemyDensity * 200 <= ownDensity * params.boldnessPercent;
     const target = neutral >= 0 && !muchWeaker ? neutral : weak ? enemy : -1;
-    if (target >= 0) game.apply(bot.id, { type: "attack", target, troops });
+    // R-BOT-17: an attack on a player heads for their capital.
+    const aim = target >= 0 && target === enemy ? capitalAim(game, target) : target;
+    if (target >= 0) game.apply(bot.id, { type: "attack", target: aim, troops });
     else sail(game, bot, troops, params.boldnessPercent, seaCooldowns, retryTicks);
   }
 

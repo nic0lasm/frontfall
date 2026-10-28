@@ -44,3 +44,25 @@
   height: 22px;
   fill: currentcolor;
 }
+
+/* Capital mode: the player's own capital first, then the fallen ones (R-CAP-03). */
+.end-capitals h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.end-capital-story {
+  margin: 0 0 6px;
+  font-weight: 700;
+}
+
+.end-falls {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.end-falls .mine {
+  color: var(--ff-ember);
+}

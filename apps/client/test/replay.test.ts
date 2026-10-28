@@ -23,9 +23,9 @@ function publishedMap(): MapData {
 }
 
 /** A solo game played for `ticks` ticks, with a start and one attack from the player. */
-function played(ticks: number): SoloGame {
+function played(ticks: number, rules?: SoloOptions["rules"]): SoloGame {
   const map = publishedMap();
-  const solo = new SoloGame(options, map);
+  const solo = new SoloGame({ ...options, rules }, map);
   const land = map.kinds.findIndex((kind) => kind !== TileKind.Water);
   solo.step([{ type: "spawn", tile: land }]);
   while (solo.game.phase === "spawn") solo.step([]);
@@ -68,6 +68,23 @@ describe("replays (#50)", () => {
     expect(update.players.map((player) => player.name)).toEqual(
       solo.step([]).players.map((player) => player.name),
     );
+  });
+
+  it("record the special rules, and play the game again under them (R-MODE-08)", async () => {
+    expect(played(50).record()?.rules).toBeUndefined();
+    const solo = played(300, { capitals: true });
+    expect(solo.game.rules.capitals).toBe(true);
+    const record = solo.record();
+    if (!record) throw new Error("no record");
+    expect(record.rules).toEqual({ collapsingFronts: false, capitals: true });
+    expect(await readReplayFile(await replayFile(record), "dev")).toEqual(record);
+    // The record wins over the options of the page that watches it.
+    const replay = new SoloGame(
+      { ...options, rules: { collapsingFronts: false, capitals: false }, record },
+      publishedMap(),
+    );
+    expect(replay.game.rules.capitals).toBe(true);
+    expect(replay.replay(1000).replay?.hash).toBe(record.hash);
   });
 
   it("keeps nothing to record while watching, nor on a map with no file", () => {

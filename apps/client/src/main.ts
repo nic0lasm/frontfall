@@ -251,6 +251,7 @@ function begin(map: MapInfo, code: GameModule): void {
       humans: 1,
       difficulty: setup.difficulty,
       disabled: setup.disabled ?? 0,
+      rules: { ...DEFAULT_RULES, ...setup.rules },
     },
   );
   menu?.dispose();
@@ -799,6 +800,7 @@ function startOnline(
       humans: Math.max(1, start.players.length),
       difficulty: start.difficulty,
       disabled: start.disabled,
+      rules: start.rules,
     },
   );
   document.body.classList.add("playing");

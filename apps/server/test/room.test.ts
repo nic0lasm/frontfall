@@ -14,7 +14,7 @@ const PUBLIC: RoomSettings = {
   teams: 0,
   disabled: 0,
   speed: 1,
-  rules: { collapsingFronts: true },
+  rules: { collapsingFronts: true, capitals: false },
   minPlayers: 2,
   countdownMs: 10_000,
   hostIdleMs: 120_000,
@@ -228,6 +228,7 @@ describe("private lobby", () => {
       disabled: 40,
       capacity: 6,
       autoStart: false,
+      rules: { collapsingFronts: true, capitals: true },
     } as const;
     expect(room.configure(guest.seat, options, 0)).toBe("not_host");
     expect(room.configure(host.seat, options, 0)).toBeUndefined();
@@ -241,8 +242,31 @@ describe("private lobby", () => {
       nations: false,
       teams: 0,
       disabled: 40,
+      rules: { collapsingFronts: true, capitals: true },
     });
     expect(room.configure(host.seat, options, 0)).toBe("game_started");
+  });
+
+  it("keeps the special rules as they were when the host's options leave them out (R-MODE-08)", () => {
+    const room = new Room(
+      "game0000",
+      { ...PRIVATE, rules: { collapsingFronts: true, capitals: true } },
+      1,
+    );
+    const host = seated(room, "Host");
+    expect(host.peer.last("lobby").rules).toEqual({ collapsingFronts: true, capitals: true });
+    const options = {
+      map: "world",
+      bots: 0,
+      difficulty: "normal",
+      nations: true,
+      teams: 0,
+      disabled: 0,
+      capacity: 4,
+      autoStart: false,
+    } as const;
+    expect(room.configure(host.seat, options, 0)).toBeUndefined();
+    expect(host.peer.last("lobby").rules).toEqual({ collapsingFronts: true, capitals: true });
   });
 
   it("hands the host role to the next player", () => {

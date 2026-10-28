@@ -93,6 +93,8 @@ export interface GameReport {
   readonly missileBurst: number;
   /** Share of the land the leading player holds at the end, in %. */
   readonly leaderSharePercent: number;
+  /** Capitals taken, in minutes of play (R-CAP-03); empty without capital mode. */
+  readonly capitalFalls: readonly { minute: number; player: number; by: number }[];
   readonly hash: number;
   readonly ms: number;
 }
@@ -352,6 +354,9 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     minutes,
     missileBurst,
     leaderSharePercent: (leaderNow().tiles * 100) / ownable,
+    capitalFalls: game.capitalFalls
+      .filter((fall) => fall.by !== 0)
+      .map(({ tick, player, by }) => ({ minute: playMinutes(tick), player, by })),
     hash: game.hash(),
     ms: Math.round(performance.now() - began),
   };

@@ -69,7 +69,7 @@ Spawn values are set for a map of 2^19 tiles (1024 × 512) (`R-SPAWN-06`). On a 
 | `B-COLLAPSE-BUILDUP` |     3 | s of overwhelming advance        | `R-ATTACK-10` | Before a front gives way, then again                        |
 | `B-COLLAPSE-DEPTH`   |     5 | tiles                            | `R-ATTACK-10` | On a map of 2^19 tiles, 10 on World                         |
 | `B-COLLAPSE-COST`    |    50 | % of the usual price per tile    | `R-ATTACK-10` | The defender still loses their troops per tile              |
-| `B-SPECIAL-RULES`    |    on | collapsing fronts                | `R-MODE-08`   | In public games and quick play                              |
+| `B-SPECIAL-RULES`    |    on | collapsing fronts                | `R-MODE-08`   | In public games and quick play; capital mode stays off      |
 
 ## Ships
 
@@ -212,6 +212,20 @@ Troop growth peaks at 38 % of the cap (`B-GROWTH-FLOOR` 20 %, `B-GROWTH-RATE` 8 
 `B-POP-FALLOFF` is off (100 %) for now. It was tried at 50 % past 20 % of the land with eight hard bots on World, five seeds, once bots had learnt to sail (`R-BOT-05`). The leader reached `B-WIN-SHARE` in 7 to 8 minutes in every seed, with or without it. Against seven hard bots over eight minutes, the scripted casual player was eliminated in four seeds out of six with it (after 5.1 to 7.2 minutes), in five out of six without it (after 4.5 to 6.0), and in four out of six with the previous bots (after 3.8 to 6.3). On a small map with three bots, though, every bot is past the share, and with the falloff the lead changed hands for 15 minutes; without it, the game was won in under 2 minutes. That gain for the casual player is within noise, so it does not pay for the stalemates.
 
 With ships for everyone, a scripted player that also sails (free land first, then its weakest neighbour, then a ship to a free or weaker coast, 30 % of its troops every 5 s) wins most solo games: against 7 normal bots on World, 7 seeds out of 8, in 5.5 to 7.2 minutes; against the menu's default of 11 normal bots on Europe, 5 out of 6, in 4.3 to 5.4 minutes. Against 7 hard bots on World it wins 2 seeds out of 4. A real casual player is slower than this script, so these are upper bounds; playtests decide whether normal bots need to be bolder.
+
+## Capitals
+
+| Key                  | Value | Unit        | Used by    | Notes                                                      |
+| -------------------- | ----: | ----------- | ---------- | ---------------------------------------------------------- |
+| `B-CAPITAL-RADIUS`   |    15 | tiles       | `R-CAP-02` | On a map of 2^19 tiles; 30 on World                        |
+| `B-CAPITAL-STRENGTH` |   300 | % of price  | `R-CAP-02` | Paid by attackers inside the radius; a fort does not add   |
+| `B-CAPITAL-GARRISON` |    20 | % of troops | `R-CAP-02` | Of the owner's soldiers, added to the capital tile's price |
+| `B-CAPITAL-SPOILS`   |    50 | %           | `R-CAP-03` | Of the fallen player's troops and of their gold            |
+| `B-CAPITAL-RAZE`     |    50 | % of troops | `R-CAP-04` | Lost when a missile razes the capital                      |
+| `B-CAPITAL-GRACE`    |   180 | s           | `R-CAP-06` | Of play before a capital can fall                          |
+| `B-CAPITAL-ALERT`    |    30 | tiles       | `R-CAP-05` | Enemy land this close threatens a capital; 60 on World     |
+
+Like a fort's, the radius and the alert distance grow with the spawn radius on larger maps. A capital is harder to take than a fort, but it cannot be moved or rebuilt, and it costs everything once lost: the only way to keep it is to keep the fronts away from it.
 
 ## Victory
 

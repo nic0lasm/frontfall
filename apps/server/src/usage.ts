@@ -148,6 +148,9 @@ export class UsageStats {
       DISABLED_NAMES.forEach((name, bit) => {
         if (report.disabled & (1 << bit)) counts.push(["disabled", name]);
       });
+      for (const [rule, on] of Object.entries(report.rules ?? {})) {
+        if (on) counts.push(["rules", rule]);
+      }
     } else if (report.kind === "error") {
       counts.push(["errors", report.type]);
     } else {

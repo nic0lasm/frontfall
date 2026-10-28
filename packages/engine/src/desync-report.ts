@@ -4,6 +4,7 @@ import { createGame } from "./create-game.ts";
 import {
   DISABLE_ALL,
   MAX_TEAMS,
+  NO_RULES,
   type Game,
   type GameRules,
   type Order,
@@ -138,6 +139,8 @@ export function readGame(report: Record<string, unknown>): RecordedGame {
   const balance = readObject(report.balance, "balance");
   for (const key of Object.keys(DEFAULT_BALANCE) as (keyof Balance)[]) {
     const expected = DEFAULT_BALANCE[key];
+    // Records from before capital mode leave its values out: they take the defaults.
+    if (key.startsWith("capital") && balance[key] === undefined) balance[key] = expected;
     const actual = balance[key];
     const ok = Array.isArray(expected)
       ? Array.isArray(actual) &&
@@ -224,17 +227,16 @@ function readDisabled(value: unknown): number {
   return disabled;
 }
 
-/** Special rules by name, each on or off (R-MODE-08); a name this build does not know is refused. */
+/** Each rule a flag; a rule this build does not know would replay another game. */
 function readRules(value: unknown): Partial<GameRules> {
-  const rules = readObject(value, "rules");
-  const known: { -readonly [Name in keyof GameRules]?: boolean } = {};
-  for (const [name, on] of Object.entries(rules)) {
-    if (name !== "collapsingFronts" || typeof on !== "boolean") {
-      throw new DesyncReportError(`invalid rule ${name}`);
-    }
-    known[name] = on;
+  const raw = readObject(value, "rules");
+  const rules: Partial<Record<keyof GameRules, boolean>> = {};
+  for (const [key, flag] of Object.entries(raw)) {
+    if (!Object.hasOwn(NO_RULES, key)) throw new DesyncReportError(`unknown rule ${key}`);
+    if (typeof flag !== "boolean") throw new DesyncReportError(`invalid rule ${key}`);
+    rules[key as keyof GameRules] = flag;
   }
-  return known;
+  return rules;
 }
 
 export class DesyncReportError extends Error {

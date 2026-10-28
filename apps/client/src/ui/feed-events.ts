@@ -36,6 +36,8 @@ const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
   gift: "diplo.eventGift",
   quick: "diplo.eventQuick",
   collapsed: "diplo.eventCollapsed",
+  capital: "diplo.eventCapital",
+  razed: "diplo.eventRazed",
 };
 
 const STRUCTURE_TEXT: Readonly<Record<StructureType, MessageKey>> = {
@@ -79,6 +81,8 @@ export class FeedWatcher {
   private readonly attackedAt = new Map<number, number>();
   private readonly collapsedAt = new Map<string, number>();
   private readonly alliances = new Set<string>();
+  /** Who threatened the player's capital at the last update (R-CAP-05), 0 for nobody. */
+  private threat = 0;
 
   /** `personal` is false in a replay, where nobody is the player. */
   constructor(private readonly personal: boolean) {}
@@ -113,6 +117,19 @@ export class FeedWatcher {
     for (const s of update.structures) {
       if (s.player === update.you) structures.set(s.id, { type: s.type, tile: s.tile });
     }
+    const threat = update.capitals?.threat ?? 0;
+    if (this.started && this.personal && threat !== 0 && threat !== this.threat) {
+      const capital = update.players.find((p) => p.id === update.you)?.capital;
+      entries.push({
+        key: `siege:${String(threat)}`,
+        tone: "bad",
+        text: t("feed.capitalThreat", { name: name(threat) }),
+        ...(capital === undefined ? {} : { tile: capital }),
+        player: threat,
+        mine: true,
+      });
+    }
+    this.threat = threat;
     if (this.started && this.personal) {
       for (const from of requests) {
         if (this.requests.has(from)) continue;
@@ -191,6 +208,10 @@ export class FeedWatcher {
         return target ? "bad" : "good";
       case "missile":
         return target ? "bad" : "info";
+      case "capital":
+        return target ? "bad" : "good";
+      case "razed":
+        return "bad";
       case "ended":
       case "quick":
         return "info";

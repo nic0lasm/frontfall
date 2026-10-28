@@ -100,6 +100,7 @@ export class GlobeView implements Renderer {
       port: { outline: markers(5.5, 6, 2), fill: markers(4, 6, 3), size: 4 },
       silo: { outline: markers(6, 5, 2), fill: markers(4.5, 5, 3), size: 4.5 },
       airDefense: { outline: markers(5.5, 12, 2), fill: markers(4, 12, 3), size: 4 },
+      capital: { outline: markers(8.5, 5, 2), fill: markers(6.5, 5, 3), size: 6.5 },
     };
   }
 
@@ -162,7 +163,15 @@ export class GlobeView implements Renderer {
   }
 
   setStructures(structures: readonly StructureMark[]): void {
-    for (const type of ["city", "palace", "fort", "port", "silo", "airDefense"] as const) {
+    for (const type of [
+      "city",
+      "palace",
+      "fort",
+      "port",
+      "silo",
+      "airDefense",
+      "capital",
+    ] as const) {
       const { outline, fill } = this.structures[type];
       let count = 0;
       for (const structure of structures) {

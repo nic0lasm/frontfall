@@ -56,7 +56,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
     capacity: 16,
     autoStart: true,
     speed: 1,
-    rules: { collapsingFronts: true },
+    rules: { collapsingFronts: true, capitals: false },
     minPlayers: 2,
     players: [
       { id: 1, name: "Nico" },
@@ -81,7 +81,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
     disabled: 32,
     tickRate: 10,
     speed: 2,
-    rules: { collapsingFronts: false },
+    rules: { collapsingFronts: false, capitals: true },
     players: [{ id: 1, name: "Nico" }],
     you: 1,
     token: "0123456789abcdefABCDEF",
@@ -197,11 +197,12 @@ describe("client messages", () => {
     const configure = (rules?: unknown) =>
       parseClientMessage(JSON.stringify({ type: "configure", options: { ...options, rules } }));
     expect(configure(undefined).ok).toBe(true);
-    expect(configure({ collapsingFronts: true }).ok).toBe(true);
-    expect(configure({ collapsingFronts: false }).ok).toBe(true);
+    expect(configure({ collapsingFronts: true, capitals: false }).ok).toBe(true);
+    expect(configure({ collapsingFronts: false, capitals: true }).ok).toBe(true);
     expect(configure({}).ok).toBe(false);
-    expect(configure({ collapsingFronts: 1 }).ok).toBe(false);
-    expect(configure({ collapsingFronts: true, doctrines: true }).ok).toBe(false);
+    expect(configure({ collapsingFronts: true }).ok).toBe(false);
+    expect(configure({ collapsingFronts: 1, capitals: false }).ok).toBe(false);
+    expect(configure({ collapsingFronts: true, capitals: false, doctrines: true }).ok).toBe(false);
   });
 
   it("keeps seats between 2 and 16 and names of a sane size", () => {

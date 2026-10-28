@@ -77,16 +77,21 @@ export interface GameSetup {
 
 /** Special rules a game can be played with (R-MODE-08), all off unless the setup turns them on. */
 export interface GameRules {
+  /** Capital mode (R-CAP): taking a player's capital conquers them. */
+  readonly capitals: boolean;
   /** R-ATTACK-10: outnumbered fronts give way by stretches. */
   readonly collapsingFronts: boolean;
 }
+
+/** A game with no special rule. */
+export const NO_RULES: GameRules = { capitals: false, collapsingFronts: false };
 
 /** Marks the special rules in the state hash. */
 const RULES_TAG = 0x72756c65;
 
 /** One bit per special rule that is on, for the state hash and the setup digest; 0 with none. */
 export function ruleBits(rules: GameRules): number {
-  return rules.collapsingFronts ? 2 : 0;
+  return (rules.capitals ? 1 : 0) | (rules.collapsingFronts ? 2 : 0);
 }
 
 /**
@@ -128,9 +133,22 @@ export interface Player {
   readonly home: number | undefined;
   /** Team from 1, or 0 in a free-for-all (R-MODE-02). */
   readonly team: number;
+  /** Tile of the player's capital in capital mode (R-CAP-01); undefined before play or without one. */
+  capital: number | undefined;
 }
 
 export type Phase = "spawn" | "play";
+
+/** A capital that fell (R-CAP-03) or was razed (R-CAP-04). */
+export interface CapitalFall {
+  readonly tick: number;
+  /** Player whose capital it was. */
+  readonly player: number;
+  /** Player who took it; 0 when it was razed and moved. */
+  readonly by: number;
+  /** Tile the capital stood on. */
+  readonly tile: number;
+}
 
 /** Most teams a game can have (R-MODE-02). */
 export const MAX_TEAMS = 4;
@@ -213,6 +231,8 @@ export class Game {
   readonly disabled: number;
   /** Special rules of this game (R-MODE-08). */
   readonly rules: GameRules;
+  /** Capitals taken or razed, oldest first (R-CAP-03, R-CAP-04). Owned by the capital rules. */
+  readonly capitalFalls: CapitalFall[] = [];
   /**
    * Winner once the game is decided (R-WIN), and the tick it happened. In a
    * team game, the member of the winning team with the most land.
@@ -237,7 +257,6 @@ export class Game {
     this.seed = setup.seed >>> 0;
     this.balance = setup.balance ?? DEFAULT_BALANCE;
     checkBalance(this.balance);
-    this.balanceDigest = digestBalance(this.balance);
     let highest = 1;
     for (const { id, name, start: home } of setup.players) {
       if (!Number.isInteger(id) || id < 1 || id > MAX_PLAYER_ID) {
@@ -262,6 +281,7 @@ export class Game {
         traitorUntil: 0,
         home,
         team: 0,
+        capital: undefined,
       });
       highest = Math.max(highest, id);
     }
@@ -275,7 +295,11 @@ export class Game {
       throw new RangeError(`invalid disabled set ${String(disabled)}`);
     }
     this.disabled = leftOut(disabled);
-    this.rules = { collapsingFronts: setup.rules?.collapsingFronts === true };
+    this.rules = {
+      capitals: setup.rules?.capitals === true,
+      collapsingFronts: setup.rules?.collapsingFronts === true,
+    };
+    this.balanceDigest = digestBalance(this.balance, this.rules);
     // R-MODE-02: dealt in turn, so team sizes differ by one at most.
     this.sortedPlayers = [...this.playersById.values()]
       .sort((a, b) => a.id - b.id)
@@ -430,6 +454,13 @@ export class Game {
       if (this.currentTick < c.until) for (const value of [c.player, c.until]) mix(value);
     }
     mix(this.decidedAt ?? -1);
+    // Games without capitals hash as they did before the mode existed.
+    if (this.rules.capitals) {
+      for (const p of this.sortedPlayers) mix(p.capital ?? -1);
+      mix(this.capitalFalls.length);
+      for (const f of this.capitalFalls)
+        for (const value of [f.tick, f.player, f.by, f.tile]) mix(value);
+    }
     return hash >>> 0;
   }
 
@@ -535,11 +566,16 @@ export class Game {
   }
 }
 
-/** FNV-1a over the balance values, by key name, so the order fields were written in does not matter. */
-function digestBalance(balance: Balance): number {
+/**
+ * FNV-1a over the balance values, by key name, so the order fields were
+ * written in does not matter. The values of a special rule count only in a
+ * game played with it, so other games hash as they did before it existed.
+ */
+function digestBalance(balance: Balance, rules: GameRules): number {
   let digest = 0x811c9dc5;
   const record = balance as unknown as Record<string, number | readonly number[]>;
   for (const key of Object.keys(record).sort()) {
+    if (!rules.capitals && key.startsWith("capital")) continue;
     for (let i = 0; i < key.length; i++) digest = Math.imul(digest ^ key.charCodeAt(i), 0x01000193);
     const value = record[key];
     for (const number of typeof value === "number" ? [value] : (value ?? [])) {
@@ -617,6 +653,11 @@ function checkBalance(balance: Balance): void {
     "traitorDefensePercent",
     "collapseOddsTenths",
     "collapseCostPercent",
+    "capitalRadius",
+    "capitalStrengthPercent",
+    "capitalAlert",
+    "capitalGraceTicks",
+    "capitalGarrisonPercent",
   ] as const) {
     if (!Number.isSafeInteger(balance[key]) || balance[key] < 0) {
       throw new RangeError(`balance ${key} must be a non-negative integer`);
@@ -631,6 +672,11 @@ function checkBalance(balance: Balance): void {
   }
   if (!Number.isSafeInteger(balance.workGoldFactor) || balance.workGoldFactor < 1) {
     throw new RangeError("balance workGoldFactor must be a positive integer");
+  }
+  for (const key of ["capitalSpoilsPercent", "capitalRazePercent"] as const) {
+    if (!Number.isSafeInteger(balance[key]) || balance[key] < 0 || balance[key] > 100) {
+      throw new RangeError(`balance ${key} must be from 0 to 100`);
+    }
   }
   const chance = balance.airDefenseChancePercent;
   if (!Number.isSafeInteger(chance) || chance < 0 || chance > 100) {

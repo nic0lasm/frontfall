@@ -17,6 +17,7 @@ import { summarize, type BalanceSummary } from "./summary.ts";
  *   pnpm balance -- --map world --bots normal:8 --seeds 1-8
  *   pnpm balance -- --map world --bots normal:4,hard:4 --nations normal --casual
  *   pnpm balance -- --map world --bots normal:0 --nations hard --average
+ *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule capitals
  *   pnpm balance -- --map europe --bots hard:11 --set tradeBase=4000 --json out.json
  *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule collapsingFronts
  */
@@ -174,6 +175,21 @@ function print(s: BalanceSummary): void {
     `missiles per game: ${String(m.median)} median, ${String(m.max)} at most; ` +
       `${round(m.atLeaderPercent, 0)} % at the leader; at most ${String(m.perMinuteMax)} in a minute, ${String(m.burstMax)} in 10 s`,
   );
+  if (values.rule.includes("capitals")) {
+    const sorted = (values: number[]): number[] => values.sort((a, b) => a - b);
+    const mid = (values: number[]): number => sorted(values)[Math.floor(values.length / 2)] ?? 0;
+    const firsts = reports.flatMap((r) => (r.capitalFalls[0] ? [r.capitalFalls[0].minute] : []));
+    const byOne = reports.map((r) => r.capitalFalls.filter((f) => f.by === 1).length);
+    const ofOne = reports.flatMap((r) =>
+      r.capitalFalls.filter((f) => f.player === 1).map((f) => f.minute),
+    );
+    console.log(
+      `capitals: ${String(mid(reports.map((r) => r.capitalFalls.length)))} fall per game (median), ` +
+        `the first after ${round(mid(firsts))} min; player 1 takes ${String(mid(byOne))} (median), ` +
+        `loses theirs in ${String(ofOne.length)} games` +
+        (ofOne.length ? `, after ${round(mid(ofOne))} min (median)` : ""),
+    );
+  }
   if (s.casual) {
     console.log(
       `${values.average ? "average" : "casual"} player: won ${String(s.casual.won)}, alive at the end ${String(s.casual.alive)}` +

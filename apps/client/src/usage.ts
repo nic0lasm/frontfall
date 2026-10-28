@@ -76,7 +76,16 @@ export function deviceOf(coarsePointer: boolean, screenSide: number): Device {
 /** What a game report says about the game itself, known when it starts. */
 export type GameFacts = Pick<
   GameReport,
-  "mode" | "map" | "teams" | "nations" | "bots" | "humans" | "difficulty" | "disabled" | "view"
+  | "mode"
+  | "map"
+  | "teams"
+  | "nations"
+  | "bots"
+  | "humans"
+  | "difficulty"
+  | "disabled"
+  | "rules"
+  | "view"
 >;
 
 /** One game played on this page, reported once when it ends for the player. */

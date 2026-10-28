@@ -18,6 +18,7 @@ export const SPECIAL_RULES: readonly {
     label: "setup.rules.collapsingFronts",
     hint: "setup.rules.collapsingFrontsHint",
   },
+  { name: "capitals", label: "setup.rules.capitals", hint: "setup.rules.capitalsHint" },
 ];
 
 /** The rules at their defaults, as a copy to change. */

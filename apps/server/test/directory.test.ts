@@ -62,6 +62,31 @@ describe("Directory", () => {
     expect(quick?.settings.countdownMs).toBeGreaterThan(0);
   });
 
+  it("never sends Play now into a game with a special rule (R-MODE-08)", () => {
+    const games = directory();
+    const special = games.quickMatch(undefined, "Quick");
+    const host = seat(special, "Host");
+    expect(special?.settings.rules).toEqual({ collapsingFronts: true, capitals: false });
+    special?.configure(
+      host,
+      {
+        map: "world",
+        bots: 0,
+        difficulty: "normal",
+        nations: true,
+        teams: 0,
+        disabled: 0,
+        capacity: 2,
+        autoStart: true,
+        rules: { collapsingFronts: true, capitals: true },
+      },
+      0,
+    );
+    const next = games.quickMatch(undefined, "Quick");
+    expect(next).not.toBe(special);
+    expect(next?.settings.rules).toEqual({ collapsingFronts: true, capitals: false });
+  });
+
   it("never sends Play now into a quick game whose host stopped the countdown", () => {
     const games = new Directory({
       maxRooms: 10,
@@ -117,6 +142,7 @@ describe("Directory", () => {
       nations: true,
       teams: 0,
       disabled: 0,
+      rules: { collapsingFronts: true, capitals: false },
       players: 2,
       capacity: 16,
       state: "waiting",

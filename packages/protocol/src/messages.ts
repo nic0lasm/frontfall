@@ -15,7 +15,7 @@ import { Order, PlayerNumber, type Turn } from "./orders.ts";
  * turn frames, so it bumps this version too; a test pins the order kinds of
  * the current version.
  */
-export const PROTOCOL_VERSION = 22;
+export const PROTOCOL_VERSION = 23;
 
 /** Ticks per second of the simulation at speed 1. The server closes one turn per tick. */
 export const TICK_RATE = 10;
@@ -95,15 +95,20 @@ export const GameRules = z
   .object({
     /** R-ATTACK-10: outnumbered fronts give way by stretches. */
     collapsingFronts: z.boolean(),
+    /** R-CAP: taking a player's capital conquers them. */
+    capitals: z.boolean(),
   })
   .strict();
 export type GameRules = z.infer<typeof GameRules>;
 
 /** The rules of public games and quick play, chosen by the balance pass (R-MODE-08). */
-export const DEFAULT_RULES: Readonly<GameRules> = { collapsingFronts: true };
+export const DEFAULT_RULES: Readonly<GameRules> = { collapsingFronts: true, capitals: false };
 
 export function isDefaultRules(rules: GameRules): boolean {
-  return rules.collapsingFronts === DEFAULT_RULES.collapsingFronts;
+  return (
+    rules.collapsingFronts === DEFAULT_RULES.collapsingFronts &&
+    rules.capitals === DEFAULT_RULES.capitals
+  );
 }
 
 /** Why a player reports another (R-MODE-06): no free text, so a report carries nothing else. */
@@ -308,6 +313,7 @@ export const PublicGame = z.object({
   nations: z.boolean(),
   teams: Teams,
   disabled: Disabled,
+  rules: GameRules,
   players: z.number().int().nonnegative(),
   capacity: z.number().int().positive(),
   /** Waiting for players, or already running and closed to newcomers. */

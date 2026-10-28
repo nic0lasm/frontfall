@@ -64,6 +64,18 @@ describe("game setup", () => {
     expect(setupQuery(setup)).toContain("off=port%2Cwarship");
   });
 
+  it("remembers capital mode, and never shares it in a link (R-MODE-08)", () => {
+    const setup = { ...defaultSetup(maps), rules: { collapsingFronts: true, capitals: true } };
+    expect(setupQuery(setup)).not.toContain("rules");
+    expect(initialSetup("?rules=capitals", undefined, maps).rules?.capitals).toBe(false);
+    const storage = new MemoryStorage() as unknown as Storage;
+    saveSetup(setup, storage);
+    expect(initialSetup("", storage, maps).rules).toEqual({
+      collapsingFronts: true,
+      capitals: true,
+    });
+  });
+
   it("ignores values it does not know", () => {
     const base = defaultSetup(maps);
     expect(
@@ -95,18 +107,22 @@ describe("game setup", () => {
   });
 
   it("plays with the default special rules, and remembers the player's choice (R-MODE-08)", () => {
-    expect(defaultSetup(maps).rules).toEqual({ collapsingFronts: true });
+    expect(defaultSetup(maps).rules).toEqual({ collapsingFronts: true, capitals: false });
     const items = new Map<string, string>();
     const storage = {
       getItem: (key: string) => items.get(key) ?? null,
       setItem: (key: string, value: string) => void items.set(key, value),
     } as unknown as Storage;
-    const off = { ...defaultSetup(maps), rules: { collapsingFronts: false } };
+    const off = { ...defaultSetup(maps), rules: { collapsingFronts: false, capitals: false } };
     saveSetup(off, storage);
-    expect(initialSetup("", storage, maps).rules).toEqual({ collapsingFronts: false });
+    expect(initialSetup("", storage, maps).rules).toEqual({
+      collapsingFronts: false,
+      capitals: false,
+    });
     // Nonsense falls back to what was there.
     expect(sanitizeSetup({ rules: { collapsingFronts: "no" } }, off, maps).rules).toEqual({
       collapsingFronts: false,
+      capitals: false,
     });
   });
 });

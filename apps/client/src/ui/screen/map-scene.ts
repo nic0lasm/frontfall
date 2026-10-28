@@ -372,11 +372,18 @@ export class MapScene {
     );
   }
 
-  /** Structures change rarely: they are drawn again only when one appears, finishes or changes hands. */
+  /**
+   * Structures change rarely: they are drawn again only when one appears,
+   * finishes or changes hands, or a capital falls or moves (R-CAP).
+   */
   private placeStructures(update: GameUpdate): void {
-    const key = update.structures
-      .map((s) => `${String(s.id)}:${String(s.player)}:${s.ready ? "1" : "0"}`)
-      .join(",");
+    const capitals = update.players.filter((p) => p.alive && p.capital !== undefined);
+    const key =
+      update.structures
+        .map((s) => `${String(s.id)}:${String(s.player)}:${s.ready ? "1" : "0"}`)
+        .join(",") +
+      "|" +
+      capitals.map((p) => `${String(p.id)}:${String(p.capital)}`).join(",");
     if (!this.view || !this.shown || key === this.drawnStructures) return;
     this.drawnStructures = key;
     const { width } = this.mapSize;
@@ -388,6 +395,16 @@ export class MapScene {
       ready: structure.ready,
       color: colorOf(structure.player, firstNation, teams),
     }));
+    for (const player of capitals) {
+      const tile = player.capital as number;
+      this.structureMarks.push({
+        x: tile % width,
+        y: Math.floor(tile / width),
+        type: "capital",
+        ready: true,
+        color: colorOf(player.id, firstNation, teams),
+      });
+    }
     this.drawStructures();
   }
 

@@ -6,6 +6,7 @@ import {
   atWar,
   canRenew,
   cityLimit,
+  capitalThreat,
   cityShare,
   isReady,
   launchSilo,
@@ -107,6 +108,7 @@ export function gameUpdate(game: Game, you: number, depth: Uint16Array): GameUpd
     workShare: player.workShare,
     tiles: territory.tileCount(player.id),
     alive: player.alive,
+    ...(player.capital === undefined ? {} : { capital: player.capital }),
   }));
   const update: GameUpdate = {
     you: you,
@@ -186,6 +188,16 @@ export function gameUpdate(game: Game, you: number, depth: Uint16Array): GameUpd
   if (game.tick % LABEL_TICKS === 0) {
     const width = game.terrain.topology.width;
     update.labels = labelAnchors(territory.owners, width, players.length, depth);
+  }
+  if (game.rules.capitals) {
+    update.capitals = {
+      falls: game.capitalFalls.map(({ tick, player, by }) => ({ tick, player, by })),
+      threat: capitalThreat(game, you),
+      standsIn: Math.max(
+        0,
+        game.balance.spawnPhaseTicks + game.balance.capitalGraceTicks - game.tick,
+      ),
+    };
   }
   if (game.winner !== undefined) update.winner = game.winner;
   if (game.winningTeam !== undefined) update.winningTeam = game.winningTeam;

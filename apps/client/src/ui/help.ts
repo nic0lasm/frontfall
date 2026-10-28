@@ -14,6 +14,8 @@ export interface HelpOptions {
   disabled: number;
   /** A finger rather than a mouse: gestures replace the keys. */
   touch: boolean;
+  /** Capital mode (R-CAP): one more line on defence. */
+  capitals?: boolean;
   /** An online game runs for everyone: no pause to offer. */
   online?: boolean;
   onClose: () => void;
@@ -49,7 +51,10 @@ export function helpPanel(options: HelpOptions): HTMLElement {
     h(
       "ul",
       { class: "help-lines" },
-      ...keys.map((key) =>
+      ...[
+        ...keys,
+        ...(options.capitals && keys === lines.defend ? (["help.defendCapital"] as const) : []),
+      ].map((key) =>
         h("li", { "data-i18n": key === "help.pause" && options.online ? "help.online" : key }),
       ),
     );

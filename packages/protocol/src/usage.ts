@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Difficulty, Disabled, Teams } from "./messages.ts";
+import { Difficulty, Disabled, GameRules, Teams } from "./messages.ts";
 
 /**
  * Reports a page sends to its own server so that the game can be measured
@@ -53,6 +53,8 @@ export const GameReport = z
     humans: z.number().int().min(1).max(1000),
     difficulty: Difficulty,
     disabled: Disabled,
+    /** Special rules of the game (R-MODE-08); absent from reports of pages before them. */
+    rules: GameRules.optional(),
     /** Time this player spent in the game. */
     minutes: z
       .number()

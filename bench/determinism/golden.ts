@@ -73,6 +73,16 @@ export const GOLDEN_REPLAYS: readonly Golden[] = [
     rules: { collapsingFronts: true },
     ticks: 2000,
   },
+  {
+    name: "europe-capitals",
+    map: "europe",
+    seed: 9,
+    bots: 5,
+    difficulty: "hard",
+    nations: true,
+    rules: { collapsingFronts: true, capitals: true },
+    ticks: 3000,
+  },
 ];
 
 /** Ticks between two hashes in a golden replay, as online clients send them. */

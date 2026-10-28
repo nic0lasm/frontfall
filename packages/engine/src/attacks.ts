@@ -2,6 +2,7 @@ import type { Game, Player } from "./game.ts";
 import { divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
 import { isAllied, isTraitor, logEvent } from "./diplomacy.ts";
 import { soldiers } from "./economy.ts";
+import { capitalsStand, guardedByCapital } from "./capitals.ts";
 import { spawnSettings } from "./spawn.ts";
 import { fortRadius, fortified, isReady, StructureKind } from "./structures.ts";
 import { TileKind } from "./terrain.ts";
@@ -420,7 +421,8 @@ function cancelOpposingAttacks(attacks: Attack[]): void {
 
 /**
  * Troops it costs to take one tile (R-ATTACK-03, R-ATTACK-04, R-MAP-06),
- * more within reach of one of the defender's forts (R-BUILD-03).
+ * more within reach of one of the defender's forts (R-BUILD-03) or of their
+ * capital (R-CAP-02): the stronger of the two applies, not both.
  */
 export function captureCost(game: Game, tile: number, defender: Player | undefined): number {
   const { balance, terrain } = game;
@@ -431,9 +433,16 @@ export function captureCost(game: Game, tile: number, defender: Player | undefin
   const base = balance.neutralCost + mulDiv(density, balance.defenseDensityTenths, 10);
   let cost = Math.max(1, mulDiv(base, relief, 10));
   if (!defender) return cost;
-  if (fortified(game, tile, defender.id)) cost = mulDiv(cost, balance.fortStrengthPercent, 100);
+  const fort = fortified(game, tile, defender.id) ? balance.fortStrengthPercent : 100;
+  const capital = guardedByCapital(game, tile, defender.id) ? balance.capitalStrengthPercent : 100;
+  const strength = Math.max(fort, capital);
+  if (strength !== 100) cost = mulDiv(cost, strength, 100);
   // R-DIPLO-04: a traitor's land is cheaper to take while the mark lasts.
   if (isTraitor(game, defender)) cost = mulDiv(cost, balance.traitorDefensePercent, 100);
+  // R-CAP-02: the capital itself holds a share of its owner's whole army.
+  if (capitalsStand(game) && defender.capital === tile) {
+    cost += percentOf(soldiers(defender), balance.capitalGarrisonPercent);
+  }
   return Math.max(1, cost);
 }
 

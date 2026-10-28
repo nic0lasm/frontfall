@@ -6,6 +6,7 @@ describe("pieces", () => {
     expect([...PIECE_KINDS].sort()).toEqual(
       [
         "airDefense",
+        "capital",
         "city",
         "fort",
         "heavyMissile",

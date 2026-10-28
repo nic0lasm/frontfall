@@ -304,6 +304,7 @@ describe("WebSocket", () => {
           nations: true,
           teams: 0,
           disabled: 0,
+          rules: { collapsingFronts: true, capitals: false },
           players: 1,
           capacity: 16,
           state: "waiting",
@@ -438,12 +439,17 @@ describe("WebSocket", () => {
         capacity: 16,
         autoStart: false,
         speed: 4,
+        rules: { collapsingFronts: true, capitals: true },
       },
     });
-    expect((await bob.next("lobby")).speed).toBe(4);
+    expect(await bob.next("lobby")).toMatchObject({
+      speed: 4,
+      rules: { collapsingFronts: true, capitals: true },
+    });
     alice.send({ type: "start" });
     const started = await bob.next("started");
     expect(started.speed).toBe(4);
+    expect(started.rules).toEqual({ collapsingFronts: true, capitals: true });
     expect(started.players).toEqual([
       { id: 1, name: "Alice" },
       { id: 2, name: "Bob" },
@@ -1168,6 +1174,21 @@ describe("WebSocket", () => {
       const { game } = await alice.next("lobby");
       bob.send({ type: "join", game });
       await bob.next("lobby");
+      // The special rules come back with the game (R-MODE-08).
+      alice.send({
+        type: "configure",
+        options: {
+          map: "world",
+          bots: 0,
+          difficulty: "normal",
+          nations: true,
+          teams: 0,
+          disabled: 0,
+          ...SEATS,
+          rules: { collapsingFronts: true, capitals: true },
+        },
+      });
+      await bob.next("lobby");
       alice.send({ type: "start" });
       const [started] = await Promise.all([alice.next("started"), bob.next("started")]);
       alice.send({ type: "order", order: { type: "spawn", tile: 5 } });
@@ -1190,7 +1211,12 @@ describe("WebSocket", () => {
       expect(existsSync(file)).toBe(false);
       const back = await player(host, "Alice");
       back.send({ type: "rejoin", token, from: 0 });
-      expect(await back.next("started")).toMatchObject({ game, you: 1, token });
+      expect(await back.next("started")).toMatchObject({
+        game,
+        you: 1,
+        token,
+        rules: { collapsingFronts: true, capitals: true },
+      });
       const turns = [];
       while (turns.length <= tick) turns.push(...(await back.next("turns")).turns);
       expect(turns.slice(0, tick + 1).map((turn) => turn.tick)).toEqual(

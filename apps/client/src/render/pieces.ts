@@ -31,6 +31,12 @@ const GLYPHS = {
     cut: "M10.6 20.5v-3.6a1.4 1.4 0 0 1 2.8 0v3.6zM8.1 14.6h1.7v2.6H8.1zM14.2 14.6h1.7v2.6h-1.7zM4.2 13h1.2v2.4H4.2zM18.6 13h1.2v2.4h-1.2z",
     accent: "M12.6 1.8l4.2 1.4-4.2 1.4z",
   },
+  /** R-CAP-01: a crown, larger on the map than any building. */
+  capital: {
+    solid: "M3 17.2 2.2 6.8l5.3 4.4L12 3.6l4.5 7.6 5.3-4.4-.8 10.4zM3 18.6h18v2.6H3z",
+    cut: "M10.7 12.6a1.3 1.3 0 1 1 2.6 0 1.3 1.3 0 0 1-2.6 0z",
+    accent: "M12 .8l1.3 1.6L12 4 10.7 2.4z",
+  },
   fort: {
     solid: "M3.5 20.5V5h4.2v3h2.4V5h3.8v3h2.4V5h4.2v15.5z",
     cut: "M9.9 20.5v-4.6a2.1 2.1 0 0 1 4.2 0v4.6zM11.2 9.8h1.6v2.8h-1.6z",

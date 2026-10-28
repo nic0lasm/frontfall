@@ -58,8 +58,15 @@ describe("Game.hash", () => {
   it("tells apart games that differ in any balance value, whatever the key order", () => {
     const grid = new WorldGrid(8, 8);
     const terrain = new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains));
+    // Capital mode's values count only in a game played with it (R-MODE-08).
     const hashWith = (balance: Balance) =>
-      new Game({ terrain, seed: 1, players: [{ id: 1, name: "Ada" }], balance }).hash();
+      new Game({
+        terrain,
+        seed: 1,
+        players: [{ id: 1, name: "Ada" }],
+        balance,
+        rules: { capitals: true },
+      }).hash();
     const reference = hashWith(DEFAULT_BALANCE);
     const reversed = Object.fromEntries(Object.entries(DEFAULT_BALANCE).reverse()) as Balance;
     expect(hashWith(reversed)).toBe(reference);

@@ -1,4 +1,5 @@
 import {
+  capitalAim,
   divFloor,
   isAllied,
   MissileSize,
@@ -252,12 +253,13 @@ export class AveragePlayer {
     if (troops < neutralCost) return orders;
     // Answer an attacker it can beat, whatever the land left.
     if (attackerTile >= 0 && own * 100 >= this.density(attacker) * 100) {
-      orders.push({ type: "attack", target: attackerTile, troops });
+      orders.push({ type: "attack", target: capitalAim(game, attackerTile), troops });
       return orders;
     }
     if (neutral >= 0 || !ready) return orders;
     if (enemy >= 0 && own * 100 >= enemyDensity * ODDS_PERCENT) {
-      orders.push({ type: "attack", target: enemy, troops });
+      // In capital mode, a player who knows the rule heads for the capital (R-CAP-03).
+      orders.push({ type: "attack", target: capitalAim(game, enemy), troops });
       return orders;
     }
     let coast = -1;
@@ -279,7 +281,7 @@ export class AveragePlayer {
       orders.push({ type: "embark", target: coast, troops });
     } else if (enemy >= 0 && me.troops * 100 >= cap * 90) {
       // A full army is wasted troops: fight the weakest neighbour anyway.
-      orders.push({ type: "attack", target: enemy, troops });
+      orders.push({ type: "attack", target: capitalAim(game, enemy), troops });
     }
     return orders;
   }

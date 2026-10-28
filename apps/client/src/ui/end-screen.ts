@@ -117,6 +117,7 @@ export function endScreen(
       ...(played.length > 0
         ? [h("p", { class: "end-rules" }, t("setup.rules.played", { rules: played.join(", ") }))]
         : []),
+      ...(update.capitals ? capitalStory(update, summary.ticksPerSecond) : []),
       ...present(
         statsChart({
           history: summary.stats,
@@ -160,6 +161,50 @@ export function endScreen(
 }
 
 /** The achievements this game unlocked, each with its badge and, for a tiered one, the tier. */
+/** Most fallen capitals listed, the latest ones. */
+const FALLS_SHOWN = 6;
+
+/**
+ * Capital mode (R-CAP-03): how the player's own capital fared, then the
+ * capitals that fell, the latest last.
+ */
+function capitalStory(update: GameUpdate, ticksPerSecond: number): HTMLElement[] {
+  const falls = (update.capitals?.falls ?? []).filter((fall) => fall.by !== 0);
+  const name = (id: number): string => update.players.find((p) => p.id === id)?.name ?? "";
+  const time = (tick: number): string => formatDuration(tick / ticksPerSecond);
+  const lost = falls.find((fall) => fall.player === update.you);
+  const taken = falls.filter((fall) => fall.by === update.you).length;
+  const story = lost
+    ? t("end.capitalLost", { name: name(lost.by), time: time(lost.tick) })
+    : taken === 1
+      ? t("end.capitalTaken")
+      : taken > 1
+        ? t("end.capitalsTaken", { count: taken })
+        : undefined;
+  if (falls.length === 0 && story === undefined) return [];
+  return [
+    h(
+      "section",
+      { class: "end-capitals", "aria-labelledby": "end-capitals-title" },
+      h("h2", { id: "end-capitals-title", "data-i18n": "end.falls" }),
+      ...(story === undefined ? [] : [h("p", { class: "end-capital-story" }, story)]),
+      h(
+        "ol",
+        { class: "end-falls" },
+        ...falls
+          .slice(-FALLS_SHOWN)
+          .map((fall) =>
+            h(
+              "li",
+              { class: fall.player === update.you || fall.by === update.you ? "mine" : "" },
+              t("end.fall", { time: time(fall.tick), a: name(fall.by), b: name(fall.player) }),
+            ),
+          ),
+      ),
+    ),
+  ];
+}
+
 function newAchievements(gains: readonly Gain[]): HTMLElement {
   return h(
     "section",

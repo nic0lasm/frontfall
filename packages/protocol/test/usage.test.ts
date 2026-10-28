@@ -39,6 +39,12 @@ describe("parseUsageReport", () => {
     expect(parseUsageReport(JSON.stringify(vote))).toEqual({ ok: true, value: vote });
   });
 
+  it("takes the special rules of a game, or none from an older page (R-MODE-08)", () => {
+    const special = { ...GAME, rules: { collapsingFronts: true, capitals: true } };
+    expect(parseUsageReport(JSON.stringify(special))).toEqual({ ok: true, value: special });
+    expect(parseUsageReport(JSON.stringify({ ...GAME, rules: { other: true } })).ok).toBe(false);
+  });
+
   it("refuses any field it does not know, such as a name", () => {
     expect(parseUsageReport(JSON.stringify({ ...GAME, name: "Léa" })).ok).toBe(false);
     expect(parseUsageReport(JSON.stringify({ ...GAME, outcome: "won" })).ok).toBe(false);

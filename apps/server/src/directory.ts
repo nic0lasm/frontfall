@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { MAX_GAME_NAME_LENGTH, type PublicGame } from "@frontfall/protocol";
+import { MAX_GAME_NAME_LENGTH, isDefaultRules, type PublicGame } from "@frontfall/protocol";
 import { newGameId } from "./ids.ts";
 import {
   Room,
@@ -62,6 +62,8 @@ export class Directory {
       if (!waiting(room) || room.settings.visibility !== "public") continue;
       if (room.settings.countdownMs <= 0 || room.isHeld) continue;
       if (room.playerCount >= room.settings.capacity) continue;
+      // "Play now" promises the usual game: the default special rules only (R-MODE-08).
+      if (!isDefaultRules(room.settings.rules)) continue;
       // A game that would turn the player away is no match for them.
       if (owner !== undefined && (room.bars(owner) || room.atSeatLimit(owner))) continue;
       if (!best || room.playerCount > best.playerCount) best = room;
@@ -199,6 +201,7 @@ export class Directory {
       nations: room.settings.nations,
       teams: room.settings.teams,
       disabled: room.settings.disabled,
+      rules: room.settings.rules,
       players: room.playerCount,
       capacity: room.settings.capacity,
       state: waiting(room) ? "waiting" : "running",

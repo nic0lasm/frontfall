@@ -64,7 +64,10 @@ const SavedFile = z
           // Saved before the speeds of R-MODE-07: such a game ran at 1.
           speed: GameSpeed.default(1),
           // Saved before the special rules of R-MODE-08: such a game had none.
-          rules: GameRules.default({ collapsingFronts: false }),
+          rules: z.preprocess(
+            (saved) => ({ collapsingFronts: false, capitals: false, ...(saved ?? {}) }),
+            GameRules,
+          ),
         }),
         elapsedMs: z.number().min(0),
         seats: z

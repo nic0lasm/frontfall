@@ -90,6 +90,16 @@ export interface PlayerView {
   workShare: number;
   tiles: number;
   alive: boolean;
+  /** Tile of the player's capital, in capital mode (R-CAP-01). */
+  capital?: number;
+}
+
+/** A capital that fell or was razed (R-CAP-03, R-CAP-04). */
+export interface CapitalFallView {
+  tick: number;
+  player: number;
+  /** Who took it; 0 when it was razed. */
+  by: number;
 }
 
 /** One of the human's attacks under way; its id is what a retreat order names. */
@@ -141,6 +151,12 @@ export interface GameUpdate {
   diplomacy: DiplomacyView;
   /** What changed between players since the last update, for every player to read (R-DIPLO-04). */
   events: DiplomacyEvent[];
+  /**
+   * Set in capital mode (R-CAP): the capitals that fell so far, and the
+   * player whose front threatens yours (R-CAP-05), 0 while it is safe, and
+   * the ticks before capitals can fall (R-CAP-06), 0 once they can.
+   */
+  capitals?: { falls: CapitalFallView[]; threat: number; standsIn: number };
   /** Set instead of the change lists when too much changed to list. */
   owners?: Uint16Array;
   winner?: number;
@@ -290,7 +306,9 @@ export interface DiplomacyEvent {
     | "stopped"
     | "gift"
     | "quick"
-    | "collapsed";
+    | "collapsed"
+    | "capital"
+    | "razed";
   a: number;
   b: number;
   /** Where a front collapsed, for "collapsed" (R-ATTACK-10). */

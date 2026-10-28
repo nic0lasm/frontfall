@@ -1050,7 +1050,7 @@ button.feed-entry:focus-visible {
     font-size: 13px;
     text-align: center;
   }
-  .game:has(.feed-item:not(.leaving)) .banner {
+  .game:has(.feed-item:not(.leaving)) .banner:not(.danger) {
     visibility: hidden;
   }
 }
@@ -2161,4 +2161,27 @@ button.feed-entry:focus-visible {
 
 .game[data-wide]:has(.guide) .event-feed {
   top: 172px;
+}
+
+/* R-CAP-05: the banner as an alarm while the player's capital is under threat. */
+.banner.danger {
+  border-color: var(--ff-danger);
+  background: color-mix(in srgb, var(--ff-danger) 28%, var(--ff-night-800));
+  color: #fff;
+  font-weight: 700;
+  animation: capital-alarm 1.2s ease-in-out infinite;
+}
+
+@keyframes capital-alarm {
+  50% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--ff-danger) 55%, transparent),
+      var(--ff-lift);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner.danger {
+    animation: none;
+  }
 }

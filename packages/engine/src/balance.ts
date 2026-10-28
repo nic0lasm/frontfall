@@ -145,6 +145,20 @@ export interface Balance {
   traitorTicks: number;
   /** B-TRAITOR-DEFENSE, percent of the usual price an attacker pays for a traitor's tile */
   traitorDefensePercent: number;
+  /** B-CAPITAL-RADIUS, in tiles on a map of 2^19 tiles */
+  capitalRadius: number;
+  /** B-CAPITAL-STRENGTH, percent of the usual price an attacker pays for a tile near a capital */
+  capitalStrengthPercent: number;
+  /** B-CAPITAL-GARRISON, percent of its owner's soldiers the capital's own tile costs on top */
+  capitalGarrisonPercent: number;
+  /** B-CAPITAL-SPOILS, percent of a conquered player's troops and gold their conqueror takes */
+  capitalSpoilsPercent: number;
+  /** B-CAPITAL-RAZE, percent of their troops a player loses when their capital is razed */
+  capitalRazePercent: number;
+  /** B-CAPITAL-GRACE, ticks of play before a capital can fall */
+  capitalGraceTicks: number;
+  /** B-CAPITAL-ALERT, in tiles on a map of 2^19 tiles: an enemy front this close threatens a capital */
+  capitalAlert: number;
   /** B-WIN-SHARE, percent of all ownable land */
   winSharePercent: number;
   /** B-MAX-DURATION, in ticks */
@@ -223,6 +237,13 @@ export const DEFAULT_BALANCE: Balance = {
   allianceCooldownTicks: 30 * 10,
   traitorTicks: 30 * 10,
   traitorDefensePercent: 50,
+  capitalRadius: 15,
+  capitalStrengthPercent: 300,
+  capitalGarrisonPercent: 20,
+  capitalSpoilsPercent: 50,
+  capitalRazePercent: 50,
+  capitalAlert: 30,
+  capitalGraceTicks: 180 * 10,
   winSharePercent: 75,
   maxDurationTicks: 3600 * 10,
 };

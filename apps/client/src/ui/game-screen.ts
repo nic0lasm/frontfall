@@ -95,6 +95,8 @@ export class GameScreen {
   private teams: readonly number[] = [];
   /** What the game leaves out (R-MODE-03): its build keys do nothing. */
   private disabled = 0;
+  /** Capital mode (R-CAP), for the help. */
+  private capitals = false;
   private ownableTiles = 1;
   /** Special rules of the game (R-MODE-08), for the end screen. */
   private special: Readonly<Record<string, boolean>> = {};
@@ -280,6 +282,7 @@ export class GameScreen {
           this.firstNation = info.rules.firstNation;
           this.teams = info.rules.teams;
           this.disabled = info.rules.disabled;
+          this.capitals = info.rules.special.capitals;
           this.scene.show({
             map: info.map,
             you: info.you,
@@ -718,6 +721,7 @@ export class GameScreen {
       helpPanel({
         build: this.latest?.build,
         disabled: this.disabled,
+        capitals: this.capitals,
         touch: this.coarsePointer.matches,
         online: this.link !== undefined,
         onClose: () => {

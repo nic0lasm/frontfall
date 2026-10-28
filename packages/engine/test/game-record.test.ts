@@ -3,7 +3,7 @@ import { DEFAULT_BALANCE } from "../src/balance.ts";
 import { installBots } from "../src/bots/index.ts";
 import { createGame } from "../src/create-game.ts";
 import { DesyncReportError } from "../src/desync-report.ts";
-import type { Turn } from "../src/game.ts";
+import type { GameRules, Turn } from "../src/game.ts";
 import {
   GAME_RECORD_VERSION,
   readGameRecord,
@@ -16,13 +16,13 @@ import { WorldGrid } from "../src/world-grid.ts";
 const terrain = new Terrain(new WorldGrid(32, 16), new Uint8Array(32 * 16).fill(TileKind.Plains));
 
 /** Plays a short game with one bot and records it as a client would. */
-function played(): GameRecord {
+function played(rules?: Partial<GameRules>): GameRecord {
   const balance = { ...DEFAULT_BALANCE, spawnPhaseTicks: 5 };
   const players = [
     { id: 1, name: "Ada" },
     { id: 2, name: "Bot" },
   ];
-  const game = createGame({ terrain, seed: 9, players, balance });
+  const game = createGame({ terrain, seed: 9, players, balance, ...(rules && { rules }) });
   installBots(game, [2], "normal");
   const turns: Turn[] = [
     { tick: 0, orders: [{ player: 1, order: { type: "spawn", tile: 40 } }] },
@@ -38,6 +38,7 @@ function played(): GameRecord {
     balance,
     players,
     bots: { ids: [2], difficulty: "normal" },
+    ...(rules && { rules }),
     you: 1,
     ticks: game.tick,
     turns,
@@ -68,5 +69,19 @@ describe("game records (#50)", () => {
     expect(() => readGameRecord({ ...game, turns })).toThrow("out of order");
     expect(() => readGameRecord({ ...game, ticks: 12 })).toThrow("past the end");
     expect(() => readGameRecord({ ...game, you: 7 })).toThrow("you is not one of the players");
+  });
+
+  it("carry the special rules, so a replay plays the same game (R-MODE-08)", () => {
+    const game = played({ capitals: true });
+    expect(readGameRecord(JSON.parse(JSON.stringify(game)))).toEqual(game);
+    expect(replayGameRecord(game, terrain)).toBe(game.hash);
+    // Without the rule, the replay plays another game and reaches another state.
+    expect(replayGameRecord({ ...game, rules: { capitals: false } }, terrain)).not.toBe(game.hash);
+  });
+
+  it("refuse a rule this build does not know", () => {
+    const game = played();
+    expect(() => readGameRecord({ ...game, rules: { tides: true } })).toThrow("unknown rule");
+    expect(() => readGameRecord({ ...game, rules: { capitals: 1 } })).toThrow("invalid rule");
   });
 });

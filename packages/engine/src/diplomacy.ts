@@ -46,7 +46,9 @@ export interface DiplomacyEvent {
    * missile of `b` with an air defense ("stopped"), sent `b` troops or
    * gold ("gift"), or sent `b` the quick message `phrase` ("quick"), which
    * only those two are shown. "collapsed": a front of `b` gave way before
-   * an attack of `a` around `tile` (R-ATTACK-10).
+   * an attack of `a` around `tile` (R-ATTACK-10). In capital mode (R-CAP),
+   * `a` took `b`'s capital and with it all their land ("capital"), or `a`'s
+   * capital was razed and moved ("razed", with `b` the same player).
    */
   readonly type:
     | "allied"
@@ -59,7 +61,9 @@ export interface DiplomacyEvent {
     | "stopped"
     | "gift"
     | "quick"
-    | "collapsed";
+    | "collapsed"
+    | "capital"
+    | "razed";
   readonly a: number;
   readonly b: number;
   /** A "quick" event's message, by number (R-DIPLO-07). */

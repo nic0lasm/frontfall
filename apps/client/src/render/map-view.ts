@@ -53,6 +53,7 @@ const PIECE_MIN_PIXELS = {
   heavyMissile: 18,
   structure: 16,
   palace: 19,
+  capital: 22,
 } as const;
 
 /** Structures drawn at once; each player's land rarely holds more than a few. */
@@ -214,6 +215,8 @@ export class MapView implements Renderer {
       >,
       sides: number,
       size: number,
+      /** Drawn over the other structures, as a capital over the city by it. */
+      above = 0,
     ): StructureLayers => {
       const layer = (extra: number, depth: number, order: number): Marker => {
         const marker: Marker = pieces
@@ -229,10 +232,18 @@ export class MapView implements Renderer {
         this.scene.add(marker.mesh);
         return marker;
       };
-      const minPixels = kind === "palace" ? PIECE_MIN_PIXELS.palace : PIECE_MIN_PIXELS.structure;
+      const minPixels =
+        kind === "palace" || kind === "capital"
+          ? PIECE_MIN_PIXELS[kind]
+          : PIECE_MIN_PIXELS.structure;
       return pieces
-        ? { fill: layer(0, 0.3, 3), size, minPixels }
-        : { outline: layer(1.5, 0.2, 0), fill: layer(0, 0.3, 0), size, minPixels };
+        ? { fill: layer(0, 0.3 + above, 3 + above * 10), size, minPixels }
+        : {
+            outline: layer(1.5, 0.2 + above, 0),
+            fill: layer(0, 0.3 + above, 0),
+            size,
+            minPixels,
+          };
     };
     this.structures = {
       city: layers("city", 4, 4),
@@ -241,6 +252,8 @@ export class MapView implements Renderer {
       port: layers("port", 6, 4),
       silo: layers("silo", 5, 4.5),
       airDefense: layers("airDefense", 12, 4),
+      // Without the pieces, a star of a shape; drawn after the buildings, so on top.
+      capital: layers("capital", 5, 6.5, 0.1),
     };
     this.vignette = addVignette(this.scene);
     this.camera.position.z = 10;
@@ -345,7 +358,15 @@ export class MapView implements Renderer {
   }
 
   setStructures(structures: readonly StructureMark[]): void {
-    for (const type of ["city", "palace", "fort", "port", "silo", "airDefense"] as const) {
+    for (const type of [
+      "city",
+      "palace",
+      "fort",
+      "port",
+      "silo",
+      "airDefense",
+      "capital",
+    ] as const) {
       const { outline, fill } = this.structures[type];
       let count = 0;
       for (const structure of structures) {

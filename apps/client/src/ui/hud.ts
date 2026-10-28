@@ -173,7 +173,7 @@ export class Hud {
     growthFloorPercent: 100,
     teams: [],
     disabled: 0,
-    special: { collapsingFronts: false },
+    special: { collapsingFronts: false, capitals: false },
   };
 
   private readonly touch: () => boolean;
@@ -539,6 +539,8 @@ export class Hud {
       this.renderBuild(update, human);
     }
     this.banner.textContent = this.bannerText(update, human);
+    // R-CAP-05: the banner turns to an alarm while the capital is threatened.
+    this.banner.classList.toggle("danger", this.besieged(update, human));
     this.renderLeaders(update);
     this.renderGoal(update, human);
     this.renderAttacks(update);
@@ -768,14 +770,33 @@ export class Hud {
     return tick + ticks <= maxDurationTicks && ticks < 3600 * ticksPerSecond ? ticks : undefined;
   }
 
+  /** Whether the player's capital is under threat (R-CAP-05). */
+  private besieged(update: GameUpdate, human: PlayerView | undefined): boolean {
+    return human?.alive === true && update.phase === "play" && (update.capitals?.threat ?? 0) !== 0;
+  }
+
   private bannerText(update: GameUpdate, human: PlayerView | undefined): string {
     const seconds = Math.ceil(update.spawnTicksLeft / this.rules.ticksPerSecond);
     if (update.phase === "spawn") {
-      return human && human.tiles > 0
-        ? this.say("hud.spawnMove", { seconds })
-        : this.say("hud.spawnPick", { seconds });
+      const spawn =
+        human && human.tiles > 0
+          ? this.say("hud.spawnMove", { seconds })
+          : this.say("hud.spawnPick", { seconds });
+      // R-CAP-01: where the player starts is the tile they must hold.
+      return update.capitals ? `${spawn} ${t("hud.spawnCapital")}` : spawn;
     }
     if (human && !human.alive) return t("hud.eliminated");
+    if (this.besieged(update, human)) {
+      const threat = update.capitals?.threat;
+      const name = update.players.find((player) => player.id === threat)?.name ?? "";
+      return t("hud.capitalThreat", { name });
+    }
+    const standsIn = update.capitals?.standsIn ?? 0;
+    if (this.mode === "attack" && update.attacks.length === 0 && standsIn > 0) {
+      return t("hud.capitalGrace", {
+        time: formatDuration(Math.ceil(standsIn / this.rules.ticksPerSecond)),
+      });
+    }
     if (this.mode !== "attack") return this.say(MODE_BANNERS[this.mode]);
     if (update.attacks.length > 0) {
       const troops = update.attacks.reduce((sum, attack) => sum + attack.troops, 0);

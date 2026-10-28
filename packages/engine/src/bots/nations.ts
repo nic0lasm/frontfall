@@ -1,3 +1,4 @@
+import { capitalAim, capitalAlertDistance, capitalThreat, capitalsStand } from "../capitals.ts";
 import { isAllied } from "../diplomacy.ts";
 import { populationCap, soldiers } from "../economy.ts";
 import type { Game, Player } from "../game.ts";
@@ -50,6 +51,9 @@ export const NATION_SILO_CITIES = 2; // B-NATION-SILO-CITIES
 
 /** Share of all ownable land, in %, from which the leading player becomes a nation's missile target (R-BOT-12). */
 export const NATION_MISSILE_LEADER_PERCENT = 30; // B-NATION-MISSILE-LEADER
+
+/** Border tiles a nation measures the distance to an enemy capital from (R-BOT-17). */
+const CAPITAL_SAMPLES = 64;
 
 /** Tiles from the attacker's land within which a nation puts a fort, as far back as it can. */
 const FORT_SETBACK = 8;
@@ -164,7 +168,9 @@ export function installNations(
     defendCoast(game, nation);
     arm(nation);
     const cap = populationCap(game, nation);
-    const attacker = mainAttacker(nation.id);
+    // R-BOT-17: a front near its capital comes before any other attacker.
+    const besieger = capitalThreat(game, nation.id);
+    const attacker = besieger !== NEUTRAL ? besieger : mainAttacker(nation.id);
     // R-BOT-09: one war at a time. Alliances (#47) will narrow this further.
     const enemies = new Set<number>();
     for (const attack of game.attacks) {
@@ -197,10 +203,12 @@ export function installNations(
     // R-BOT-08: hold the border, and answer the attacker alone once strong enough.
     const front = attacker === NEUTRAL ? -1 : borderWith(nation, attacker);
     if (front >= 0) {
+      // R-BOT-17: a besieged capital gets the first fort; its troops stay home, where they defend it.
+      if (besieger !== NEUTRAL && nation.capital !== undefined) buildFort(nation, nation.capital);
       buildFort(nation, front);
       if (nation.troops * 100 <= cap * nationParams.holdPercent) return;
       if (troops >= balance.neutralCost) {
-        game.apply(nation.id, { type: "attack", target: front, troops });
+        game.apply(nation.id, { type: "attack", target: capitalAim(game, front), troops });
       }
       return;
     }
@@ -223,6 +231,8 @@ export function installNations(
     const ownDensity = divFloor(nation.troops, tiles);
     // R-BOT-14: once settled, the leader comes first when it borders the nation and the odds allow.
     if (!settling && hunt(nation, ownDensity, armed, open)) return;
+    // R-BOT-17: an enemy capital within reach of its border is worth more than any other target.
+    if (!settling && strikeCapital(nation, ownDensity, armed, accept)) return;
     const { neutral, enemy, enemyDensity } = scanBorder(game, nation, accept);
     const odds = full ? params.boldnessPercent : nationParams.oddsPercent;
     const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * odds;
@@ -231,7 +241,8 @@ export function installNations(
     const target = neutral >= 0 && !muchWeaker ? neutral : weak ? enemy : -1;
     if (target >= 0) {
       const sent = target === enemy ? armed() : troops;
-      game.apply(nation.id, { type: "attack", target, troops: sent });
+      const aim = target >= 0 && target === enemy ? capitalAim(game, target) : target;
+      game.apply(nation.id, { type: "attack", target: aim, troops: sent });
     } else sail(game, nation, troops, odds, seaCooldowns, retryTicks, accept);
   }
 
@@ -327,12 +338,50 @@ export function installNations(
       }
     }
     if (top === NEUTRAL || territory.tileCount(nation.id) >= most) return false;
-    if (most * 100 < game.terrain.ownableCount * nationParams.huntPercent) return false;
+    // R-BOT-17: with capitals, a runaway leader is a threat twice as soon.
+    const huntShare = game.rules.capitals
+      ? divFloor(nationParams.huntPercent, 2)
+      : nationParams.huntPercent;
+    if (most * 100 < game.terrain.ownableCount * huntShare) return false;
     if (open && !open(top)) return false;
     const { enemy, enemyDensity } = scanBorder(game, nation, (owner) => owner === top);
     if (enemy < 0 || enemyDensity * 100 > ownDensity * params.boldnessPercent) return false;
-    game.apply(nation.id, { type: "attack", target: enemy, troops: armed() });
+    game.apply(nation.id, { type: "attack", target: capitalAim(game, enemy), troops: armed() });
     return true;
+  }
+
+  /**
+   * R-BOT-17: in capital mode, an attack on the capital of a neighbour not
+   * its ally whose capital lies within B-CAPITAL-ALERT of the nation's
+   * border, if that neighbour's troops per tile are within its boldness,
+   * the lowest player number first. Whether it attacked.
+   */
+  function strikeCapital(
+    nation: Player,
+    ownDensity: number,
+    armed: () => number,
+    accept: OwnerFilter | undefined,
+  ): boolean {
+    if (!capitalsStand(game)) return false;
+    const topology = game.terrain.topology;
+    const reach = capitalAlertDistance(game);
+    const borders = territory.borderCount(nation.id);
+    const stride = Math.max(1, Math.ceil(borders / CAPITAL_SAMPLES));
+    for (const player of game.players()) {
+      const capital = player.capital;
+      if (player.id === nation.id || !player.alive || capital === undefined) continue;
+      if (isAllied(game, nation.id, player.id) || (accept && !accept(player.id))) continue;
+      let near = false;
+      for (let i = 0; i < borders && !near; i += stride) {
+        near = topology.distance(territory.borderTile(nation.id, i), capital) <= reach;
+      }
+      if (!near) continue;
+      const { enemy, enemyDensity } = scanBorder(game, nation, (owner) => owner === player.id);
+      if (enemy < 0 || enemyDensity * 100 > ownDensity * params.boldnessPercent) continue;
+      game.apply(nation.id, { type: "attack", target: capitalAim(game, enemy), troops: armed() });
+      return true;
+    }
+    return false;
   }
 
   /**
