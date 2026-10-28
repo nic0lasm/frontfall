@@ -1,13 +1,7 @@
 import type { GameUpdate } from "../game/game-view.ts";
 import { CueWatcher, type Cue } from "./cues.ts";
+import { soundSettings } from "./settings.ts";
 import { play } from "./synth.ts";
-
-/** What the player chose in the settings. */
-export interface SoundSettings {
-  /** 0 to 100. */
-  volume: number;
-  muted: boolean;
-}
 
 /** The least time between two sounds of one kind, so a burst of events stays a single, soft one. */
 const MIN_GAP_MS = 250;
@@ -25,8 +19,6 @@ export class Sound {
   private ctx: AudioContext | undefined;
   private master: GainNode | undefined;
 
-  constructor(private readonly settings: () => SoundSettings) {}
-
   /** Reads one update of a live game and plays what it holds. */
   observe(update: GameUpdate): void {
     // A replay and a paused or finished screen are watched, not played.
@@ -41,7 +33,7 @@ export class Sound {
   }
 
   private cue(cue: Cue): void {
-    const { volume, muted } = this.settings();
+    const { volume, muted } = soundSettings();
     if (muted || volume <= 0) return;
     const now = performance.now();
     if (now - (this.last.get(cue) ?? -Infinity) < MIN_GAP_MS) return;

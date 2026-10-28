@@ -12,22 +12,11 @@ export interface AccessibilitySettings {
   reduceMotion: boolean;
   /** Lighter text and stronger edges on panels. */
   highContrast: boolean;
-  /** Sound effects level, 0 to 100. */
-  volume: number;
-  /** No sound effects at all. */
-  muted: boolean;
 }
 
 export const STORAGE_KEY = "frontfall.accessibility";
 
-const DEFAULT_VOLUME = 60;
-const DEFAULTS: AccessibilitySettings = {
-  scale: 100,
-  reduceMotion: false,
-  highContrast: false,
-  volume: DEFAULT_VOLUME,
-  muted: false,
-};
+const DEFAULTS: AccessibilitySettings = { scale: 100, reduceMotion: false, highContrast: false };
 
 /** What was stored, with anything unreadable or out of range put back to the default. */
 export function parseSettings(raw: string | null | undefined): AccessibilitySettings {
@@ -41,11 +30,6 @@ export function parseSettings(raw: string | null | undefined): AccessibilitySett
     if (scale) settings.scale = scale;
     settings.reduceMotion = stored["reduceMotion"] === true;
     settings.highContrast = stored["highContrast"] === true;
-    const volume = stored["volume"];
-    if (typeof volume === "number" && Number.isFinite(volume)) {
-      settings.volume = Math.min(100, Math.max(0, Math.round(volume)));
-    }
-    settings.muted = stored["muted"] === true;
   } catch {
     // Not JSON: the defaults stand.
   }
@@ -100,7 +84,7 @@ function apply(settings: AccessibilitySettings): void {
   root.toggleAttribute("data-high-contrast", settings.highContrast);
 }
 
-/** The "Accessibility" disclosure of the menu: interface size, motion, contrast and sound. */
+/** The "Accessibility" disclosure of the menu: interface size, motion, contrast and, from the audio code, sound. */
 export function accessibilityPanel(): HTMLDetailsElement {
   const scale = h("select", { id: "ui-scale", "data-i18n-attr": "aria-label:a11y.scale" });
   for (const value of SCALES) {
@@ -112,11 +96,7 @@ export function accessibilityPanel(): HTMLDetailsElement {
     updateAccessibility({ scale: Number(scale.value) as Scale });
   });
 
-  const toggle = (
-    id: string,
-    key: "reduceMotion" | "highContrast" | "muted",
-    label: string,
-  ): HTMLElement => {
+  const toggle = (id: string, key: "reduceMotion" | "highContrast", label: string): HTMLElement => {
     const input = h("input", { type: "checkbox", id });
     input.checked = current[key];
     input.addEventListener("change", () => {
@@ -125,19 +105,7 @@ export function accessibilityPanel(): HTMLDetailsElement {
     return h("label", { class: "toggle", for: id }, input, h("span", { "data-i18n": label }));
   };
 
-  const volume = h("input", {
-    type: "range",
-    id: "sound-volume",
-    min: "0",
-    max: "100",
-    step: "10",
-    "data-i18n-attr": "aria-label:a11y.volume",
-  });
-  volume.value = String(current.volume);
-  volume.addEventListener("change", () => {
-    updateAccessibility({ volume: Number(volume.value) });
-  });
-
+  const soundControls = h("div", { class: "sound-controls" });
   const panel = h(
     "details",
     { class: "accessibility" },
@@ -153,15 +121,16 @@ export function accessibilityPanel(): HTMLDetailsElement {
       ),
       toggle("reduce-motion", "reduceMotion", "a11y.motion"),
       toggle("high-contrast", "highContrast", "a11y.contrast"),
-      toggle("sound-muted", "muted", "a11y.mute"),
-      h(
-        "div",
-        { class: "field" },
-        h("label", { for: "sound-volume", "data-i18n": "a11y.volume" }),
-        volume,
-      ),
+      soundControls,
       h("p", { class: "accessibility-note", "data-i18n": "a11y.note" }),
     ),
+  );
+  // The sound settings come with the audio code, apart from the first visit.
+  void import("../audio/controls.ts").then(
+    ({ soundPanel }) => {
+      soundControls.append(...soundPanel());
+    },
+    () => undefined,
   );
   applyTranslations(panel);
   return panel;

@@ -15,6 +15,7 @@ import { safeStorage } from "./setup.ts";
 // The end screen loads while the game starts, out of the first download.
 import type { endScreen } from "./end-screen.ts";
 // Only replays show the bar: it loads with the replay, out of the first download.
+import type { Sound } from "../audio/sound.ts";
 import type { ReplayBar } from "./replay-bar.ts";
 import { REPLAY_MAP_CHANGED, REPLAY_SPEEDS } from "../game/replay-file.ts";
 import { ClickMarks } from "./click-marks.ts";
@@ -26,7 +27,6 @@ import { GameAchievements } from "./screen/game-achievements.ts";
 import { gameKey } from "./screen/game-keys.ts";
 import { GuideHost } from "./screen/guide-host.ts";
 import { MapScene } from "./screen/map-scene.ts";
-import { GameSound } from "./screen/game-sound.ts";
 import { Orders } from "./screen/orders.ts";
 import { Overlays } from "./screen/overlays.ts";
 import { usage, type GameFacts, type GameTracker } from "../usage.ts";
@@ -83,7 +83,8 @@ export class GameScreen {
   private ownableTiles = 1;
   private peakTiles = 0;
   private readonly achievements: GameAchievements;
-  private readonly sound = new GameSound();
+  /** The sound effects, once their code is fetched; none for a replay. */
+  private sound: Sound | undefined;
   private frameHandle = 0;
   private readonly marks = new ClickMarks();
   private readonly labels = new PlayerLabels();
@@ -253,6 +254,13 @@ export class GameScreen {
           this.ownableTiles = info.rules.ownableTiles;
           if (!options.record) {
             this.achievements.start(info.rules, link ? undefined : options.difficulty);
+            // Without it the game goes on in silence.
+            import("../audio/sound.ts").then(
+              (module) => {
+                this.sound = new module.Sound();
+              },
+              () => undefined,
+            );
             // Failing here only leaves showEnd to try again.
             import("./end-screen.ts").then(
               (module) => {
@@ -373,7 +381,7 @@ export class GameScreen {
     cancelAnimationFrame(this.frameHandle);
     for (const cleanup of this.cleanups.splice(0)) cleanup();
     this.session.dispose();
-    this.sound.dispose();
+    this.sound?.dispose();
     this.input.dispose();
     this.scene.dispose();
     this.element.remove();
@@ -414,7 +422,7 @@ export class GameScreen {
     const human = update.players.find((player) => player.id === update.you);
     if (human) this.peakTiles = Math.max(this.peakTiles, human.tiles);
     this.achievements.observe(update);
-    this.sound.observe(update);
+    this.sound?.observe(update);
     if (human) this.guide.follow(update, human.tiles);
     if (!this.focused && human && human.tiles > 0) {
       // Once, when the player's start appears.
