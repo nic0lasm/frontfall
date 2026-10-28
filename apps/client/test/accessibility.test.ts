@@ -4,7 +4,13 @@ import { parseSettings } from "../src/ui/accessibility.ts";
 
 describe("accessibility settings", () => {
   it("starts from the defaults and mends anything unreadable", () => {
-    const defaults = { scale: 100, reduceMotion: false, highContrast: false };
+    const defaults = {
+      scale: 100,
+      reduceMotion: false,
+      highContrast: false,
+      volume: 60,
+      muted: false,
+    };
     expect(parseSettings(null)).toEqual(defaults);
     expect(parseSettings("not json")).toEqual(defaults);
     expect(parseSettings("42")).toEqual(defaults);
@@ -12,11 +18,17 @@ describe("accessibility settings", () => {
   });
 
   it("keeps what was chosen", () => {
-    expect(parseSettings('{"scale":125,"reduceMotion":true,"highContrast":true}')).toEqual({
-      scale: 125,
-      reduceMotion: true,
-      highContrast: true,
-    });
+    expect(
+      parseSettings(
+        '{"scale":125,"reduceMotion":true,"highContrast":true,"volume":30,"muted":true}',
+      ),
+    ).toEqual({ scale: 125, reduceMotion: true, highContrast: true, volume: 30, muted: true });
+  });
+
+  it("keeps the volume within range", () => {
+    expect(parseSettings('{"volume":250}').volume).toBe(100);
+    expect(parseSettings('{"volume":-5}').volume).toBe(0);
+    expect(parseSettings('{"volume":"loud"}').volume).toBe(60);
   });
 });
 

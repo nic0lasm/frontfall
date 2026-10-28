@@ -26,6 +26,7 @@ import { GameAchievements } from "./screen/game-achievements.ts";
 import { gameKey } from "./screen/game-keys.ts";
 import { GuideHost } from "./screen/guide-host.ts";
 import { MapScene } from "./screen/map-scene.ts";
+import { GameSound } from "./screen/game-sound.ts";
 import { Orders } from "./screen/orders.ts";
 import { Overlays } from "./screen/overlays.ts";
 import { usage, type GameFacts, type GameTracker } from "../usage.ts";
@@ -82,6 +83,7 @@ export class GameScreen {
   private ownableTiles = 1;
   private peakTiles = 0;
   private readonly achievements: GameAchievements;
+  private readonly sound = new GameSound();
   private frameHandle = 0;
   private readonly marks = new ClickMarks();
   private readonly labels = new PlayerLabels();
@@ -371,6 +373,7 @@ export class GameScreen {
     cancelAnimationFrame(this.frameHandle);
     for (const cleanup of this.cleanups.splice(0)) cleanup();
     this.session.dispose();
+    this.sound.dispose();
     this.input.dispose();
     this.scene.dispose();
     this.element.remove();
@@ -411,6 +414,7 @@ export class GameScreen {
     const human = update.players.find((player) => player.id === update.you);
     if (human) this.peakTiles = Math.max(this.peakTiles, human.tiles);
     this.achievements.observe(update);
+    this.sound.observe(update);
     if (human) this.guide.follow(update, human.tiles);
     if (!this.focused && human && human.tiles > 0) {
       // Once, when the player's start appears.

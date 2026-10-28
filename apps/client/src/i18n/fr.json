@@ -351,6 +351,8 @@
   "a11y.scale": "Taille de l’interface",
   "a11y.motion": "Réduire les animations",
   "a11y.contrast": "Contraste renforcé",
+  "a11y.mute": "Couper les effets sonores",
+  "a11y.volume": "Volume des effets sonores",
   "a11y.note": "Les animations réduites suivent aussi le réglage de votre appareil.",
   "help.keyboardPick": "Clavier : la croix marque le centre de la vue. Entrée ou Espace clique dessus, Maj+Entrée ouvre son menu",
   "end.achievements": "Succès débloqués",

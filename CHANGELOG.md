@@ -4,8 +4,13 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **Sound effects.** Short, soft sounds for an attack you launch, land you take, a building you finish, a missile you fire, a new alliance, and for victory and defeat. They are made by your browser as you play, so nothing extra is downloaded until the first sound is due. The page stays silent until you have clicked or pressed a key once, as browsers require. In the menu's Accessibility section, a switch mutes them and a slider sets their volume; both are kept between visits. There is no music.
+
 ### For self-hosters and contributors
 
+- **Sound code on demand.** The sound effects live in `apps/client/src/audio/` and load as their own chunk, so the first-visit budget is unchanged. The cues are read from the updates the game screen already gets, and no game rule, replay or message depends on them.
 - **Two more server fixes from [@MohammadBnei](https://github.com/MohammadBnei)** (#139, #140). A missing `usage.json` next to its `.bak` now loads the copy instead of starting the counts from zero, which the second save would have written over the backup; to reset the counts, delete both files ([server](docs/server.md#usage-counts)). The end-to-end test that plays a game and sends a thumbs down no longer runs against the public server after a deploy, so it stops adding a test game to the real counts. Thank you.
 
 ## [0.6.2] - 2026-10-28
