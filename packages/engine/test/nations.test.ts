@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { installAttacks } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { installBoats } from "../src/boats.ts";
-import { BOT_DIFFICULTIES } from "../src/bots/difficulty.ts";
+import type { BotDifficulty } from "../src/bots/difficulty.ts";
 import {
   installBots,
   installNations,
   NATION_FULL_PERCENT,
-  NATION_HOLD_PERCENT,
+  NATION_DIFFICULTIES,
 } from "../src/bots/index.ts";
 import { installEconomy, populationCap } from "../src/economy.ts";
 import { Game, type Order, type Player } from "../src/game.ts";
@@ -18,15 +18,17 @@ import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
 
 const balance: Balance = { ...DEFAULT_BALANCE, spawnPhaseTicks: 10, spawnDistance: 12 };
-const interval = BOT_DIFFICULTIES.hard.intervalSeconds * balance.ticksPerSecond;
+const intervalOf = (difficulty: BotDifficulty) =>
+  NATION_DIFFICULTIES[difficulty].intervalSeconds * balance.ticksPerSecond;
+const interval = intervalOf("hard");
 
 /**
  * A strip of 60 x 3 plains, no wrap: Ada holds columns 0 to 19, the nation
  * (player 1) 20 to 39 and Bea 40 to 59. One tile per tick for every attack,
  * so a fight lasts. The nation decides on the ticks where (tick + 1) is a
- * multiple of the hard interval.
+ * multiple of its interval, hard unless told otherwise.
  */
-function strip(overrides: Partial<Balance> = {}) {
+function strip(overrides: Partial<Balance> = {}, difficulty: BotDifficulty = "hard") {
   const grid = new WorldGrid(60, 3, { wrapsX: false });
   const game = new Game({
     terrain: new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains)),
@@ -47,7 +49,7 @@ function strip(overrides: Partial<Balance> = {}) {
   });
   installAttacks(game);
   installStructures(game);
-  installNations(game, [1], "hard", 0);
+  installNations(game, [1], difficulty, 0);
   for (let tile = 0; tile < grid.size; tile++) {
     const x = grid.x(tile);
     game.territory.setOwner(tile, x < 20 ? 2 : x < 40 ? 1 : 3);
@@ -66,7 +68,7 @@ function strip(overrides: Partial<Balance> = {}) {
   };
   /** Ada attacks the nation on the tick just before its next decision. */
   const adaAttacks = (troops = 3000) => {
-    run(interval - 2);
+    run(intervalOf(difficulty) - 2);
     run(1, [{ player: 2, order: { type: "attack", target: grid.index(25, 1), troops } }]);
   };
   return { grid, game, nation, ada, bea, ordersOf, run, adaAttacks };
@@ -75,13 +77,13 @@ function strip(overrides: Partial<Balance> = {}) {
 describe("nations", () => {
   it("hold under attack while their troops are at most B-NATION-HOLD of their cap (R-BOT-08)", () => {
     const { game, nation, ada, bea, ordersOf, run, adaAttacks } = strip();
-    nation.troops = 2000;
+    nation.troops = 1000;
     ada.troops = 5000;
     // Bea is easy prey: a bot would turn on her.
     bea.troops = 10;
     adaAttacks();
     expect(nation.troops * 100).toBeLessThanOrEqual(
-      populationCap(game, nation) * NATION_HOLD_PERCENT,
+      populationCap(game, nation) * NATION_DIFFICULTIES.hard.holdPercent,
     );
     run(1);
     expect(game.attacks.some((attack) => attack.player === 2 && attack.target === 1)).toBe(true);
@@ -89,7 +91,8 @@ describe("nations", () => {
   });
 
   it("keep playing through attacks too small to threaten them (B-NATION-THREAT)", () => {
-    const { game, grid, nation, ada, bea, ordersOf, run, adaAttacks } = strip();
+    // Easy nations do not hunt the leader (R-BOT-14), which Ada becomes.
+    const { game, grid, nation, ada, bea, ordersOf, run, adaAttacks } = strip({}, "easy");
     nation.troops = 4000;
     ada.troops = 5000;
     bea.troops = 10;
@@ -139,9 +142,10 @@ describe("nations", () => {
   it("leave alone a neighbour that is weaker but not by B-NATION-ODDS (R-BOT-09)", () => {
     const { ordersOf, run, nation, ada, bea } = strip();
     nation.troops = 4000;
-    // 90 % of the nation's troops per tile on both sides: a hard bot would attack.
-    ada.troops = 3600;
-    bea.troops = 3600;
+    // Denser than the nation by a tenth on both sides: a hard bot would attack.
+    const denser = (4000 * (NATION_DIFFICULTIES.hard.oddsPercent + 10)) / 100;
+    ada.troops = denser;
+    bea.troops = denser;
     run(3 * interval);
     expect(ordersOf(1)).toEqual([]);
   });
@@ -149,10 +153,10 @@ describe("nations", () => {
   it("take a bot's odds once their army is full (B-NATION-FULL)", () => {
     const { game, ordersOf, run, nation, ada, bea } = strip();
     const cap = populationCap(game, nation);
-    // Just under full, then full: neighbours as dense as the nation.
+    // Just under full with neighbours a little denser, then full with neighbours as dense.
     nation.troops = Math.floor((cap * NATION_FULL_PERCENT) / 100) - 1;
-    ada.troops = nation.troops;
-    bea.troops = nation.troops;
+    ada.troops = nation.troops + 120;
+    bea.troops = nation.troops + 120;
     run(interval);
     expect(ordersOf(1)).toEqual([]);
     nation.troops = cap;
@@ -160,6 +164,25 @@ describe("nations", () => {
     bea.troops = cap;
     run(interval);
     expect(ordersOf(1).map((order) => order.type)).toEqual(["attack"]);
+  });
+
+  it("turn on the leader first from B-NATION-HUNT, odds allowing, but not on easy (R-BOT-14)", () => {
+    for (const difficulty of ["hard", "easy"] as const) {
+      const { game, grid, ordersOf, run, nation, ada, bea } = strip({}, difficulty);
+      // Ada leads with 25 columns out of 60, thinner than the nation; Bea is much weaker still.
+      for (let y = 0; y < 3; y++) {
+        for (let x = 20; x < 25; x++) game.territory.setOwner(grid.index(x, y), 2);
+      }
+      nation.troops = 4000;
+      ada.troops = 4000;
+      bea.troops = 10;
+      run(intervalOf(difficulty));
+      const targets = ordersOf(1).map((order) =>
+        order.type === "attack" ? game.territory.ownerOf(order.target) : -1,
+      );
+      expect(targets).toEqual([difficulty === "hard" ? 2 : 3]);
+    }
+    expect(NATION_DIFFICULTIES.easy.huntPercent).toBe(0);
   });
 
   it("fight one player at a time (R-BOT-09)", () => {

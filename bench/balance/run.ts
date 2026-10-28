@@ -16,6 +16,7 @@ import { summarize, type BalanceSummary } from "./summary.ts";
  *
  *   pnpm balance -- --map world --bots normal:8 --seeds 1-8
  *   pnpm balance -- --map world --bots normal:4,hard:4 --nations normal --casual
+ *   pnpm balance -- --map world --bots normal:0 --nations hard --average
  *   pnpm balance -- --map europe --bots hard:11 --set tradeBase=4000 --json out.json
  */
 const { values } = parseArgs({
@@ -28,6 +29,8 @@ const { values } = parseArgs({
     nations: { type: "string" },
     teams: { type: "string" },
     casual: { type: "boolean", default: false },
+    // The stronger scripted player, in place of the casual one.
+    average: { type: "boolean", default: false },
     seeds: { type: "string", default: "1-8" },
     minutes: { type: "string", default: "20" },
     jobs: { type: "string", default: String(availableParallelism()) },
@@ -79,6 +82,7 @@ const setups: BalanceSetup[] = seeds.map((seed) => ({
   ...(values.nations ? { nations: difficulty(values.nations) } : {}),
   ...(values.teams ? { teams: Number(values.teams) } : {}),
   ...(values.casual ? { casual: true } : {}),
+  ...(values.average ? { average: true } : {}),
   minutes: Number(values.minutes),
   ...(values.set.length ? { balance: balance } : {}),
 }));
@@ -128,7 +132,7 @@ function print(s: BalanceSummary): void {
   const round = (value: number, digits = 1): string => value.toFixed(digits);
   console.log(
     `\n${values.map}, bots ${values.bots}${values.nations ? `, nations ${values.nations}` : ""}` +
-      `${values.teams ? `, ${values.teams} teams` : ""}${values.casual ? ", casual player" : ""}` +
+      `${values.teams ? `, ${values.teams} teams` : ""}${values.average ? ", average player" : values.casual ? ", casual player" : ""}` +
       (values.set.length ? `, ${values.set.join(" ")}` : ""),
   );
   console.log(
@@ -167,7 +171,7 @@ function print(s: BalanceSummary): void {
   );
   if (s.casual) {
     console.log(
-      `casual player: won ${String(s.casual.won)}, alive at the end ${String(s.casual.alive)}` +
+      `${values.average ? "average" : "casual"} player: won ${String(s.casual.won)}, alive at the end ${String(s.casual.alive)}` +
         (s.casual.eliminatedMedian === undefined
           ? ""
           : `, eliminated after ${round(s.casual.eliminatedMedian)} min (median)`),

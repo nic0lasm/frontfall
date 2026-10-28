@@ -4,6 +4,14 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Changed
+
+- **Normal and hard nations fight back.** Nations at normal and hard now play every second, keep fewer troops at home, give you less time before they attack (2 minutes at normal, 1 and a half at hard instead of 2 and a half) and gang up on whoever holds a fifth of the map, when they can win the fight. A player who used to win every game on normal in about 7 minutes now wins about half of them, and hard is meant to beat you. Easy is unchanged and is the level for a first game. Games with bots only play as before.
+
+### For self-hosters and contributors
+
+- `pnpm balance -- --average` plays a scripted average player, stronger than `--casual`, to measure the difficulty levels; nations take their own pace, attack ratio and reserve from `NATION_DIFFICULTIES` (`B-NATION-INTERVAL`, `B-NATION-ATTACK-RATIO`, `B-NATION-RESERVE`, `B-NATION-HUNT`, rule `R-BOT-14`), and the `world-nations` golden replay was recorded again.
+
 ## [0.6.1] - 2026-10-28
 
 ### Fixed

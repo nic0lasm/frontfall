@@ -57,17 +57,15 @@ export {
 export {
   installBots,
   installNations,
-  NATION_EXTRA_RESERVE,
   NATION_FULL_PERCENT,
-  NATION_GRACE_SECONDS,
   NATION_PILE_MAX,
   NATION_PILE_SECONDS,
-  NATION_HOLD_PERCENT,
-  NATION_ODDS_PERCENT,
   NATION_THREAT_PERCENT,
   BOT_DIFFICULTIES,
+  NATION_DIFFICULTIES,
   type BotDifficulty,
   type BotParameters,
+  type NationParameters,
 } from "./bots/index.ts";
 export {
   DISABLE_ALL,

@@ -131,7 +131,7 @@ export function summarize(reports: readonly GameReport[]): BalanceSummary {
   };
 
   const casuals = reports.flatMap((r) => {
-    const casual = r.players.find((p) => p.kind === "casual");
+    const casual = r.players.find((p) => p.kind === "casual" || p.kind === "average");
     return casual ? [{ casual, won: r.winner === casual.id }] : [];
   });
   const lost = casuals.flatMap(({ casual }) =>

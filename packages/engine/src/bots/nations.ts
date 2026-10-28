@@ -13,7 +13,7 @@ import {
   structureCount,
 } from "../structures.ts";
 import { NEUTRAL } from "../territory/territory-map.ts";
-import { BOT_DIFFICULTIES, type BotDifficulty } from "./difficulty.ts";
+import { BOT_DIFFICULTIES, NATION_DIFFICULTIES, type BotDifficulty } from "./difficulty.ts";
 import {
   RETRY_DECISIONS,
   buildCity,
@@ -27,14 +27,8 @@ import {
   type OwnerFilter,
 } from "./shared.ts";
 
-/** A nation attacks a player whose troops per tile are at most this share of its own. */
-export const NATION_ODDS_PERCENT = 80; // B-NATION-ODDS
-
 /** Troops, in % of its population cap, from which a nation attacks as boldly as a bot: its army can grow no more. */
 export const NATION_FULL_PERCENT = 90; // B-NATION-FULL
-
-/** Seconds of play during which a nation opens no front against a player: it settles its land first. */
-export const NATION_GRACE_SECONDS = 150; // B-NATION-GRACE
 
 /** Seconds of play during which a nation opens no front against a player already under attack by `NATION_PILE_MAX` nations, unless that player leads. */
 export const NATION_PILE_SECONDS = 600; // B-NATION-PILE-TIME
@@ -44,12 +38,6 @@ export const NATION_PILE_MAX = 2; // B-NATION-PILE
 
 /** An attack counts as a threat to a nation from this share of the nation's troops: smaller ones do not stop it. */
 export const NATION_THREAT_PERCENT = 10; // B-NATION-THREAT
-
-/** Under attack, a nation answers only with more troops than this share of its population cap. */
-export const NATION_HOLD_PERCENT = 60; // B-NATION-HOLD
-
-/** Points of population cap a nation keeps at home on top of the reserve of a bot of the same difficulty. */
-export const NATION_EXTRA_RESERVE = 10; // B-NATION-RESERVE
 
 /** Cities a nation owns before it builds a missile silo (R-BOT-12). */
 export const NATION_SILO_CITIES = 2; // B-NATION-SILO-CITIES
@@ -61,9 +49,10 @@ export const NATION_MISSILE_LEADER_PERCENT = 30; // B-NATION-MISSILE-LEADER
 const FORT_SETBACK = 8;
 
 /**
- * Nations (R-BOT-02, R-BOT-07 to R-BOT-09): computer players named after a
- * country, starting on the tile their map gives them (see installSpawn).
- * They play like bots, at the same pace for the same difficulty (R-BOT-04),
+ * Nations (R-BOT-02, R-BOT-07 to R-BOT-09, R-BOT-14): computer players
+ * named after a country, starting on the tile their map gives them (see
+ * installSpawn). They play like bots, at their own pace for the difficulty
+ * (B-NATION-INTERVAL, B-NATION-ATTACK-RATIO, B-NATION-RESERVE, R-BOT-04),
  * but steadier:
  *
  * - under attack, they hold: no order at all until their troops are above
@@ -83,15 +72,16 @@ export function installNations(
   ids: readonly number[],
   difficulty: BotDifficulty,
   /** B-NATION-GRACE; tests of later behaviour set it to 0. */
-  graceSeconds = NATION_GRACE_SECONDS,
+  graceSeconds = NATION_DIFFICULTIES[difficulty].graceSeconds,
 ): void {
   const { territory, balance } = game;
   const params = BOT_DIFFICULTIES[difficulty];
-  const interval = Math.max(1, params.intervalSeconds * balance.ticksPerSecond);
+  const nationParams = NATION_DIFFICULTIES[difficulty];
+  const interval = Math.max(1, nationParams.intervalSeconds * balance.ticksPerSecond);
   const retryTicks = RETRY_DECISIONS * interval;
   const graceTicks = graceSeconds * balance.ticksPerSecond;
   const pileTicks = NATION_PILE_SECONDS * balance.ticksPerSecond;
-  const reservePercent = Math.min(100, params.reservePercent + NATION_EXTRA_RESERVE);
+  const reservePercent = nationParams.reservePercent;
   const nations = [...new Set(ids)].sort((a, b) => a - b);
   const nationSet = new Set(nations);
   for (const id of nations) {
@@ -166,7 +156,7 @@ export function installNations(
     const cap = populationCap(game, nation);
     const reserve = percentOf(cap, reservePercent);
     const troops = Math.min(
-      percentOf(nation.troops, params.attackRatioPercent),
+      percentOf(nation.troops, nationParams.attackRatioPercent),
       nation.troops - reserve,
     );
 
@@ -175,7 +165,7 @@ export function installNations(
     const front = attacker === NEUTRAL ? -1 : borderWith(nation, attacker);
     if (front >= 0) {
       buildFort(nation, front);
-      if (nation.troops * 100 <= cap * NATION_HOLD_PERCENT) return;
+      if (nation.troops * 100 <= cap * nationParams.holdPercent) return;
       if (troops >= balance.neutralCost) {
         game.apply(nation.id, { type: "attack", target: front, troops });
       }
@@ -199,17 +189,52 @@ export function installNations(
       : game.tick < pileTicks
         ? (owner) => (open?.(owner) ?? true) && (enemies.has(owner) || spared(owner))
         : open;
-    const { neutral, enemy, enemyDensity } = scanBorder(game, nation, accept);
     const ownDensity = divFloor(nation.troops, tiles);
+    // R-BOT-14: once settled, the leader comes first when it borders the nation and the odds allow.
+    if (!settling && hunt(nation, ownDensity, troops, open)) return;
+    const { neutral, enemy, enemyDensity } = scanBorder(game, nation, accept);
     // Troops past the cap would be wasted: a full army takes the odds a bot would.
     const full = nation.troops * 100 >= cap * NATION_FULL_PERCENT;
-    const odds = full ? params.boldnessPercent : NATION_ODDS_PERCENT;
+    const odds = full ? params.boldnessPercent : nationParams.oddsPercent;
     const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * odds;
     // Free land is cheaper than a fight, unless the neighbour is much weaker.
     const muchWeaker = weak && enemyDensity * 200 <= ownDensity * odds;
     const target = neutral >= 0 && !muchWeaker ? neutral : weak ? enemy : -1;
     if (target >= 0) game.apply(nation.id, { type: "attack", target, troops });
     else sail(game, nation, troops, odds, seaCooldowns, retryTicks, accept);
+  }
+
+  /**
+   * R-BOT-14: an attack on the player who is not its ally with the most land,
+   * once they hold B-NATION-HUNT of it, from a sample of the border, if their
+   * troops per tile are within B-BOT-BOLDNESS of the nation's own. Whether
+   * it attacked.
+   */
+  function hunt(
+    nation: Player,
+    ownDensity: number,
+    troops: number,
+    open: OwnerFilter | undefined,
+  ): boolean {
+    if (nationParams.huntPercent === 0) return false;
+    let top = NEUTRAL;
+    let most = 0;
+    for (const player of game.players()) {
+      if (player.id === nation.id || !player.alive || isAllied(game, nation.id, player.id))
+        continue;
+      const tiles = territory.tileCount(player.id);
+      if (tiles > most) {
+        top = player.id;
+        most = tiles;
+      }
+    }
+    if (top === NEUTRAL || territory.tileCount(nation.id) >= most) return false;
+    if (most * 100 < game.terrain.ownableCount * nationParams.huntPercent) return false;
+    if (open && !open(top)) return false;
+    const { enemy, enemyDensity } = scanBorder(game, nation, (owner) => owner === top);
+    if (enemy < 0 || enemyDensity * 100 > ownDensity * params.boldnessPercent) return false;
+    game.apply(nation.id, { type: "attack", target: enemy, troops });
+    return true;
   }
 
   /**

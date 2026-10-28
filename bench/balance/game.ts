@@ -16,6 +16,7 @@ import {
   type Terrain,
   type Turn,
 } from "@frontfall/engine";
+import { AveragePlayer } from "./average.ts";
 import { CasualPlayer } from "./casual.ts";
 
 /** One headless game of the balance runs: who plays, where, for how long. */
@@ -29,13 +30,15 @@ export interface BalanceSetup {
   readonly teams?: number;
   /** Whether player 1 is the scripted casual player, starting near the middle of the map. */
   readonly casual?: boolean;
+  /** Whether player 1 is the scripted average player instead, starting away from the nations. */
+  readonly average?: boolean;
   /** Minutes of play after the spawn phase before the run stops undecided. */
   readonly minutes: number;
   /** Balance values to try instead of the defaults. */
   readonly balance?: Partial<Balance>;
 }
 
-export type PlayerKind = "casual" | "bot" | "nation";
+export type PlayerKind = "casual" | "average" | "bot" | "nation";
 
 export interface PlayerReport {
   readonly id: number;
@@ -134,7 +137,10 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
 
   const players: PlayerSetup[] = [];
   const kinds = new Map<number, { kind: PlayerKind; difficulty?: BotDifficulty }>();
-  if (setup.casual) {
+  if (setup.average) {
+    players.push({ id: 1, name: "Average" });
+    kinds.set(1, { kind: "average" });
+  } else if (setup.casual) {
     players.push({ id: 1, name: "Casual" });
     kinds.set(1, { kind: "casual" });
   }
@@ -168,13 +174,20 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
   });
   for (const { ids, difficulty } of groups) installBots(game, ids, difficulty);
   if (setup.nations) installNations(game, nations, setup.nations);
-  const casual = setup.casual
-    ? new CasualPlayer(
+  const casual = setup.average
+    ? new AveragePlayer(
         game,
         1,
-        topology.index(Math.floor(topology.width / 2), Math.floor(topology.height / 3)),
+        manifest.nations.map((n) => n.tile),
+        setup.seed,
       )
-    : undefined;
+    : setup.casual
+      ? new CasualPlayer(
+          game,
+          1,
+          topology.index(Math.floor(topology.width / 2), Math.floor(topology.height / 3)),
+        )
+      : undefined;
 
   const ownable = terrain.ownableCount;
   const perMinute = 60 * balance.ticksPerSecond;
