@@ -353,6 +353,18 @@ button.secondary:disabled {
 }
 
 @media (width < 720px) {
+  .menu-online .online-actions {
+    flex-direction: column;
+  }
+
+  .online-actions > .replay-picker {
+    flex: 1;
+  }
+
+  .replay-picker > button {
+    flex: 1;
+  }
+
   .public-game {
     flex-wrap: wrap;
   }
