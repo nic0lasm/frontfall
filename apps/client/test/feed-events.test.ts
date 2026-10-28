@@ -159,3 +159,29 @@ describe("player card", () => {
     expect(facts(update(), 2, rules)).toBe("80 / 200 troops · 10 gold · 2% of the map");
   });
 });
+
+describe("collapsed fronts (R-ATTACK-10)", () => {
+  const collapsed = (a: number, b: number, tick = 100) =>
+    update({ tick, events: [{ type: "collapsed", a, b, tile: 77 }] });
+
+  it("tells the attacker with good news and the defender with a warning, at the tip", () => {
+    const watcher = new FeedWatcher(true);
+    const [won] = watcher.observe(collapsed(1, 2), new Map(), mine);
+    expect(won).toMatchObject({ tone: "good", text: "Bo's front gave way", tile: 77, mine: true });
+    const [lost] = watcher.observe(collapsed(3, 1, 400), new Map(), mine);
+    expect(lost).toMatchObject({ tone: "bad", text: "Your front gave way before Cy", tile: 77 });
+  });
+
+  it("leaves other players' collapses out, and in a replay", () => {
+    expect(new FeedWatcher(true).observe(collapsed(2, 3), new Map(), mine)).toEqual([]);
+    expect(new FeedWatcher(false).observe(collapsed(1, 2), new Map(), mine)).toEqual([]);
+  });
+
+  it("tells a pair once every five seconds of game time", () => {
+    const watcher = new FeedWatcher(true);
+    expect(watcher.observe(collapsed(1, 2, 100), new Map(), mine)).toHaveLength(1);
+    expect(watcher.observe(collapsed(1, 2, 120), new Map(), mine)).toEqual([]);
+    expect(watcher.observe(collapsed(3, 1, 120), new Map(), mine)).toHaveLength(1);
+    expect(watcher.observe(collapsed(1, 2, 160), new Map(), mine)).toHaveLength(1);
+  });
+});

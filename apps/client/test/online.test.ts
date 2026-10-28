@@ -91,6 +91,7 @@ const START: Extract<ServerMessage, { type: "started" }> = {
   disabled: 0,
   tickRate: 10,
   speed: 1,
+  rules: { collapsingFronts: true },
   players: [
     { id: 1, name: "Alice" },
     { id: 2, name: "Bob" },
@@ -235,6 +236,7 @@ describe("OnlineClient", () => {
       capacity: 16,
       autoStart: true,
       speed: 1,
+      rules: { collapsingFronts: true },
       minPlayers: 2,
       players: START.players,
       you: 2,
@@ -269,6 +271,7 @@ describe("OnlineClient", () => {
       capacity: 2,
       autoStart: true,
       speed: 1,
+      rules: { collapsingFronts: true },
     } as const;
     const lobby: Extract<ServerMessage, { type: "lobby" }> = {
       type: "lobby",
@@ -391,6 +394,7 @@ describe("OnlineClient", () => {
       capacity: 16,
       autoStart: true,
       speed: 1,
+      rules: { collapsingFronts: true },
       minPlayers: 1,
       players: START.players,
       you: 1,
@@ -429,6 +433,7 @@ describe("OnlineClient", () => {
       capacity: 16,
       autoStart: true,
       speed: 1,
+      rules: { collapsingFronts: true },
       minPlayers: 2,
       players: START.players,
       you: 2,

@@ -1,5 +1,5 @@
 import type { GameRecord } from "@frontfall/engine";
-import type { GameOptions, Teams } from "@frontfall/protocol";
+import { DEFAULT_RULES, type GameOptions, type Teams, type Visibility } from "@frontfall/protocol";
 import {
   applyTranslations,
   loadLanguage,
@@ -528,7 +528,7 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
         history.replaceState(null, "", `?${new URLSearchParams({ game: state.game }).toString()}`);
         if (fromMenu && state.host === state.you) {
           fromMenu = false;
-          const options = initialOptions(chosen, playable, state.players.length);
+          const options = initialOptions(chosen, playable, state.players.length, state.visibility);
           if (options) {
             client.configure(options);
             behind = true;
@@ -593,6 +593,7 @@ function initialOptions(
   chosen: GameSetup,
   playable: readonly MapInfo[],
   players: number,
+  visibility: Visibility,
 ): GameOptions | undefined {
   const map = playable.find((candidate) => candidate.id === chosen.map);
   if (!map || (map.maxPlayers ?? 0) < players) return undefined;
@@ -608,6 +609,10 @@ function initialOptions(
     autoStart: true,
     // A rematch keeps the pace of the game before (R-MODE-07).
     ...(chosen.speed === 2 || chosen.speed === 4 ? { speed: chosen.speed } : {}),
+    // The special rules chosen in the menu, which only a private game may change (R-MODE-08).
+    ...(visibility === "private" && chosen.rules
+      ? { rules: { ...DEFAULT_RULES, ...chosen.rules } }
+      : {}),
   };
 }
 
@@ -658,6 +663,7 @@ function startOnline(
         teams: start.teams,
         disabled: start.disabled,
         speed: start.speed,
+        rules: start.rules,
       },
     );
   };
@@ -672,6 +678,7 @@ function startOnline(
       nations: start.nations,
       teams: start.teams,
       disabled: start.disabled,
+      rules: start.rules,
       // Ticks per beat of the server, which the screen paces the turns by.
       speed: start.speed,
       playerName: "",

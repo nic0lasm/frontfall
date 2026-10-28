@@ -1,5 +1,6 @@
 export {
   captureCost,
+  collapseDepth,
   defenderLoss,
   defensePerTile,
   installAttacks,
@@ -75,6 +76,8 @@ export {
   Disable,
   Game,
   MAX_TEAMS,
+  ruleBits,
+  type GameRules,
   type GameSetup,
   type Order,
   type OrderHandler,

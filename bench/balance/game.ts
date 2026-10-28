@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import {
   createGame,
   DEFAULT_BALANCE,
+  type GameRules,
   installBots,
   installNations,
   isReady,
@@ -36,6 +37,8 @@ export interface BalanceSetup {
   readonly minutes: number;
   /** Balance values to try instead of the defaults. */
   readonly balance?: Partial<Balance>;
+  /** Special rules to play with (R-MODE-08). */
+  readonly rules?: Partial<GameRules>;
 }
 
 export type PlayerKind = "casual" | "average" | "bot" | "nation";
@@ -171,6 +174,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     players,
     balance,
     ...(setup.teams ? { teams: setup.teams } : {}),
+    ...(setup.rules ? { rules: setup.rules } : {}),
   });
   for (const { ids, difficulty } of groups) installBots(game, ids, difficulty);
   if (setup.nations) installNations(game, nations, setup.nations);

@@ -109,6 +109,7 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
         firstNation: game.firstNation,
         teams: game.teamsById(),
         disabled: game.game.disabled,
+        special: game.game.rules,
         allianceRequestTicks,
       },
     },

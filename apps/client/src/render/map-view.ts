@@ -331,6 +331,11 @@ export class MapView implements Renderer {
     this.effects?.ships(ships, this.clock());
   }
 
+  /** A front gave way around `tile` (R-ATTACK-10). */
+  collapsed(tile: number): void {
+    this.effects?.collapsed(tile, this.clock());
+  }
+
   animating(): boolean {
     return this.effects?.alive(this.clock()) ?? false;
   }

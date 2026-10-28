@@ -136,6 +136,7 @@ function writeState(game: Game, out: SnapshotWriter): void {
   out.uint(game.attacks.length);
   for (const a of game.attacks) {
     for (const value of [a.id, a.player, a.target, a.aim, a.troops]) out.uint(value);
+    if (game.rules.collapsingFronts) out.uint(a.pressure);
   }
   out.uint(game.nextBoatId);
   out.uint(game.boats.length);
@@ -249,7 +250,9 @@ function readState(game: Game, tick: number, from: SnapshotReader): void {
 
   game.nextAttackId = id();
   for (let n = from.count(); n > 0; n--) {
-    game.attacks.push({ id: id(), player: player(), target: player(), aim: tile(), troops: id() });
+    const [attackId, owner, target, aim, troops] = [id(), player(), player(), tile(), id()];
+    const pressure = game.rules.collapsingFronts ? id() : 0;
+    game.attacks.push({ id: attackId, player: owner, target, aim, troops, pressure });
   }
   game.nextBoatId = id();
   for (let n = from.count(); n > 0; n--) {

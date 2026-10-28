@@ -18,6 +18,7 @@ import { summarize, type BalanceSummary } from "./summary.ts";
  *   pnpm balance -- --map world --bots normal:4,hard:4 --nations normal --casual
  *   pnpm balance -- --map world --bots normal:0 --nations hard --average
  *   pnpm balance -- --map europe --bots hard:11 --set tradeBase=4000 --json out.json
+ *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule collapsingFronts
  */
 const { values } = parseArgs({
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
@@ -36,6 +37,8 @@ const { values } = parseArgs({
     jobs: { type: "string", default: String(availableParallelism()) },
     // A balance value to try, as a field of Balance: --set tradeBase=4000.
     set: { type: "string", multiple: true, default: [] },
+    // Special rules to play with (R-MODE-08), by name: --rule collapsingFronts.
+    rule: { type: "string", multiple: true, default: [] },
     json: { type: "string" },
   },
 });
@@ -85,6 +88,7 @@ const setups: BalanceSetup[] = seeds.map((seed) => ({
   ...(values.average ? { average: true } : {}),
   minutes: Number(values.minutes),
   ...(values.set.length ? { balance: balance } : {}),
+  ...(values.rule.length ? { rules: Object.fromEntries(values.rule.map((r) => [r, true])) } : {}),
 }));
 
 const run = promisify(execFile);
@@ -133,7 +137,8 @@ function print(s: BalanceSummary): void {
   console.log(
     `\n${values.map}, bots ${values.bots}${values.nations ? `, nations ${values.nations}` : ""}` +
       `${values.teams ? `, ${values.teams} teams` : ""}${values.average ? ", average player" : values.casual ? ", casual player" : ""}` +
-      (values.set.length ? `, ${values.set.join(" ")}` : ""),
+      (values.set.length ? `, ${values.set.join(" ")}` : "") +
+      (values.rule.length ? `, rules ${values.rule.join(" ")}` : ""),
   );
   console.log(
     `decided: ${String(s.decided)} of ${String(s.games)}` +

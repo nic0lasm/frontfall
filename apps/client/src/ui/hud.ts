@@ -168,6 +168,7 @@ export class Hud {
     allianceRequestTicks: 200,
     teams: [],
     disabled: 0,
+    special: { collapsingFronts: false },
   };
 
   /** `pausable`: false online, where the game runs for everyone. */

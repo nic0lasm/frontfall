@@ -11,7 +11,7 @@ import {
   NATION_WORK_PERCENT,
 } from "../src/bots/index.ts";
 import { installEconomy, populationCap } from "../src/economy.ts";
-import { Game, type Order, type Player } from "../src/game.ts";
+import { Game, type GameRules, type Order, type Player } from "../src/game.ts";
 import { installSpawn, spawnSettings } from "../src/spawn.ts";
 import { StructureKind, installStructures } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
@@ -29,7 +29,11 @@ const interval = intervalOf("hard");
  * so a fight lasts. The nation decides on the ticks where (tick + 1) is a
  * multiple of its interval, hard unless told otherwise.
  */
-function strip(overrides: Partial<Balance> = {}, difficulty: BotDifficulty = "hard") {
+function strip(
+  overrides: Partial<Balance> = {},
+  difficulty: BotDifficulty = "hard",
+  rules: Partial<GameRules> = {},
+) {
   const grid = new WorldGrid(60, 3, { wrapsX: false });
   const game = new Game({
     terrain: new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains)),
@@ -47,6 +51,7 @@ function strip(overrides: Partial<Balance> = {}, difficulty: BotDifficulty = "ha
       encircleMaxTiles: 1,
       ...overrides,
     },
+    rules,
   });
   installAttacks(game);
   installStructures(game);
@@ -178,6 +183,18 @@ describe("nations", () => {
     expect(nation.workShare).toBe(0);
   });
 
+  it("keep their troops under arms where a neighbour could break their front (R-BOT-16)", () => {
+    const { game, nation, ada, bea, workOf, run } = strip({}, "hard", { collapsingFronts: true });
+    installEconomy(game);
+    const cap = populationCap(game, nation);
+    // Half of Ada's soldiers are well over three times the nation's 3-tile front, once at work.
+    ada.troops = 10 * cap;
+    bea.troops = 10 * cap;
+    nation.troops = cap;
+    run(2 * interval);
+    expect(workOf(1)).toEqual([]);
+  });
+
   it("take a bot's odds once their army is full (B-NATION-FULL)", () => {
     const { game, ordersOf, run, nation, ada, bea } = strip();
     const cap = populationCap(game, nation);
@@ -228,6 +245,29 @@ describe("nations", () => {
     expect(targets.length).toBeGreaterThan(0);
     for (const x of targets) expect(x).toBeLessThan(20);
     expect(game.attacks.some((attack) => attack.player === 1 && attack.target === 3)).toBe(false);
+  });
+
+  it("feed an attack that is building pressure, with collapsing fronts on (R-BOT-16)", () => {
+    const feeds = (collapsingFronts: boolean) => {
+      const { game, grid, ordersOf, run, nation, ada, bea } = strip(
+        { collapseBuildupTicks: 1000 },
+        "hard",
+        { collapsingFronts },
+      );
+      // Only a front on a player with more land is pressed: the nation keeps two columns.
+      for (let tile = 0; tile < grid.size; tile++) {
+        if (grid.x(tile) >= 22 && grid.x(tile) < 40) game.territory.setOwner(tile, 3);
+      }
+      // Ada is too dense for the nation's odds, yet the attack overwhelms her 3-tile front.
+      nation.troops = 3000;
+      ada.troops = 4000;
+      bea.troops = 4000;
+      run(1, [{ player: 1, order: { type: "attack", target: grid.index(15, 1), troops: 2000 } }]);
+      run(2 * interval);
+      return ordersOf(1).filter((order) => order.type === "attack" && grid.x(order.target) < 20)
+        .length;
+    };
+    expect(feeds(true)).toBeGreaterThan(feeds(false));
   });
 
   it("attack no player during B-NATION-GRACE, but still answer an attacker (R-BOT-09)", () => {

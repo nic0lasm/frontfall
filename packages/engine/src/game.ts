@@ -71,6 +71,22 @@ export interface GameSetup {
   teams?: number;
   /** What this game leaves out (R-MODE-03), as `Disable` bits; 0 or left out for nothing. */
   disabled?: number;
+  /** Special rules this game plays with (R-MODE-08); each one left out is off. */
+  rules?: Partial<GameRules>;
+}
+
+/** Special rules a game can be played with (R-MODE-08), all off unless the setup turns them on. */
+export interface GameRules {
+  /** R-ATTACK-10: outnumbered fronts give way by stretches. */
+  readonly collapsingFronts: boolean;
+}
+
+/** Marks the special rules in the state hash. */
+const RULES_TAG = 0x72756c65;
+
+/** One bit per special rule that is on, for the state hash and the setup digest; 0 with none. */
+export function ruleBits(rules: GameRules): number {
+  return rules.collapsingFronts ? 2 : 0;
 }
 
 /**
@@ -195,6 +211,8 @@ export class Game {
   readonly teams: number;
   /** `Disable` bits of what this game leaves out (R-MODE-03). */
   readonly disabled: number;
+  /** Special rules of this game (R-MODE-08). */
+  readonly rules: GameRules;
   /**
    * Winner once the game is decided (R-WIN), and the tick it happened. In a
    * team game, the member of the winning team with the most land.
@@ -257,6 +275,7 @@ export class Game {
       throw new RangeError(`invalid disabled set ${String(disabled)}`);
     }
     this.disabled = leftOut(disabled);
+    this.rules = { collapsingFronts: setup.rules?.collapsingFronts === true };
     // R-MODE-02: dealt in turn, so team sizes differ by one at most.
     this.sortedPlayers = [...this.playersById.values()]
       .sort((a, b) => a.id - b.id)
@@ -334,8 +353,11 @@ export class Game {
       }
     }
     mix(this.nextAttackId);
-    for (const a of this.attacks)
+    for (const a of this.attacks) {
       for (const value of [a.id, a.player, a.target, a.aim, a.troops]) mix(value);
+      // Games without collapsing fronts hash as they did before the rule existed.
+      if (this.rules.collapsingFronts) mix(a.pressure);
+    }
     mix(this.nextBoatId);
     for (const b of this.boats) {
       for (const value of [b.id, b.player, b.target, b.troops, b.step, b.path.length]) mix(value);
@@ -398,6 +420,12 @@ export class Game {
     }
     // So do games that leave nothing out, and games without quick messages.
     if (this.disabled !== 0) mix(this.disabled);
+    // And games with no special rule.
+    if (ruleBits(this.rules) !== 0) {
+      // Tagged, so that no value of `disabled` before it reads the same.
+      mix(RULES_TAG);
+      mix(ruleBits(this.rules));
+    }
     for (const c of this.quickCooldowns) {
       if (this.currentTick < c.until) for (const value of [c.player, c.until]) mix(value);
     }
@@ -465,6 +493,7 @@ export class Game {
     }
     mix(this.teams);
     mix(this.disabled);
+    if (ruleBits(this.rules) !== 0) mix(ruleBits(this.rules));
     return hash >>> 0;
   }
 
@@ -531,6 +560,8 @@ function checkBalance(balance: Balance): void {
     "ticksPerSecond",
     "attackSpeedDivisor",
     "encircleMaxTiles",
+    "collapseBuildupTicks",
+    "collapseDepth",
     "boatSpeed",
     "boatMax",
     "boatRange",
@@ -584,6 +615,8 @@ function checkBalance(balance: Balance): void {
     "allianceCooldownTicks",
     "traitorTicks",
     "traitorDefensePercent",
+    "collapseOddsTenths",
+    "collapseCostPercent",
   ] as const) {
     if (!Number.isSafeInteger(balance[key]) || balance[key] < 0) {
       throw new RangeError(`balance ${key} must be a non-negative integer`);

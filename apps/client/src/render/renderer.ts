@@ -76,6 +76,8 @@ export interface Renderer {
   setShips(ships: readonly UnitMark[]): void;
   /** Discs of land under fallout (R-UNIT-06), in tiles, replacing the previous ones; whether they changed. */
   setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean;
+  /** A front gave way around `tile` (R-ATTACK-10); a renderer without effects leaves it out. */
+  collapsed?(tile: number): void;
   /** Every structure on the map, replacing the previous ones. */
   setStructures(structures: readonly StructureMark[]): void;
   /** Whether effects are still playing, which keeps frames coming; a renderer without effects leaves it out. */

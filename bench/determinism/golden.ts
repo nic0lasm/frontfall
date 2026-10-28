@@ -12,6 +12,7 @@ import {
   StructureKind,
   type BotDifficulty,
   type DesyncReport,
+  type GameRules,
   type MapDescription,
   type Order,
   type PlayerSetup,
@@ -36,6 +37,8 @@ interface Golden {
   readonly nations?: boolean;
   /** Teams the players are dealt into (R-MODE-02); a free-for-all without. */
   readonly teams?: number;
+  /** Special rules the game is played with (R-MODE-08); none without. */
+  readonly rules?: Partial<GameRules>;
   readonly ticks: number;
 }
 
@@ -58,6 +61,16 @@ export const GOLDEN_REPLAYS: readonly Golden[] = [
     bots: 7,
     difficulty: "normal",
     teams: 2,
+    ticks: 2000,
+  },
+  {
+    name: "world-collapse",
+    map: "world",
+    seed: 17,
+    bots: 3,
+    difficulty: "normal",
+    nations: true,
+    rules: { collapsingFronts: true },
     ticks: 2000,
   },
 ];
@@ -95,6 +108,7 @@ function record(golden: Golden): DesyncReport {
     players,
     balance: DEFAULT_BALANCE,
     ...(golden.teams === undefined ? {} : { teams: golden.teams }),
+    ...(golden.rules === undefined ? {} : { rules: golden.rules }),
   });
   installBots(game, bots, golden.difficulty);
   installNations(game, nations, golden.difficulty);
@@ -178,6 +192,7 @@ function record(golden: Golden): DesyncReport {
     bots: { ids: bots, difficulty: golden.difficulty },
     ...(nations.length > 0 ? { nations } : {}),
     ...(golden.teams === undefined ? {} : { teams: golden.teams }),
+    ...(golden.rules === undefined ? {} : { rules: golden.rules }),
     you: 1,
     ticks: game.tick,
     turns,

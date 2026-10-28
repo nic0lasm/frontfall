@@ -13,6 +13,7 @@ import {
 } from "@frontfall/protocol";
 import { MAP_GROUPS, type MapInfo } from "../game/maps.ts";
 import { MAX_BOTS } from "../game/solo-game.ts";
+import { activeRuleNames, defaultRules, rulesFieldset } from "./rules-fieldset.ts";
 import { LEFT_OUT, TEAM_CHOICES } from "./setup.ts";
 import { applyTranslations, getLanguage, t, type MessageKey, type Params } from "../i18n/index.ts";
 import type { LobbyState } from "../net/online.ts";
@@ -145,6 +146,11 @@ export class LobbyScreen {
     input: h("input", { id: `lobby-allow-${name}`, type: "checkbox", "data-bit": bit }),
     name,
   }));
+  /** Special rules (R-MODE-08): the host's switches while the game is private, else a reading. */
+  private readonly rules = rulesFieldset("lobby", defaultRules(), () => {
+    this.onRulesChange();
+  });
+  private onRulesChange = (): void => undefined;
   private readonly settings = h(
     "div",
     { class: "lobby-settings", hidden: true },
@@ -184,8 +190,11 @@ export class LobbyScreen {
         h("label", { class: "toggle" }, input, h("span", { "data-i18n": `hud.${name}` })),
       ),
     ),
+    this.rules.element,
   );
   private readonly summary = h("p", { class: "lobby-summary", id: "lobby-summary" });
+  /** The special rules of the game, for those who do not set them. */
+  private readonly rulesLine = h("p", { class: "lobby-summary", id: "lobby-rules-line" });
   private shown: { key: MessageKey; params: Params } = { key: "status.connecting", params: {} };
   /** Countdown of a public game: when it starts, by this page's clock. */
   private startsAt: number | undefined;
@@ -233,6 +242,8 @@ export class LobbyScreen {
         capacity: Math.min(Number(this.seats.value), seatLimit(map, bots)),
         autoStart: this.autoStart.checked,
         ...(this.speed.hidden ? {} : { speed: Number(this.speed.value) as GameSpeed }),
+        // A public game always plays the default rules; the server refuses others.
+        ...(this.lastLobby.visibility === "private" ? { rules: this.rules.read() } : {}),
       };
       actions.onConfigure(options, name);
     };
@@ -260,6 +271,7 @@ export class LobbyScreen {
     this.nations.addEventListener("change", reconfigure);
     this.teams.addEventListener("change", reconfigure);
     this.speed.addEventListener("change", reconfigure);
+    this.onRulesChange = reconfigure;
     for (const { input } of this.allowed) input.addEventListener("change", reconfigure);
     this.bots.addEventListener("input", () => {
       this.botsValue.textContent = this.bots.value;
@@ -296,6 +308,7 @@ export class LobbyScreen {
         this.kind,
         this.status,
         this.summary,
+        this.rulesLine,
         this.settings,
         this.players,
         this.invitation,
@@ -484,6 +497,9 @@ export class LobbyScreen {
     const editable = lobby.host === lobby.you && map;
     this.settings.hidden = !editable;
     this.summary.hidden = Boolean(editable);
+    const played = activeRuleNames(lobby.rules);
+    this.rulesLine.textContent = t("setup.rules.played", { rules: played.join(", ") });
+    this.rulesLine.hidden = Boolean(editable) || played.length === 0;
     // An answer to an earlier change would undo the later ones, and the next change would send it back.
     if (!editable || this.behind) return;
     // Only maps that seat every player already in.
@@ -529,6 +545,8 @@ export class LobbyScreen {
     );
     this.difficulty.value = lobby.difficulty;
     this.nations.checked = lobby.nations;
+    // A public game plays the default rules, shown but not offered for change.
+    this.rules.show(lobby.rules, lobby.visibility === "private");
     this.teams.replaceChildren(
       ...TEAM_CHOICES.map((teams) =>
         h("option", { value: teams }, t(`mode.${String(teams)}` as MessageKey)),

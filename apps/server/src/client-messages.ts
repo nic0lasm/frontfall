@@ -1,6 +1,7 @@
 import {
   CloseCode,
   encodeServerMessage,
+  isDefaultRules,
   normalizeGameName,
   normalizeName,
   PROTOCOL_VERSION,
@@ -269,10 +270,11 @@ export function messageHandler(ctx: MessageContext): {
           }
         };
         const seats = seatsFor(message.options, ctx.maps, ctx.maxBots, current.room.playerCount);
-        // A public game runs at the pace everyone expects (R-MODE-07).
-        const fast =
-          (message.options.speed ?? 1) !== 1 && current.room.settings.visibility === "public";
-        if (seats === undefined || fast) {
+        // A public game runs at the pace everyone expects (R-MODE-07), with the default rules (R-MODE-08).
+        const isPublic = current.room.settings.visibility === "public";
+        const fast = (message.options.speed ?? 1) !== 1 && isPublic;
+        const ruled = message.options.rules !== undefined && !isDefaultRules(message.options.rules);
+        if (seats === undefined || fast || (ruled && isPublic)) {
           refuse("invalid_settings");
           return;
         }
