@@ -25,9 +25,12 @@ const TEXTS: Record<Language, { title: string; hide: string; show: string; hint:
   },
 };
 
+/** Phones and short windows (docs/hud-layout.md): the minimap opens as a sheet. */
+export const NARROW = "(width < 720px), (height < 560px)";
+
 const SVG = "http://www.w3.org/2000/svg";
-/** A chevron to fold the open minimap, and a folded map to unfold it. */
-const FOLD = "M6 9l6 6 6-6";
+/** A cross to close the open minimap, and a folded map to unfold it. */
+const FOLD = "M6 6l12 12M18 6L6 18";
 const MAP = "M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5zM9 4v13.5M15 6.5V20";
 
 export interface MinimapOptions {
@@ -41,8 +44,6 @@ export interface MinimapOptions {
   readonly camera: () => ViewCamera;
   /** The player picked a place on the minimap: the camera goes to this tile. */
   readonly onMove: (tile: number) => void;
-  /** A phone or a short window: the minimap starts folded there. */
-  readonly compact: boolean;
   readonly storage?: Storage | undefined;
 }
 
@@ -78,6 +79,7 @@ export class Minimap {
   private wasBurning = false;
   private shown = "";
   private dragging: number | undefined;
+  private jumped = false;
 
   constructor(private readonly options: MinimapOptions) {
     const { source } = options;
@@ -116,6 +118,7 @@ export class Minimap {
     this.map.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
       this.dragging = event.pointerId;
+      this.jumped = false;
       this.map.setPointerCapture(event.pointerId);
       this.moveTo(event);
       event.preventDefault();
@@ -124,7 +127,10 @@ export class Minimap {
       if (this.dragging === event.pointerId) this.moveTo(event);
     });
     const stop = (event: PointerEvent): void => {
-      if (this.dragging === event.pointerId) this.dragging = undefined;
+      if (this.dragging !== event.pointerId) return;
+      this.dragging = undefined;
+      // A sheet over the map closes after a jump, to show where it landed.
+      if (this.jumped && this.sheet()) this.setOpen(false);
     };
     this.map.addEventListener("pointerup", stop);
     this.map.addEventListener("pointercancel", stop);
@@ -145,13 +151,14 @@ export class Minimap {
 
   /** Whether the minimap is open on a first visit: not on a phone, where it would cover the map. */
   private restore(): boolean {
+    if (this.sheet()) return false;
     try {
       const kept = this.options.storage?.getItem(STORAGE_KEY);
       if (kept === "1" || kept === "0") return kept === "1";
     } catch {
       // Storage is blocked: the default holds.
     }
-    return !this.options.compact;
+    return true;
   }
 
   private words(): void {
@@ -163,12 +170,20 @@ export class Minimap {
     this.toggle.title = label;
   }
 
+  /** Whether the open minimap is a sheet over the map: on a phone, or a window as short as one. */
+  private sheet(): boolean {
+    return window.matchMedia(NARROW).matches;
+  }
+
   private setOpen(open: boolean): void {
     this.open = open;
-    try {
-      this.options.storage?.setItem(STORAGE_KEY, open ? "1" : "0");
-    } catch {
-      // Not kept: it only means the next game starts as it would have.
+    // The sheet of a phone is always folded at first: only a wide screen keeps the choice.
+    if (!this.sheet()) {
+      try {
+        this.options.storage?.setItem(STORAGE_KEY, open ? "1" : "0");
+      } catch {
+        // Not kept: it only means the next game starts as it would have.
+      }
     }
     this.sync();
     this.words();
@@ -198,6 +213,7 @@ export class Minimap {
       height - 1,
       Math.max(0, Math.floor(((event.clientY - rect.top) / rect.height) * height)),
     );
+    this.jumped = true;
     this.options.onMove(y * width + x);
   }
 

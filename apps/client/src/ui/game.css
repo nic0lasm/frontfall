@@ -1248,8 +1248,9 @@
   outline-offset: 2px;
 }
 
-/* Phones: the bottom right belongs to the leaderboard chip, so the mini-map takes the top right,
-   beside the figures, folded until it is asked for. Other panels draw over it. */
+/* Narrow (docs/hud-layout.md): folded it is a round button, 36 wide, top right on a phone, where
+   the bottom right belongs to the leaderboard chip; open it is a sheet centred on the map,
+   at most 40 % of the screen high (60 % on a short window), over the tips and under the requests. */
 @media (width < 720px) {
   .minimap {
     top: 12px;
@@ -1257,12 +1258,46 @@
     bottom: auto;
   }
 
-  .minimap-map {
-    width: min(150px, max(96px, calc(100vw - 252px)), calc(70px * var(--minimap-aspect, 2)));
-  }
-
   .minimap:not([data-open]) .minimap-toggle {
     width: 36px;
     height: 36px;
   }
+}
+
+@media (width < 720px), (height < 560px) {
+  .minimap {
+    --sheet-height: 40vh;
+  }
+
+  .minimap[data-open] {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    z-index: 2;
+    width: fit-content;
+    max-width: calc(90vw - 24px);
+    max-height: var(--sheet-height);
+    transform: translate(-50%, -50%);
+  }
+
+  .minimap[data-open] .minimap-map {
+    width: min(100%, calc((var(--sheet-height) - 56px) * var(--minimap-aspect, 2)));
+    justify-self: center;
+  }
+
+  .minimap[data-open] .minimap-toggle {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (height < 560px) {
+  .minimap {
+    --sheet-height: 60vh;
+  }
+}
+
+.requests {
+  z-index: 3;
 }

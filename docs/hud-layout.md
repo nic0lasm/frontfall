@@ -77,6 +77,8 @@ Same zones, except the bottom bar is split: figures top left (TL becomes the fee
 | Above the bar | The leaderboard chip bottom right (one line: your colour, name and share, an arrow). The first-steps banner across the width at bottom 110. Refused-click notes go at the top (top 140), never over the bar. |
 | Never         | More than one row above the bar except the banner; panels wider than the screen minus 24; a control under 36 px that can be touched.                                                                         |
 
+Narrow: the mini-map is a round button, 36, top right (bottom right on a short window), and opens as a sheet centred on the map (z 2), at most 40 % of the screen high, 60 % on a short window. It closes after a jump or with its close button.
+
 When the screen is narrow because it is short (landscape phone), the leaderboard stays top right, the banner goes under it, and the first-steps banner keeps bottom 110.
 
 ## Adding an element
