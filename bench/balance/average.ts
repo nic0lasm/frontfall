@@ -33,6 +33,13 @@ const KEEP_PERCENT = 35;
 /** Its troops per tile, in % of the target's, from which a neighbour is worth attacking. */
 const ODDS_PERCENT = 120;
 
+/**
+ * Rounds over which a land front that gains less than 1 % of the player's land
+ * counts as stuck: it then looks overseas first, as a player who sees the
+ * front stall would.
+ */
+const STUCK_ROUNDS = 15;
+
 /** Candidate start tiles weighed in the spawn phase. */
 const SPAWN_CANDIDATES = 400;
 
@@ -51,6 +58,8 @@ const SILO_CITIES = 2;
 export class AveragePlayer {
   private readonly around = new Int32Array(4);
   private readonly every: number;
+  /** Its land at each of the last STUCK_ROUNDS rounds, oldest first. */
+  private readonly history: number[] = [];
 
   constructor(
     private readonly game: Game,
@@ -241,6 +250,9 @@ export class AveragePlayer {
         }
       }
     }
+    this.history.push(tiles);
+    if (this.history.length > STUCK_ROUNDS) this.history.shift();
+    const before = this.history[0] as number;
     const orders: Order[] = [];
     const neutralCost = game.balance.neutralCost;
     if (neutral >= 0) {
@@ -256,7 +268,8 @@ export class AveragePlayer {
       return orders;
     }
     if (neutral >= 0 || !ready) return orders;
-    if (enemy >= 0 && own * 100 >= enemyDensity * ODDS_PERCENT) {
+    const overseas = this.history.length === STUCK_ROUNDS && tiles * 100 < before * 101;
+    if (!overseas && enemy >= 0 && own * 100 >= enemyDensity * ODDS_PERCENT) {
       orders.push({ type: "attack", target: enemy, troops });
       return orders;
     }
@@ -277,6 +290,8 @@ export class AveragePlayer {
     }
     if (coast >= 0 && own * 100 >= coastDensity * ODDS_PERCENT) {
       orders.push({ type: "embark", target: coast, troops });
+    } else if (overseas && enemy >= 0 && own * 100 >= enemyDensity * ODDS_PERCENT) {
+      orders.push({ type: "attack", target: enemy, troops });
     } else if (enemy >= 0 && me.troops * 100 >= cap * 90) {
       // A full army is wasted troops: fight the weakest neighbour anyway.
       orders.push({ type: "attack", target: enemy, troops });
