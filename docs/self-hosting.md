@@ -134,3 +134,15 @@ Logs are one JSON object per line: `docker compose logs -f`. [operations.md](ope
 The game serves its pages with a content security policy that keeps them out of frames and only runs their own code. A proxy may replace that header with its own.
 
 Each release of Frontfall checks this setup: CI builds the image, starts it with `compose.yaml`, plays solo and private games against it, and restarts it to check that the data volume is kept.
+
+## Announce public games on Discord
+
+A small script polls your server and posts to a Discord channel when a public game opens, with a link to join it. Create a webhook in the channel's settings (Integrations, Webhooks), then run it on any machine that reaches the server, from a checkout of the repository with its packages installed (`pnpm install`):
+
+```sh
+FRONTFALL_URL=https://example.org/frontfall/ \
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/… \
+pnpm announce
+```
+
+`ANNOUNCE_SECONDS` sets how often it asks, 30 by default. It posts the game's name, its host's name and map, and the seats taken, all of which `/api/games` already shows to anyone, and mentions nobody. The games already open when it starts are not announced, and a game is never announced twice. Ends are not announced: the server does not know who won, and a game also leaves the list when the server restarts. Keep the webhook's address secret: anyone who has it can post in the channel.
