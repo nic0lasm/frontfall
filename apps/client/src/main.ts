@@ -1,3 +1,5 @@
+// First: before the schemas are built, so that none is compiled (the page forbids it).
+import "@frontfall/protocol/jitless";
 import type { GameRecord } from "@frontfall/engine";
 import type { GameOptions, Teams } from "@frontfall/protocol";
 import {

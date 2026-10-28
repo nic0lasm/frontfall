@@ -5,9 +5,12 @@
   "description": "Messages exchanged between the client and the server.",
   "license": "MIT",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/jitless.ts"
+  ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./jitless": "./src/jitless.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
