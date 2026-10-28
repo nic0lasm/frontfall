@@ -53,6 +53,11 @@ const TRAIL_PIXELS = 8;
 const BURST_BUDGET = 8;
 /** Most sparks started by one batch of changed tiles. */
 const FRONT_BUDGET = 10;
+/** Tiles of a start region at most, and its radius in tiles on a map of 2^19 tiles (B-SPAWN-RADIUS). */
+const ARRIVAL_TILES = 60;
+const SPAWN_RADIUS = 3;
+/** Seconds between two pulses along a front. */
+const PULSE_EVERY = 0.5;
 /** Margin around the view in which effects still start, in tiles. */
 const VIEW_MARGIN = 4;
 
@@ -76,6 +81,9 @@ export class EffectTracker {
   private view: CameraView | undefined;
   private tilesPerPixel = 1;
   private budget = 0;
+  private pulsedAt = -Infinity;
+  /** Players whose land has been seen, to tell a first arrival. */
+  private readonly owners = new Set<number>();
   private seed = 0x9e3779b9;
   private readonly blast: number;
 
@@ -134,8 +142,11 @@ export class EffectTracker {
 
   /** Sparks along the tiles that just changed hands: the front moving. */
   fronts(tiles: ArrayLike<number>, owners: ArrayLike<number>, now: number): void {
-    if (!this.moving || !this.view) return;
+    if (!this.view) return;
     const { width } = this.options;
+    this.arrivals(tiles, owners, now);
+    if (!this.moving) return;
+    this.pulse(tiles, owners, now);
     let started = 0;
     let skip = 0;
     // A random start, so that the same tiles of a long front are not always the ones that spark.
@@ -164,6 +175,40 @@ export class EffectTracker {
         shape: "dot",
       });
     }
+  }
+
+  /** A ring where a player's land first appears: a start tile picked, as the spawn phase ends. */
+  private arrivals(tiles: ArrayLike<number>, owners: ArrayLike<number>, now: number): void {
+    const { width } = this.options;
+    const batch = new Map<number, { count: number; x: number; y: number }>();
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i] as number;
+      const owner = owners[tile] as number;
+      if (owner === 0 || this.owners.has(owner)) continue;
+      const entry = batch.get(owner);
+      if (entry) entry.count++;
+      else batch.set(owner, { count: 1, x: tile % width, y: Math.floor(tile / width) });
+    }
+    for (const [owner, { count, x, y }] of batch) {
+      this.owners.add(owner);
+      // A start region is a few dozen tiles; a larger batch is a resynchronisation, not an arrival.
+      if (count > ARRIVAL_TILES || !this.visible(x, y)) continue;
+      const r = SPAWN_RADIUS * this.blast;
+      if (this.moving) this.ring(x, y, now, 1.6, r, r * 5, FLASH, 0.8);
+      else this.emit(disc(x, y, now, 1.6, r * 3, r * 3, FLASH, 0.35, 10));
+    }
+  }
+
+  /** A soft glow that breathes where a front is taking land, at most twice a second. */
+  private pulse(tiles: ArrayLike<number>, owners: ArrayLike<number>, now: number): void {
+    if (tiles.length === 0 || now - this.pulsedAt < PULSE_EVERY) return;
+    const { width } = this.options;
+    const tile = tiles[Math.floor(this.random() * tiles.length)] as number;
+    const x = tile % width;
+    const y = Math.floor(tile / width);
+    if (owners[tile] === 0 || !this.visible(x, y)) return;
+    this.pulsedAt = now;
+    this.emit(disc(x, y, now, 0.9, 5, 9, FLASH, 0.22, 14));
   }
 
   private appeared(unit: Seen, now: number): void {

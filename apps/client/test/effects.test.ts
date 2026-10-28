@@ -124,10 +124,53 @@ describe("EffectTracker", () => {
     const tiles = Int32Array.from({ length: 400 }, (_, i) => 20 + i);
     t.fronts(tiles, owners, 5);
     expect(particles.length).toBeGreaterThan(0);
-    expect(particles.length).toBeLessThanOrEqual(10);
+    expect(particles.filter((p) => p.size0 === 1.2).length).toBeLessThanOrEqual(10);
     particles.length = 0;
     t.fronts(tiles, new Uint16Array(5000), 5);
     expect(particles).toEqual([]);
+  });
+});
+
+describe("EffectTracker, land taken", () => {
+  it("rings a player's first land once, and breathes along a front at most twice a second", () => {
+    const { tracker: t, particles } = tracker();
+    const owners = new Uint16Array(5000);
+    owners.fill(2, 2540, 2560);
+    t.fronts(
+      Int32Array.from({ length: 20 }, (_, i) => 2540 + i),
+      owners,
+      1,
+    );
+    expect(particles.filter((p) => p.shape === "ring")).toHaveLength(1);
+    expect(particles.filter((p) => p.size1 === 9)).toHaveLength(1);
+    particles.length = 0;
+    t.fronts(
+      Int32Array.from({ length: 20 }, (_, i) => 2540 + i),
+      owners,
+      1.2,
+    );
+    expect(particles.some((p) => p.shape === "ring")).toBe(false);
+    expect(particles.some((p) => p.size1 === 9)).toBe(false);
+  });
+
+  it("takes a resynchronisation for no arrival, and holds still when motion is reduced", () => {
+    const big = tracker();
+    big.tracker.fronts(
+      Int32Array.from({ length: 200 }, (_, i) => 2540 + i),
+      new Uint16Array(5000).fill(2),
+      1,
+    );
+    expect(big.particles.some((p) => p.shape === "ring")).toBe(false);
+    const still = tracker(false);
+    const owners = new Uint16Array(5000).fill(3, 2540, 2550);
+    still.tracker.fronts(
+      Int32Array.from({ length: 10 }, (_, i) => 2540 + i),
+      owners,
+      1,
+    );
+    expect(still.particles).toHaveLength(1);
+    expect(still.particles[0]?.shape).toBe("dot");
+    expect(still.particles[0]?.size1).toBe(still.particles[0]?.size0);
   });
 });
 
