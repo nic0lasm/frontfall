@@ -26,6 +26,45 @@ describe("PointerGestures", () => {
     expect(gestures.active).toBe(0);
   });
 
+  it("announces a press as the pointer goes down, and ends it with the click", () => {
+    const { camera } = setup();
+    const onPress = vi.fn<(tile: number | undefined) => void>();
+    const onTileClick = vi.fn<(tile: number, finger: boolean) => void>();
+    const gestures = new PointerGestures(camera, { onPress, onTileClick });
+    gestures.down({ id: 1, x: 300, y: 200 });
+    expect(onPress).toHaveBeenCalledExactlyOnceWith(camera.screenToTile(300, 200));
+    expect(onTileClick).not.toHaveBeenCalled();
+    gestures.up({ id: 1, x: 300, y: 200 });
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(onTileClick).toHaveBeenCalledOnce();
+  });
+
+  it("ends a press that turns into a drag, a pinch or a long press", () => {
+    const { camera } = setup();
+    const onPress = vi.fn<(tile: number | undefined) => void>();
+    const gestures = new PointerGestures(camera, { onPress });
+    gestures.down({ id: 1, x: 300, y: 200 });
+    gestures.move({ id: 1, x: 340, y: 200 });
+    expect(onPress).toHaveBeenLastCalledWith(undefined);
+    gestures.up({ id: 1, x: 340, y: 200 });
+    expect(onPress).toHaveBeenCalledTimes(2);
+
+    gestures.down({ id: 1, x: 300, y: 200 });
+    gestures.down({ id: 2, x: 400, y: 200 });
+    expect(onPress).toHaveBeenLastCalledWith(undefined);
+    gestures.reset();
+    expect(onPress).toHaveBeenCalledTimes(4);
+
+    gestures.down({ id: 1, x: 300, y: 200, time: 0 });
+    gestures.up({ id: 1, x: 300, y: 200, time: LONG_PRESS_MS });
+    expect(onPress).toHaveBeenLastCalledWith(undefined);
+
+    gestures.down({ id: 1, x: 300, y: 200 });
+    gestures.cancel(1);
+    expect(onPress).toHaveBeenLastCalledWith(undefined);
+    expect(onPress).toHaveBeenCalledTimes(8);
+  });
+
   it("says when a click is a finger's, which covers more of the screen than a mouse", () => {
     const { camera, gestures, onTileClick } = setup();
     gestures.down({ id: 1, x: 300, y: 200, time: 0, finger: true });

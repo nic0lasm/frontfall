@@ -77,6 +77,18 @@ describe("TurnPacer", () => {
     expect(Math.min(...gaps.slice(10))).toBeGreaterThan(TICK_MS / 2);
   });
 
+  it("lets a lone late turn play late rather than hold back the turns after it", () => {
+    // Every 30th turn is held up 200 ms, by the network or a busy page.
+    const played = simulate(600, (tick) => 150 + (tick % 30 === 15 ? 200 : 0));
+    // The next one, which cannot overtake it, comes late too.
+    const held = played
+      .filter((_, tick) => tick % 30 !== 15 && tick % 30 !== 16)
+      .slice(30)
+      .map((turn) => turn.played - turn.sent);
+    // The others wait no more than the usual delay, give or take a frame.
+    expect(Math.max(...held)).toBeLessThanOrEqual(150 + 2 * FRAME_MS);
+  });
+
   it("plays a backlog at once, as after a rejoin", () => {
     const calls: number[] = [];
     const pacer = new TurnPacer((turns) => calls.push(turns.length), TICK_MS);

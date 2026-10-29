@@ -121,7 +121,9 @@ whichever is lower. The other players see the settings as one line. The worker h
 clock of its own: it runs each turn the server relays, every player's orders
 in it, and a batch of turns at once after a rejoin. The page holds the turns
 back in a jitter buffer (`game/turn-pacer.ts`): turn n plays at n ticks of
-the clock plus the largest delay among the last 30 turns, so bunched
+the clock plus the largest delay among the last 30 turns but for the 3
+latest (a lone late turn plays late on its own rather than hold the others
+back), so bunched
 arrivals still come out one per tick; a backlog of more than 4 turns plays
 at once. A solo game goes down the same path: each tick, its orders become
 the turn a server would have sent. A click becomes an order
@@ -131,8 +133,9 @@ it, so the server can tell a client out of step (`desync`). The worker keeps
 every turn with orders and every hash it sent; on a desync the notice offers
 "Download a report", a `DesyncReport` (docs/engine.md) that
 `pnpm sim -- --replay` plays again to find the first tick that differs. Games
-on generated maps have no report. Until its turn comes back, an online
-order's ring pulses on its target. Once a game starts, the tab keeps its seat token in session storage and the
+on generated maps have no report. A ring shows under the pointer as soon as it
+presses the map, and becomes the answer to the click once the worker reads
+it. Until its turn comes back, an online order's ring pulses on its target. Once a game starts, the tab keeps its seat token in session storage and the
 URL becomes `?game=<id>`: a reload sends `rejoin` from tick 0, replays every
 turn at once and plays on; leaving from the menu gives the seat up. An online game never pauses, and its HUD
 has no pause button.
