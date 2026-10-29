@@ -163,6 +163,7 @@ export function messageHandler(ctx: MessageContext): {
       reply(session, seat);
       return;
     }
+    ctx.games.admit();
     session.room = room;
     session.seat = seat;
     session.idleSince = undefined;

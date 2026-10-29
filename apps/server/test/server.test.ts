@@ -1071,8 +1071,6 @@ describe("WebSocket", () => {
     await bob.next("lobby");
     alice.send({ type: "start" });
     const { token } = await alice.next("started");
-    // The count is taken at the next tick.
-    await new Promise((resolve) => setTimeout(resolve, 250));
     const carol = await player(host, "Carol");
     carol.send({ type: "play" });
     expect((await carol.next("error")).code).toBe("too_many_games");

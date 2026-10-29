@@ -171,14 +171,19 @@ export class Directory {
 
   /**
    * Whether the server holds all the players it can serve well: new players
-   * are turned away, those of a game under way still come back. Counted at
-   * each tick, so a burst of arrivals may overshoot by a tick's worth.
+   * are turned away, those of a game under way still come back. Counted
+   * afresh at each tick, and between two as players are seated.
    */
   get full(): boolean {
     return (
       this.seated >= (this.options.maxPlayers ?? Infinity) ||
       this.logBytes >= (this.options.maxLogBytes ?? Infinity)
     );
+  }
+
+  /** Counts a player just seated, so that a burst of arrivals within a tick cannot overshoot. */
+  admit(): void {
+    this.seated++;
   }
 
   /** Players seated in every game, as of the last tick. */
