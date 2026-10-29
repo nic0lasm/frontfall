@@ -85,7 +85,7 @@ test("two players meet in a private game without leaving the base path", async (
   // The game takes the menu's choices; the host changes them in the lobby.
   await expect(host.locator("#lobby-bots")).toHaveValue(menuBots);
   // Maps by group, as in the menu: the game's seats fit whichever is picked.
-  await expect(host.locator('#lobby-map optgroup[label="World maps"] option')).toHaveCount(5);
+  await expect(host.locator('#lobby-map optgroup[label="World maps"] option')).toHaveCount(7);
   await expect(host.locator('#lobby-map optgroup[label="Quick games"] option')).toHaveCount(3);
   await host.locator("#lobby-map").selectOption("world");
   await host.locator("#lobby-bots").fill("0");
