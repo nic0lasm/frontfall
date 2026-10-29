@@ -1,9 +1,9 @@
 import { captureCost, defensePerTile } from "../attacks.ts";
 import { soldiers } from "../economy.ts";
 import { reachableCoasts } from "../boats.ts";
-import { isAllied } from "../diplomacy.ts";
+import { allianceOf, alliesOf, canRenew, isAllied, isTraitor, sameTeam } from "../diplomacy.ts";
 import { Disable, type Game, type Player } from "../game.ts";
-import { divFloor, isqrt } from "../integer-math.ts";
+import { divFloor, isqrt, mulDiv } from "../integer-math.ts";
 import {
   StructureKind,
   cityLimit,
@@ -275,4 +275,58 @@ export function sail(
   }
   cooldowns.set(bot.id, game.tick + retryTicks);
   return false;
+}
+
+/**
+ * R-BOT-10, R-BOT-18: a computer player renews its alliances and accepts
+ * requests, oldest first, from players not marked traitors, with no attack or
+ * ship between them, whose land is under `sizePercent` of its own, while the
+ * two of them hold less than B-WIN-SHARE of the land together and it has
+ * fewer than `max` allies. In a team game, each side's land is its whole
+ * team's, and teammates count among its allies.
+ */
+export function answerAlliances(game: Game, bot: Player, sizePercent: number, max: number): void {
+  const { territory, terrain, balance } = game;
+  // Attacks either way, and ships of theirs sailing for the bot's coast.
+  const fighting = (other: number) =>
+    game.attacks.some(
+      (a) =>
+        a.troops > 0 &&
+        ((a.player === bot.id && a.target === other) ||
+          (a.player === other && a.target === bot.id)),
+    ) || game.boats.some((b) => b.player === other && territory.ownerOf(b.target) === bot.id);
+  // Two allies who hold the winning share between them could only wait for the
+  // time limit. In a team game, each side's land is its team's (R-MODE-02).
+  const room = mulDiv(terrain.ownableCount, balance.winSharePercent, 100);
+  const sideLand = (id: number) => {
+    let land = territory.tileCount(id);
+    for (const player of game.players()) {
+      if (player.alive && sameTeam(game, id, player.id)) land += territory.tileCount(player.id);
+    }
+    return land;
+  };
+  const ours = game.teams > 0 ? sideLand(bot.id) : territory.tileCount(bot.id);
+  const worth = (other: number) => {
+    const theirs = game.teams > 0 ? sideLand(other) : territory.tileCount(other);
+    const traitor = isTraitor(game, game.player(other) as Player);
+    return (
+      theirs * 100 < ours * sizePercent && ours + theirs < room && !fighting(other) && !traitor
+    );
+  };
+  let teammates = 0;
+  for (const player of game.players()) {
+    if (player.alive && sameTeam(game, bot.id, player.id)) teammates++;
+  }
+  for (const ally of alliesOf(game, bot.id)) {
+    const alliance = allianceOf(game, bot.id, ally);
+    if (!alliance || !canRenew(game, alliance) || !worth(ally)) continue;
+    // Its vote stands until the other side's comes.
+    if (bot.id === alliance.a ? alliance.renewA : alliance.renewB) continue;
+    game.apply(bot.id, { type: "ally", target: ally });
+  }
+  // Oldest request first, the same on every client.
+  for (const request of [...game.allianceRequests]) {
+    if (request.to !== bot.id || alliesOf(game, bot.id).length + teammates >= max) continue;
+    if (worth(request.from)) game.apply(bot.id, { type: "ally", target: request.from });
+  }
 }

@@ -28,7 +28,7 @@ export function defaultSetup(maps: readonly MapInfo[]): GameSetup {
   return {
     map: map.id,
     bots: suggestedBots(map, true),
-    difficulty: "normal",
+    difficulty: "easy",
     nations: true,
     rules: { ...DEFAULT_RULES },
     playerName: "",

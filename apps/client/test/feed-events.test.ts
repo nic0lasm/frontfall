@@ -229,7 +229,7 @@ describe("player card", () => {
     const base = update();
     expect(relation(base, 1, rules)).toBe("You");
     expect(relation(base, 2, rules)).toBe("Not allied with you");
-    expect(relation(base, 3, rules)).toBe("A nation: no alliances");
+    expect(relation(base, 3, rules)).toBe("A nation, not allied with you");
     const allied = update({
       diplomacy: {
         ...base.diplomacy,

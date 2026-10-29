@@ -99,7 +99,7 @@ export const DEFAULT_GAME: GameSettings = {
   capacity: 16,
   autoStart: true,
   bots: 0,
-  difficulty: "normal",
+  difficulty: "easy",
   nations: true,
   teams: 0,
   disabled: 0,

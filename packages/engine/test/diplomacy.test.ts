@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { captureCost } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { installBots } from "../src/bots/bots.ts";
+import { installNations } from "../src/bots/nations.ts";
 import { createGame } from "../src/create-game.ts";
 import {
   DIPLOMACY_LOG_SIZE,
@@ -414,5 +415,31 @@ describe("bots and alliances (R-BOT-10)", () => {
     run(60);
     expect(isAllied(game, 1, 2)).toBe(false);
     expect(game.allianceRequests.some((r) => r.from === 2 || r.from === 3)).toBe(false);
+  });
+});
+
+describe("nations and alliances (R-BOT-19)", () => {
+  it("accepts a player up to B-NATION-ALLIANCE-SIZE of its land, up to B-NATION-ALLIANCE-MAX allies", () => {
+    // Ada, Bea and Cy hold as much land each: a bot would turn both down.
+    const { game, ally, run } = newGame({ allianceRequestTicks: 100, winSharePercent: 100 });
+    installNations(game, [2], "normal");
+    ally(1, 2);
+    ally(3, 2);
+    run(60);
+    expect(isAllied(game, 1, 2)).toBe(true);
+    expect(isAllied(game, 3, 2)).toBe(true);
+  });
+
+  it("lets the request of a player half again its size or more run out", () => {
+    const { game, grid, ally, run } = newGame({ allianceRequestTicks: 100, winSharePercent: 100 });
+    // Ada holds 600 tiles to Bea's 400.
+    for (let x = 20; x < 30; x++)
+      for (let y = 0; y < 20; y++) game.territory.setOwner(grid.index(x, y), 1);
+    for (let x = 40; x < 50; x++)
+      for (let y = 0; y < 20; y++) game.territory.setOwner(grid.index(x, y), 2);
+    installNations(game, [2], "normal");
+    ally(1, 2);
+    run(60);
+    expect(isAllied(game, 1, 2)).toBe(false);
   });
 });

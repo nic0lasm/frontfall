@@ -17,6 +17,7 @@ import { NEUTRAL } from "../territory/territory-map.ts";
 import { BOT_DIFFICULTIES, NATION_DIFFICULTIES, type BotDifficulty } from "./difficulty.ts";
 import {
   RETRY_DECISIONS,
+  answerAlliances,
   buildCity,
   buildPort,
   defendCoast,
@@ -51,6 +52,15 @@ export const NATION_SILO_CITIES = 2; // B-NATION-SILO-CITIES
 
 /** Share of all ownable land, in %, from which the leading player becomes a nation's missile target (R-BOT-12). */
 export const NATION_MISSILE_LEADER_PERCENT = 30; // B-NATION-MISSILE-LEADER
+
+/** Allies a nation keeps at most (R-BOT-19). */
+export const NATION_ALLIANCE_MAX = 2; // B-NATION-ALLIANCE-MAX
+
+/**
+ * A nation allies with a player whose land is under this share of its own,
+ * in %, so that the leader cannot buy peace with everyone (R-BOT-19).
+ */
+export const NATION_ALLIANCE_SIZE_PERCENT = 150; // B-NATION-ALLIANCE-SIZE
 
 /** Border tiles a nation measures the distance to an enemy capital from (R-BOT-17). */
 const CAPITAL_SAMPLES = 64;
@@ -172,6 +182,7 @@ export function installNations(
     pileFresh = false;
     const tiles = territory.tileCount(nation.id);
     if (tiles === 0 || territory.borderCount(nation.id) === 0) return;
+    answerAlliances(game, nation, NATION_ALLIANCE_SIZE_PERCENT, NATION_ALLIANCE_MAX);
     buildCity(game, nation, cityCooldowns, retryTicks);
     buildPort(game, nation, portCooldowns, retryTicks);
     defendCoast(game, nation);

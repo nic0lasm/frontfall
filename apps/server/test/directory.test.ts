@@ -233,7 +233,7 @@ describe("Directory", () => {
     const options = {
       map: "world",
       bots: 0,
-      difficulty: "normal" as const,
+      difficulty: "easy" as const,
       nations: true,
       teams: 0 as const,
       disabled: 0,

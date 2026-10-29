@@ -13,6 +13,12 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 - **Protocol 25.** `configure` takes `operatorBonuses`, a sum of bonuses, in place of `operatorGold`, and `lobby` and `started` carry `operatorBonuses` in place of `goldBonus` ([R-MODE-09](docs/rules.md), [protocol](docs/protocol.md)). Pages from before this release reload on their next connection.
 
+### Changed
+
+- **Nations make alliances.** Ask a nation for an alliance and it now answers: it accepts when you are not fighting it, have not betrayed anyone lately, are less than half again its size and it has fewer than two allies, and it renews on the same terms. Your ally never attacks you. The player menu says these terms before you ask. A nation still never asks first.
+- **Every level is easier.** Nations leave you more time to take free land before they turn on anyone: 5 minutes at easy instead of 3, 140 seconds at normal instead of 100, 115 at hard instead of 90. In our test games a steady player now wins almost every game at easy, about one in three at normal and one in four at hard.
+- **Easy by default.** A new solo game, a quick game and public online games now start at easy; pick normal or hard in the menu or the lobby when you want more. A setup you chose before is kept.
+
 ### Fixed
 
 - **Signing out in plain sight.** Signed in, the menu now says how under your name, with a Sign out button there, instead of a small link inside the closed profile card.

@@ -514,7 +514,7 @@ describe("WebSocket", () => {
     expect(lobby).toMatchObject({
       map: "world",
       bots: 0,
-      difficulty: "normal",
+      difficulty: "easy",
       nations: true,
       teams: 0,
     });

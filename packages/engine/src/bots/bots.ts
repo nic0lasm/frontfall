@@ -1,11 +1,11 @@
 import { capitalAim } from "../capitals.ts";
 import { populationCap } from "../economy.ts";
-import { allianceOf, alliesOf, canRenew, isTraitor, sameTeam } from "../diplomacy.ts";
 import type { Game, Player } from "../game.ts";
-import { divFloor, mulDiv, percentOf } from "../integer-math.ts";
+import { divFloor, percentOf } from "../integer-math.ts";
 import { BOT_DIFFICULTIES, type BotDifficulty } from "./difficulty.ts";
 import {
   RETRY_DECISIONS,
+  answerAlliances,
   buildCity,
   buildPort,
   sail,
@@ -16,6 +16,9 @@ import {
 
 /** Allies a bot keeps at most, so that it always has someone left to fight. */
 const ALLIANCE_MAX = 1; // B-BOT-ALLIANCE-MAX
+
+/** A bot only allies with a player smaller than itself (R-BOT-10). */
+const ALLIANCE_SIZE_PERCENT = 100;
 
 /**
  * Bots (R-BOT-01, R-BOT-03, R-BOT-04): the given players expand into unowned
@@ -41,7 +44,7 @@ const ALLIANCE_MAX = 1; // B-BOT-ALLIANCE-MAX
  * ends (R-SPAWN-03).
  */
 export function installBots(game: Game, ids: readonly number[], difficulty: BotDifficulty): void {
-  const { territory, terrain, balance } = game;
+  const { territory, balance } = game;
   const params = BOT_DIFFICULTIES[difficulty];
   const interval = Math.max(1, params.intervalSeconds * balance.ticksPerSecond);
   const retryTicks = RETRY_DECISIONS * interval;
@@ -71,7 +74,7 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
   function decide(bot: Player): void {
     const tiles = territory.tileCount(bot.id);
     if (tiles === 0 || territory.borderCount(bot.id) === 0) return;
-    answerAlliances(bot, tiles);
+    answerAlliances(game, bot, ALLIANCE_SIZE_PERCENT, ALLIANCE_MAX);
     buildCity(game, bot, cityCooldowns, retryTicks);
     buildPort(game, bot, portCooldowns, retryTicks);
     const reserve = percentOf(populationCap(game, bot), params.reservePercent);
@@ -89,52 +92,5 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
     const aim = target >= 0 && target === enemy ? capitalAim(game, target) : target;
     if (target >= 0) game.apply(bot.id, { type: "attack", target: aim, troops });
     else sail(game, bot, troops, params.boldnessPercent, seaCooldowns, retryTicks);
-  }
-
-  /** R-BOT-10: alliances with smaller players the bot is not fighting, asked for by them. */
-  function answerAlliances(bot: Player, tiles: number): void {
-    // Attacks either way, and ships of theirs sailing for the bot's coast.
-    const fighting = (other: number) =>
-      game.attacks.some(
-        (a) =>
-          a.troops > 0 &&
-          ((a.player === bot.id && a.target === other) ||
-            (a.player === other && a.target === bot.id)),
-      ) || game.boats.some((b) => b.player === other && territory.ownerOf(b.target) === bot.id);
-    // Two allies who hold the winning share between them could only wait for the
-    // time limit. In a team game, each side's land is its team's (R-MODE-02).
-    const room = mulDiv(terrain.ownableCount, balance.winSharePercent, 100);
-    const sideLand = (id: number) => {
-      let land = territory.tileCount(id);
-      for (const player of game.players()) {
-        if (player.alive && sameTeam(game, id, player.id)) land += territory.tileCount(player.id);
-      }
-      return land;
-    };
-    const ours = game.teams > 0 ? sideLand(bot.id) : tiles;
-    const worth = (other: number) => {
-      const theirs = game.teams > 0 ? sideLand(other) : territory.tileCount(other);
-      const traitor = isTraitor(game, game.player(other) as Player);
-      return theirs < ours && ours + theirs < room && !fighting(other) && !traitor;
-    };
-    // Teammates count among the bot's allies.
-    let teammates = 0;
-    for (const player of game.players()) {
-      if (player.alive && sameTeam(game, bot.id, player.id)) teammates++;
-    }
-    for (const ally of alliesOf(game, bot.id)) {
-      const alliance = allianceOf(game, bot.id, ally);
-      if (!alliance || !canRenew(game, alliance) || !worth(ally)) continue;
-      // Its vote stands until the other side's comes.
-      if (bot.id === alliance.a ? alliance.renewA : alliance.renewB) continue;
-      game.apply(bot.id, { type: "ally", target: ally });
-    }
-    // Oldest request first, the same on every client.
-    for (const request of [...game.allianceRequests]) {
-      if (request.to !== bot.id || alliesOf(game, bot.id).length + teammates >= ALLIANCE_MAX) {
-        continue;
-      }
-      if (worth(request.from)) game.apply(bot.id, { type: "ally", target: request.from });
-    }
   }
 }

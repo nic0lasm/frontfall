@@ -190,7 +190,7 @@ export class DiplomacyPanel {
     const waiting = diplomacy.waiting.includes(id);
     const traitor = diplomacy.traitors.find((x) => x.id === id);
     const playing = update.phase === "play" && update.winner === undefined;
-    // Nations neither ask nor answer (R-BOT-02): no button that would wait for nothing.
+    // Nations answer on their own terms (R-BOT-19): say them before the player asks.
     const nation = id >= this.rules.firstNation;
 
     let status: string;
@@ -250,7 +250,7 @@ export class DiplomacyPanel {
               className: "betray",
             },
       );
-    } else if (!nation && !teammate) {
+    } else if (!teammate) {
       buttons.push({
         key: asked
           ? "diplo.accept"
