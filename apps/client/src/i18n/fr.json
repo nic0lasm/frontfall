@@ -416,6 +416,7 @@
   "help.defendTitle": "Se défendre",
   "help.defendTroops": "Plus vous gardez de troupes par case, plus votre terre coûte cher à prendre : n’envoyez pas tout",
   "help.defendFort": "Un fort double le prix de la terre autour de lui : posez-le derrière une frontière attaquée",
+  "help.defendFronts": "Un front tenu par bien moins de troupes que le camp d’en face cède par pans : gardez des troupes à la maison",
   "help.defendRetreat": "La retraite d’une attaque en cours rappelle ses troupes, moins une part perdue en chemin",
   "help.defendCapital": "Mode capitale : la couronne est votre capitale. Qui la prend prend tout votre empire : tenez les fronts à distance et fortifiez ses abords",
   "help.holdTouch": "Un appui long sur un bouton de bâtiment explique ce qu’il fait",

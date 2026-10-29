@@ -6,7 +6,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Changed
 
-- **A clearer tutorial.** The first steps are now six instead of eight, each in short sentences with one thing to do: place your start, expand, set the share of troops with the slider, build a city, build a fort, offer an alliance. The control a step asks for is ringed on screen (the slider, the City or Fort button, or the build button on a phone), and moving the slider moves the guide on. After you place your start, the guide says to wait for the countdown instead of asking you to expand too early. Ships, ports and fronts are left to the help (H or ?), and the tutorial game now plays at easy.
+- **A clearer tutorial.** The first steps are now six instead of eight, each in short sentences with one thing to do: place your start, expand, set the share of troops with the slider, build a city, build a fort, offer an alliance. The control a step asks for is ringed on screen (the slider, the City or Fort button, or the build button on a phone), and moving the slider moves the guide on. After you place your start, the guide says to wait for the countdown instead of asking you to expand too early. Ships and ports are left to the help, which now also explains fronts (H or ?), and the tutorial game now plays at easy.
 
 ## [0.9.1] - 2026-10-29
 

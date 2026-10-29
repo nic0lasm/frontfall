@@ -416,6 +416,7 @@
   "help.defendTitle": "Defend",
   "help.defendTroops": "The more troops you keep per tile, the dearer your land is to take: do not send everything",
   "help.defendFort": "A fort doubles the price of the land around it: build it behind a border that is attacked",
+  "help.defendFronts": "A front held by far fewer troops than the other side’s gives way by stretches: keep troops at home",
   "help.defendRetreat": "Retreat on a running attack calls its troops back, minus a share lost on the way",
   "help.defendCapital": "Capital mode: the crown is your capital. Whoever takes it takes your whole empire, so keep fronts away from it and build forts around it",
   "help.holdTouch": "Long press a building button to read what it does",

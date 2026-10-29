@@ -29,13 +29,13 @@ export interface HelpOptions {
 const LINES: Readonly<Record<"mouse" | "touch", Record<string, readonly MessageKey[]>>> = {
   mouse: {
     expand: ["help.click", "help.ships", "help.ratio"],
-    defend: ["help.defendTroops", "help.defendFort", "help.defendRetreat"],
+    defend: ["help.defendTroops", "help.defendFort", "help.defendFronts", "help.defendRetreat"],
     diplomacy: ["help.diplomacy"],
     map: ["help.drag", "help.zoom", "help.keys", "help.keyboardPick", "help.pause"],
   },
   touch: {
     expand: ["help.tap", "help.shipsTouch", "help.ratioTouch"],
-    defend: ["help.defendTroops", "help.defendFort", "help.defendRetreat"],
+    defend: ["help.defendTroops", "help.defendFort", "help.defendFronts", "help.defendRetreat"],
     diplomacy: ["help.diplomacyTouch"],
     map: ["help.dragTouch", "help.holdTouch"],
   },
