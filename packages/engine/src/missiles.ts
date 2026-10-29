@@ -283,11 +283,12 @@ export function installMissiles(game: Game): void {
     const radius = blastRadius(game, missile.size);
     const reach = radius * radius;
     const heavy = missile.size === MissileSize.Heavy;
-    const until = game.tick + 1 + balance.falloutTicks;
+    const fallout = heavy ? balance.falloutTicks : balance.lightFalloutTicks;
+    const until = game.tick + 1 + fallout;
     const lost = new Map<number, number>();
     for (const tile of topology.tilesWithin(missile.to, radius)) {
       if (!terrain.isOwnable(tile) || topology.squaredDistance(tile, missile.to) > reach) continue;
-      if (heavy) game.falloutUntil[tile] = Math.max(game.falloutUntil[tile] as number, until);
+      if (fallout > 0) game.falloutUntil[tile] = Math.max(game.falloutUntil[tile] as number, until);
       const owner = territory.ownerOf(tile);
       if (owner === NEUTRAL) continue;
       lost.set(owner, (lost.get(owner) ?? 0) + 1);
@@ -296,12 +297,16 @@ export function installMissiles(game: Game): void {
     for (const [owner, tiles] of [...lost].sort((a, b) => a[0] - b[0])) {
       const player = game.player(owner);
       if (!player) continue;
-      player.troops -= mulDiv(player.troops, tiles, territory.tileCount(owner));
+      const share = Math.min(
+        territory.tileCount(owner),
+        mulDiv(tiles, balance.missileTroopsPercent, 100),
+      );
+      player.troops -= mulDiv(player.troops, share, territory.tileCount(owner));
     }
     for (const tile of topology.tilesWithin(missile.to, radius)) {
       if (!terrain.isOwnable(tile) || topology.squaredDistance(tile, missile.to) > reach) continue;
       if (territory.ownerOf(tile) !== NEUTRAL) territory.setOwner(tile, NEUTRAL);
     }
-    if (heavy) game.fallout.push({ tile: missile.to, radius, until });
+    if (fallout > 0) game.fallout.push({ tile: missile.to, radius, until });
   }
 }

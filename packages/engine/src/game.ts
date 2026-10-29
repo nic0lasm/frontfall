@@ -772,6 +772,8 @@ function checkBalance(balance: Balance): void {
     "missileRadius",
     "heavyMissileRadius",
     "falloutTicks",
+    "lightFalloutTicks",
+    "missileTroopsPercent",
     "airDefenseRadius",
     "airDefenseReloadTicks",
     "tradeBase",

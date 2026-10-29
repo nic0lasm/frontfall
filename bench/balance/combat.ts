@@ -27,6 +27,18 @@ export interface CombatReport {
   /** When player 1 took that worst blow, in seconds of the game, and the land they held 10 s before. */
   readonly playerWorstBlowAt?: number;
   readonly playerWorstBlowFrom?: number;
+  /**
+   * For each player a missile struck, the share of their land it took, in %,
+   * and the share of those tiles they held again 30 s later.
+   */
+  readonly strikes: readonly { readonly share: number; readonly retaken: number }[];
+}
+
+interface Strike {
+  readonly tick: number;
+  readonly owner: number;
+  readonly tiles: number[];
+  readonly land: number;
 }
 
 interface Running {
@@ -62,6 +74,10 @@ export class CombatLog {
   private playerBlowFrom = 0;
   private paid = 0;
   private lost = 0;
+  /** Land a player lost to nobody this tick, which only a missile does. */
+  private readonly struckThisTick = new Map<number, number[]>();
+  private readonly pending: Strike[] = [];
+  private readonly strikes: { share: number; retaken: number }[] = [];
 
   constructor(private readonly game: Game) {
     const territory = game.territory;
@@ -76,6 +92,13 @@ export class CombatLog {
         }
         const key = player * 4096 + previous;
         this.takenThisTick.set(key, (this.takenThisTick.get(key) ?? 0) + 1);
+      } else if (previous !== NEUTRAL && player === NEUTRAL) {
+        let tiles = this.struckThisTick.get(previous);
+        if (!tiles) {
+          tiles = [];
+          this.struckThisTick.set(previous, tiles);
+        }
+        tiles.push(tile);
       }
       setOwner(tile, player);
     };
@@ -85,6 +108,21 @@ export class CombatLog {
   afterTick(): void {
     const { game } = this;
     const tick = game.tick;
+    for (const [owner, tiles] of this.struckThisTick) {
+      // A player losing their last tiles to nobody is eliminated, not struck: skip them.
+      const land = game.territory.tileCount(owner) + tiles.length;
+      if (tiles.length < land) this.pending.push({ tick, owner, tiles, land });
+    }
+    this.struckThisTick.clear();
+    const later = 30 * game.balance.ticksPerSecond;
+    while (this.pending.length > 0 && (this.pending[0] as Strike).tick + later <= tick) {
+      const strike = this.pending.shift() as Strike;
+      const held = strike.tiles.filter((t) => game.territory.owners[t] === strike.owner).length;
+      this.strikes.push({
+        share: (strike.tiles.length * 100) / strike.land,
+        retaken: (held * 100) / strike.tiles.length,
+      });
+    }
     const live = new Set<number>();
     for (const attack of game.attacks) {
       if (attack.target === NEUTRAL) continue;
@@ -155,6 +193,7 @@ export class CombatLog {
       attackerPaid: this.paid,
       defenderLost: this.lost,
       worstBlows: [...this.worst.values()],
+      strikes: this.strikes,
       lastStands: this.stands,
       ...(this.worst.has(1) ? { playerWorstBlow: this.worst.get(1) as number } : {}),
       ...(this.playerStand === undefined ? {} : { playerLastStand: this.playerStand }),

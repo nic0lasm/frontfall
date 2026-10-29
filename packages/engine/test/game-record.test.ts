@@ -79,6 +79,14 @@ describe("game records (#50)", () => {
     expect(replayGameRecord({ ...game, rules: { capitals: false } }, terrain)).not.toBe(game.hash);
   });
 
+  it("read a record from before light fallout as it was played (R-UNIT-06)", () => {
+    const game = played();
+    const { lightFalloutTicks, missileTroopsPercent, ...older } = game.balance;
+    expect([lightFalloutTicks, missileTroopsPercent]).toEqual([300, 300]);
+    const read = readGameRecord(JSON.parse(JSON.stringify({ ...game, balance: older })));
+    expect([read.balance.lightFalloutTicks, read.balance.missileTroopsPercent]).toEqual([0, 100]);
+  });
+
   it("refuse a rule this build does not know", () => {
     const game = played();
     expect(() => readGameRecord({ ...game, rules: { tides: true } })).toThrow("unknown rule");

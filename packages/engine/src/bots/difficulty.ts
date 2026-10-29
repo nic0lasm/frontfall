@@ -55,7 +55,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     holdPercent: 60,
     reservePercent: 25,
     huntPercent: 0,
-    missilePauseSeconds: 120,
+    missilePauseSeconds: 240,
   },
   normal: {
     intervalSeconds: 1,
@@ -65,7 +65,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     holdPercent: 30,
     reservePercent: 40,
     huntPercent: 20,
-    missilePauseSeconds: 60,
+    missilePauseSeconds: 120,
   },
   hard: {
     intervalSeconds: 1,
@@ -75,6 +75,6 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     holdPercent: 30,
     reservePercent: 40,
     huntPercent: 20,
-    missilePauseSeconds: 30,
+    missilePauseSeconds: 60,
   },
 };

@@ -153,11 +153,13 @@ Distances and land are given for a map of 2^19 tiles, like the spawn values: on 
 | ------------------------ | ------: | -------------- | ------------ | --------------------------------------------------------------------- |
 | `B-SILO-RELOAD`          |      30 | s              | `R-BUILD-04` | From a launch to the next one from the same silo                      |
 | `B-COST-MISSILE`         |  600000 | gold           | `R-UNIT-05`  | Every missile; it does not grow                                       |
-| `B-COST-HEAVY-MISSILE`   | 1500000 | gold           | `R-UNIT-05`  | Every heavy missile                                                   |
+| `B-COST-HEAVY-MISSILE`   | 3000000 | gold           | `R-UNIT-05`  | Every heavy missile                                                   |
 | `B-MISSILE-SPEED`        |       8 | tiles per tick | `R-UNIT-05`  | 80 tiles a second: across World in under 13 s                         |
 | `B-MISSILE-RADIUS`       |      12 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 24 on World                                   |
-| `B-HEAVY-MISSILE-RADIUS` |      30 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 60 on World                                   |
-| `B-FALLOUT-TIME`         |      60 | s              | `R-UNIT-06`  | Under a heavy missile                                                 |
+| `B-HEAVY-MISSILE-RADIUS` |      45 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 90 on World                                   |
+| `B-FALLOUT-TIME`         |      90 | s              | `R-UNIT-06`  | Under a heavy missile                                                 |
+| `B-FALLOUT-TIME-LIGHT`   |      30 | s              | `R-UNIT-06`  | Under a light missile: the land cannot be taken back at once          |
+| `B-MISSILE-TROOPS`       |     300 | %              | `R-UNIT-05`  | Of the share of troops the land under the blast held                  |
 | `B-AIR-DEFENSE-RADIUS`   |      60 | tiles          | `R-BUILD-05` | On a map of 2^19 tiles; 120 on World                                  |
 | `B-AIR-DEFENSE-CHANCE`   |      75 | %              | `R-BUILD-05` | Per missile flying into the radius                                    |
 | `B-AIR-DEFENSE-RELOAD`   |      10 | s              | `R-BUILD-05` | From a missile stopped to the next one the same air defense tries for |
@@ -196,7 +198,7 @@ Each value is given for easy / normal / hard (`R-BOT-04`); the others are the sa
 | `B-NATION-SILO-CITIES`    |               2 | cities                          | `R-BOT-12` | Before a nation builds a silo                                                                                                                  |
 | `B-NATION-HUNT`           |     0 / 20 / 20 | % of all ownable land           | `R-BOT-14` | From here the leading player is the first target of every nation along its border, odds allowing; never on easy                                |
 | `B-NATION-MISSILE-LEADER` |              30 | % of all ownable land           | `R-BOT-12` | From here the leading player becomes a nation's target when nobody attacks it                                                                  |
-| `B-NATION-MISSILE-PAUSE`  |   120 / 60 / 30 | s                               | `R-BOT-12` | From one of its missiles to the next; at hard, the silo's reload (`B-SILO-RELOAD`)                                                             |
+| `B-NATION-MISSILE-PAUSE`  |  240 / 120 / 60 | s                               | `R-BOT-12` | From one of its missiles to the next; twice as long since missiles leave fallout and kill more                                                 |
 | `B-NATION-SCRAPS`         |               5 | % of the nation's land          | `R-BOT-18` | A neighbour with less land than this is attacked by land only when no landing is worth it                                                      |
 | `B-NATION-ALLIANCE-MAX`   |               2 | allies                          | `R-BOT-19` | In place of `B-BOT-ALLIANCE-MAX`: a nation leaves room for a second friend                                                                     |
 | `B-NATION-ALLIANCE-SIZE`  |             150 | % of the nation's land          | `R-BOT-19` | A player less than half again its size can still buy peace                                                                                     |
@@ -247,6 +249,8 @@ Slower fights stop one nation from rolling over the others, and the average play
 | Hard    | 0 of 12, eliminated in 5 | 0 of 12, eliminated in 6                               |
 
 Players found every level too hard after that, easy included, so the grace was lengthened again: the longer it is, the more free land the player takes before any nation turns on them. Normal went from 100 to 140 s, where the average player wins 9 games of 24 (7 at 100 s, 5 at 110 s, 7 at 120 s, 17 at 160 s), and is eliminated in 1. Hard went from 90 to 115 s, where the average player wins 3 games of 12 and is never eliminated, 7 games staying undecided (0 at 110 s, 5 at 120 s). Easy went from 180 to 300 s, where the average player wins 22 games of 24 in 13 to 21 minutes, and is never eliminated (11 at 180 s, 22 as well at 420 s). Lower `B-NATION-ODDS` or `B-NATION-ATTACK-RATIO` made the game harder, not easier: nations that fight each other less grow faster. A player cut down to a few thousand tiles still loses most of it within 10 s when a large nation turns on them: the pace of an attack follows the front, and a small country is all front.
+
+Missiles then changed nothing that lasted. On World against normal nations, a light missile took 0.54 % of the land of the player it struck (median of 1,305 strikes) and as much of their troops, and 30 s later that player held all of it again: free land is cheap to take back. A light missile now leaves 30 s of fallout (`B-FALLOUT-TIME-LIGHT`) and kills three times that share of troops (`B-MISSILE-TROOPS`): none of the land is back 30 s later. The heavy missile was a bargain at 2.5 times the price for 6 times the land; it now covers 90 tiles on World for 3,000,000 gold and leaves 90 s of fallout. With nations firing as often, the average player won 6 games of 24 at normal; with `B-NATION-MISSILE-PAUSE` doubled, it wins 21 of 24 at easy, 8 of 24 at normal and 5 of 12 at hard, within the noise of 22, 9 and 3 before. Flattening gold instead (0.3 gold per 100 troops, 800 a second for everyone) made normal harder, 5 of 24.
 
 ## Capitals
 

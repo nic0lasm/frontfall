@@ -138,6 +138,9 @@ export function readDesyncReport(value: unknown): DesyncReport {
 /** What a desync report and a game record share: the game's setup and its turns. */
 export type RecordedGame = Omit<DesyncReport, "version" | "build" | "hashes">;
 
+/** What a light missile did before `B-FALLOUT-TIME-LIGHT` and `B-MISSILE-TROOPS` (R-UNIT-05, R-UNIT-06). */
+const BEFORE_LIGHT_FALLOUT = { lightFalloutTicks: 0, missileTroopsPercent: 100 } as const;
+
 /** Checks the setup and turns of a parsed report or record. */
 export function readGame(report: Record<string, unknown>): RecordedGame {
   const map = readObject(report.map, "map");
@@ -147,6 +150,10 @@ export function readGame(report: Record<string, unknown>): RecordedGame {
     // Records from before capital mode or landmarks leave their values out: they take the defaults.
     if ((key.startsWith("capital") || key.startsWith("landmark")) && balance[key] === undefined) {
       balance[key] = expected;
+    }
+    // Records from before light missiles left fallout play on as they were played.
+    if (key in BEFORE_LIGHT_FALLOUT && balance[key] === undefined) {
+      balance[key] = BEFORE_LIGHT_FALLOUT[key as keyof typeof BEFORE_LIGHT_FALLOUT];
     }
     const actual = balance[key];
     const ok = Array.isArray(expected)

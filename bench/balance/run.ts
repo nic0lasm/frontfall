@@ -216,6 +216,32 @@ function print(s: BalanceSummary): void {
           (ownStands.length ? `, ${round(centile(ownStands, 50))} s from half to out` : "")
         : ""),
   );
+  const strikes = combats.flatMap((c) => c.strikes);
+  if (strikes.length > 0) {
+    console.log(
+      `missiles: ${String(strikes.length)} players struck, each losing ` +
+        `${round(
+          centile(
+            strikes.map((x) => x.share),
+            50,
+          ),
+          2,
+        )} % of their land (median, ` +
+        `${round(
+          centile(
+            strikes.map((x) => x.share),
+            90,
+          ),
+          2,
+        )} % at 90 %), ` +
+        `${round(
+          centile(
+            strikes.map((x) => x.retaken),
+            50,
+          ),
+        )} % of it theirs again 30 s later (median)`,
+    );
+  }
   if (s.casual) {
     console.log(
       `${values.average ? "average" : "casual"} player: won ${String(s.casual.won)}, alive at the end ${String(s.casual.alive)}` +

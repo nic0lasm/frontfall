@@ -34,6 +34,9 @@ const balance: Balance = {
   missileSpeed: 5,
   siloReloadTicks: 20,
   falloutTicks: 30,
+  // Tests below read a light strike alone; fallout and the troops it kills have their own.
+  lightFalloutTicks: 0,
+  missileTroopsPercent: 100,
   airDefenseRadius: 8,
   airDefenseReloadTicks: 15,
   goldPerThousandTroops: 0,
@@ -245,6 +248,36 @@ describe("fallout (R-UNIT-06)", () => {
     for (let i = 0; i < 40 && game.territory.ownerOf(target) !== 2; i++) step();
     expect(game.territory.ownerOf(target)).toBe(2);
     expect(game.fallout).toHaveLength(0);
+  });
+});
+
+describe("a light strike (R-UNIT-05, R-UNIT-06)", () => {
+  it("kills B-MISSILE-TROOPS of the share of troops its land held, never more than all", () => {
+    for (const percent of [300, 100_000]) {
+      const { game, grid, bea, step } = newGame({ missileTroopsPercent: percent });
+      const target = grid.index(50, 10);
+      const tilesBefore = game.territory.tileCount(2);
+      const troopsBefore = bea.troops;
+      step([{ player: 1, order: launch(target) }]);
+      while (game.missiles.length > 0) step();
+      const hit = tilesBefore - game.territory.tileCount(2);
+      const share = Math.min(tilesBefore, Math.floor((hit * percent) / 100));
+      // Past all of them, the army is wiped out and grows back from nothing.
+      if (percent === 300) {
+        expect(bea.troops).toBe(troopsBefore - Math.floor((troopsBefore * share) / tilesBefore));
+      } else expect(bea.troops).toBeLessThan(10);
+    }
+  });
+
+  it("leaves its land unusable for B-FALLOUT-TIME-LIGHT", () => {
+    const { game, grid, step } = newGame({ lightFalloutTicks: 10 });
+    const target = grid.index(50, 10);
+    step([{ player: 1, order: launch(target) }]);
+    while (game.missiles.length > 0) step();
+    expect(game.usable(target)).toBe(false);
+    expect(game.fallout).toHaveLength(1);
+    for (let i = 0; i < 10; i++) step();
+    expect(game.usable(target)).toBe(true);
   });
 });
 
