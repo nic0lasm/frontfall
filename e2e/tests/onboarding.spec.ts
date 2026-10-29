@@ -39,24 +39,25 @@ test("the first steps follow the player, and stay hidden once put away", async (
   await startSolo(page);
   const guide = page.locator("#guide");
   await expect(guide).toHaveAttribute("data-step", "start");
-  await expect(guide).toContainText("choose where you start");
+  await expect(guide).toContainText("place your start");
 
   // Next moves on without doing the step; the guide never blocks the game.
   await page.locator("#guide-next").click();
   await expect(guide).toHaveAttribute("data-step", "expand");
   await page.locator("#guide-next").click();
-  await expect(guide).toHaveAttribute("data-step", "attack");
-  await expect(guide).toContainText("Retreat");
-  await page.locator("#guide-next").click();
-  await expect(guide).toHaveAttribute("data-step", "fronts");
-  await expect(guide).toContainText("gives way");
-  await page.locator("#guide-next").click();
-  await page.locator("#guide-next").click();
-  await expect(guide).toHaveAttribute("data-step", "sail");
-  await expect(guide).toContainText("Port");
+  await expect(guide).toHaveAttribute("data-step", "troops");
+  await expect(guide).toContainText("slider");
+  // The step lights the slider, and moving it is what moves the guide on.
+  await expect(page.locator("#attack-ratio")).toHaveClass(/guide-target/);
+  await page.locator("#attack-ratio").fill("50");
+  await expect(guide).toHaveAttribute("data-step", "build");
+  await expect(guide).toContainText("City");
+  await expect(page.locator("#build-city")).toHaveClass(/guide-target/);
+  await expect(page.locator("#attack-ratio")).not.toHaveClass(/guide-target/);
   await page.locator("#guide-next").click();
   await expect(guide).toHaveAttribute("data-step", "defend");
   await expect(guide).toContainText("Fort");
+  await expect(page.locator("#build-fort")).toHaveClass(/guide-target/);
 
   await page.locator("#guide-hide").click();
   await expect(guide).toHaveCount(0);

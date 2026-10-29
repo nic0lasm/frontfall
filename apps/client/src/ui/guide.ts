@@ -4,17 +4,7 @@ import { h } from "./dom.ts";
 import { formatCount } from "./format.ts";
 
 /** The steps of a first game, in order; each one waits for the player to do it. */
-export const STEPS = [
-  "start",
-  "expand",
-  "attack",
-  "fronts",
-  "build",
-  "sail",
-  "defend",
-  "players",
-  "done",
-] as const;
+export const STEPS = ["start", "expand", "troops", "build", "defend", "players", "done"] as const;
 export type Step = (typeof STEPS)[number];
 
 /** What the guide watches in the game. */
@@ -28,20 +18,15 @@ export interface GuideState {
   cities: number;
   /** Forts the player owns, built or being built. */
   forts: number;
-  /** Ports the player owns, built or being built. */
-  ports: number;
-  /** Whether a ship of the player's has sailed since the guide began. */
-  sailed: boolean;
-  /** Whether a front has given way since the guide began. */
-  collapsed: boolean;
+  /** Whether the player moved the slider of the share of troops since the guide began. */
+  ratioMoved: boolean;
   /** Whether the menu of another player is open. */
   playerMenu: boolean;
 }
 
-/** What the steps quote: the price of the buildings they ask for. */
+/** What the steps quote: the price of the building they ask for. */
 export interface GuideCosts {
   city: number;
-  port: number;
 }
 
 /** The step the player is on once they have done what `step` asks, or `step` itself. */
@@ -49,13 +34,9 @@ export function advance(step: Step, state: GuideState): Step {
   const done: Record<Step, boolean> = {
     start: state.tiles > 0,
     expand: state.phase === "play" && state.tiles > state.tilesAtPlay,
-    // Sending troops is the one thing here the guide cannot see; it moves on once the player builds.
-    attack: state.cities > 0 || state.forts > 0,
-    // A front giving way cannot be asked for; the step waits for Next, one, or a building.
-    fronts: state.collapsed || state.cities > 0 || state.forts > 0,
+    // Moving the slider is the one thing here the player may skip: Next, or a building, moves on.
+    troops: state.ratioMoved || state.cities > 0 || state.forts > 0,
     build: state.cities > 0,
-    // Not every map has a coast to sail from: Next, a ship, a port or a fort moves on.
-    sail: state.sailed || state.ports > 0 || state.forts > 0,
     defend: state.forts > 0,
     players: state.playerMenu,
     done: false,
@@ -69,14 +50,23 @@ export function advance(step: Step, state: GuideState): Step {
 const TEXTS: Readonly<Record<Step, { mouse: MessageKey; touch: MessageKey }>> = {
   start: { mouse: "guide.start", touch: "guide.startTouch" },
   expand: { mouse: "guide.expand", touch: "guide.expandTouch" },
-  attack: { mouse: "guide.attack", touch: "guide.attackTouch" },
-  fronts: { mouse: "guide.fronts", touch: "guide.fronts" },
+  troops: { mouse: "guide.troops", touch: "guide.troopsTouch" },
   build: { mouse: "guide.build", touch: "guide.buildTouch" },
-  sail: { mouse: "guide.sail", touch: "guide.sailTouch" },
   defend: { mouse: "guide.defend", touch: "guide.defendTouch" },
   players: { mouse: "guide.players", touch: "guide.playersTouch" },
   done: { mouse: "guide.done", touch: "guide.doneTouch" },
 };
+
+/** What each step points at on screen, the first one that shows: a narrow screen keeps the buildings behind a button. */
+const TARGETS: Readonly<Partial<Record<Step, readonly string[]>>> = {
+  troops: ["#attack-ratio"],
+  build: ["#build-city", "#build-toggle"],
+  defend: ["#build-fort", "#build-toggle"],
+  players: ["#leaderboard-toggle"],
+};
+
+/** Marks the element a step points at; see guide.css. */
+const TARGET_CLASS = "guide-target";
 
 /**
  * First steps for a new player: a small card, out of the way, with one thing
@@ -95,7 +85,10 @@ export class Guide {
     id: "guide-hide",
     "data-i18n": "guide.hide",
   });
-  private costs: GuideCosts = { city: 0, port: 0 };
+  private costs: GuideCosts = { city: 0 };
+  /** Whether the attacks have opened: until then the player can only wait, after choosing a start. */
+  private waiting = false;
+  private target: Element | undefined;
 
   /** `onComplete`: the player is through the guide or put it away, so it is not shown again. */
   constructor(
@@ -126,11 +119,14 @@ export class Guide {
   /** Follows the game: moves on when the player did what the step asks. */
   update(state: GuideState, costs: GuideCosts): void {
     const step = advance(this.step, state);
-    const costChanged =
-      (step === "build" && costs.city !== this.costs.city) ||
-      (step === "sail" && costs.port !== this.costs.port);
+    const costChanged = step === "build" && costs.city !== this.costs.city;
+    const waiting = step === "expand" && state.phase === "spawn";
+    const waitChanged = waiting !== this.waiting;
     this.costs = costs;
-    if (step !== this.step || costChanged) this.show(step);
+    this.waiting = waiting;
+    if (step !== this.step || costChanged || waitChanged) this.show(step);
+    // A narrow screen opens and closes the tray of buildings: the pointer follows.
+    else this.point(step);
   }
 
   /** Language changed: the texts again. */
@@ -146,18 +142,32 @@ export class Guide {
       step: Math.min(number, STEPS.length - 1),
       count: STEPS.length - 1,
     });
-    this.text.dataset.i18n = TEXTS[step][this.touch ? "touch" : "mouse"];
-    this.text.dataset.i18nParams = JSON.stringify({
-      cost: formatCount(step === "sail" ? this.costs.port : this.costs.city),
-    });
+    this.text.dataset.i18n =
+      step === "expand" && this.waiting
+        ? "guide.expandWait"
+        : TEXTS[step][this.touch ? "touch" : "mouse"];
+    this.text.dataset.i18nParams = JSON.stringify({ cost: formatCount(this.costs.city) });
     this.next.dataset.i18n = step === "done" ? "guide.close" : "guide.next";
     this.hide.hidden = step === "done";
     this.element.dataset.step = step;
     applyTranslations(this.element);
+    this.point(step);
     if (step === "done") this.onComplete();
   }
 
+  /** Lights the control the step asks the player to use, and only that one. */
+  private point(step: Step): void {
+    const next = (TARGETS[step] ?? [])
+      .map((selector) => document.querySelector(selector))
+      .find((element) => element && element.getClientRects().length > 0);
+    if (next === this.target) return;
+    this.target?.classList.remove(TARGET_CLASS);
+    next?.classList.add(TARGET_CLASS);
+    this.target = next ?? undefined;
+  }
+
   private finish(): void {
+    this.target?.classList.remove(TARGET_CLASS);
     this.element.remove();
     this.onComplete();
   }

@@ -144,3 +144,23 @@
     margin-top: 0;
   }
 }
+
+/* The control the step asks for: a ring that breathes, so the eye finds it among the others. */
+.guide-target {
+  outline: 2px solid var(--ff-ember-bright);
+  outline-offset: 3px;
+  animation: guide-target-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes guide-target-pulse {
+  50% {
+    outline-offset: 6px;
+    outline-color: var(--ff-ember);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-target {
+    animation: none;
+  }
+}

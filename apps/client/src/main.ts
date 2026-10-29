@@ -237,7 +237,7 @@ function tutorial(): void {
   const practice: GameSetup = {
     map: "skirmish",
     bots: 2,
-    difficulty: "normal",
+    difficulty: "easy",
     nations: false,
     rules: { ...DEFAULT_RULES },
     playerName: setup.playerName,
