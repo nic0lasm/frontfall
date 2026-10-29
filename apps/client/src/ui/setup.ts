@@ -135,6 +135,10 @@ export function setupQuery(setup: GameSetup): string {
   if (setup.teams) params.set("teams", String(setup.teams));
   const off = LEFT_OUT.filter(({ bit }) => ((setup.disabled ?? 0) & bit) !== 0);
   if (off.length > 0) params.set("off", off.map(({ name }) => name).join(","));
+  // The page that measures a phone (ui/perf-report.ts) stays on through the games it starts.
+  if (typeof location !== "undefined" && new URLSearchParams(location.search).has("perf")) {
+    params.set("perf", "1");
+  }
   return `?${params.toString()}`;
 }
 

@@ -68,3 +68,26 @@ describe("RenderScale", () => {
     expect(frames(40_000, 50_000)).toEqual([]);
   });
 });
+
+describe("RenderScale under a cap", () => {
+  it("never draws sharper than the cap", () => {
+    expect(new RenderScale(3, 1).ratio).toBe(1);
+    expect(new RenderScale(2, 1.5).ratio).toBe(1.5);
+    expect(new RenderScale(1, 1.5).ratio).toBe(1);
+  });
+
+  it("says once that frames are too slow with nothing left to lower", () => {
+    const scale = new RenderScale(1, 1);
+    play(scale, 0, 2000, 40);
+    expect(scale.ratio).toBe(MIN_PIXEL_RATIO);
+    expect(scale.takeFloored()).toBe(true);
+    expect(scale.takeFloored()).toBe(false);
+    expect(scale.frameMs).toBeGreaterThan(30);
+  });
+
+  it("does not say it while a lower ratio is left to try", () => {
+    const scale = new RenderScale(2);
+    play(scale, 0, 30, 40);
+    expect(scale.takeFloored()).toBe(false);
+  });
+});

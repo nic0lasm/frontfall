@@ -4,7 +4,14 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **A Graphics setting, and a lighter picture for phones that struggle.** The menu's Accessibility section has a new Graphics choice: Automatic (the default), Light and Sharpest. Automatic picks by your device: a weak one gets the light picture, the flat map drawn at your screen's own pixels, a phone gets the full map at 1.5 times its screen's pixels instead of twice, and a game that still cannot keep up at the lowest sharpness switches to the light picture by itself and remembers it. Sharpest keeps the picture as sharp as the screen allows whatever the device. The choice applies to the next game.
+- **Measure a phone with `?perf`.** Add `?perf` to the game's address and a small panel shows the map's frame time, with a button to copy a report of the device, the picture used and how frames fared.
+
 ### Changed
+
+- **Taps on a touch screen no longer turn into drags.** A finger that wobbles up to 12 pixels while it taps still picks the tile, instead of moving the map by a hair and picking nothing.
 
 - **A smoother map on high-density screens.** Moving, zooming and playing no longer stutter on a laptop whose graphics chip cannot draw every pixel of a Retina screen sixty times a second: the map is drawn a little less sharp while frames fall behind, and back at full sharpness as soon as they keep up. Phones draw the map at most at twice their screen's resolution. The map's shading also does less work for the same picture: borders up close, the sea's swell and the grain of the ground are cheaper to draw.
 

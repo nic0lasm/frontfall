@@ -4,7 +4,13 @@ import { parseSettings } from "../src/ui/accessibility.ts";
 
 describe("accessibility settings", () => {
   it("starts from the defaults and mends anything unreadable", () => {
-    const defaults = { scale: 100, reduceMotion: false, highContrast: false, flatMap: false };
+    const defaults = {
+      scale: 100,
+      reduceMotion: false,
+      highContrast: false,
+      flatMap: false,
+      graphics: "auto",
+    };
     expect(parseSettings(null)).toEqual(defaults);
     expect(parseSettings("not json")).toEqual(defaults);
     expect(parseSettings("42")).toEqual(defaults);
@@ -13,13 +19,17 @@ describe("accessibility settings", () => {
 
   it("keeps what was chosen", () => {
     expect(
-      parseSettings('{"scale":125,"reduceMotion":true,"highContrast":true,"flatMap":true}'),
+      parseSettings(
+        '{"scale":125,"reduceMotion":true,"highContrast":true,"flatMap":true,"graphics":"saver"}',
+      ),
     ).toEqual({
       scale: 125,
       reduceMotion: true,
       highContrast: true,
       flatMap: true,
+      graphics: "saver",
     });
+    expect(parseSettings('{"graphics":"ultra"}').graphics).toBe("auto");
   });
 });
 

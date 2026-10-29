@@ -464,6 +464,12 @@ export class GameScreen {
   /** Call once the element is in the page, so sizes are known. */
   start(): void {
     this.scene.resize();
+    // `?perf` shows the frame time of the map and a report to copy, for measuring a phone.
+    if (new URLSearchParams(location.search).has("perf")) {
+      void import("./perf-report.ts").then(({ mountPerfReport }) => {
+        if (!this.disposed) this.cleanups.push(mountPerfReport(this.element, this.scene));
+      });
+    }
     let last = performance.now();
     const frame = (now: number): void => {
       this.input.update(now - last);

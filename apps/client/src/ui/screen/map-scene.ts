@@ -17,6 +17,14 @@ import {
 } from "../../render/renderer.ts";
 import type { Minimap } from "../../render/minimap.ts";
 import { RenderScale } from "../../render/render-scale.ts";
+import {
+  type GraphicsProfile,
+  SAVER,
+  chooseProfile,
+  learnedSaver,
+  readDevice,
+  rememberSaver,
+} from "../graphics.ts";
 import { usage } from "../../usage.ts";
 import { accessibility, motionReduced } from "../accessibility.ts";
 import { safeStorage } from "../setup.ts";
@@ -54,7 +62,9 @@ export class MapScene {
   private owners = new Uint16Array(0);
   private cam: ViewCamera;
   /** How sharp the map is drawn, lowered when the GPU cannot keep up with the display. */
-  private readonly scale = new RenderScale(window.devicePixelRatio);
+  private scale: RenderScale;
+  /** What the map is drawn with, from the graphics setting and the device. */
+  private profile: GraphicsProfile;
   /** The scale changed since the last frame, and the renderer has yet to follow. */
   private rescaled = false;
   private view: Renderer | undefined;
@@ -108,6 +118,48 @@ export class MapScene {
     this.viewKind = this.globeAllowed ? "globe" : "flat";
     this.mapSize = { width: map.width, height: map.height };
     this.cam = createCamera(map, this.viewKind);
+    this.profile = chooseProfile(
+      accessibility().graphics,
+      readDevice(),
+      learnedSaver(safeStorage()),
+    );
+    this.scale = new RenderScale(window.devicePixelRatio, this.profile.maxPixelRatio);
+  }
+
+  /** What a report of the game's smoothness holds (ui/perf-report.ts). */
+  report(): { profile: GraphicsProfile; ratio: number; frameMs: number; flat: boolean } {
+    return {
+      profile: this.profile,
+      ratio: this.scale.ratio,
+      frameMs: this.scale.frameMs,
+      flat: this.flat,
+    };
+  }
+
+  /** The flat map, asked for in the accessibility settings or by the graphics profile. */
+  private get flat(): boolean {
+    return accessibility().flatMap || this.profile.flat;
+  }
+
+  /**
+   * Frames stayed too slow at the lowest sharpness: in auto mode, the device
+   * is remembered as one that needs the light picture, and the map is drawn
+   * with it from now on.
+   */
+  private lighten(): void {
+    if (accessibility().graphics !== "auto" || this.profile.saver || !this.view) return;
+    rememberSaver(safeStorage());
+    this.profile = SAVER;
+    this.scale = new RenderScale(window.devicePixelRatio, SAVER.maxPixelRatio);
+    const kept = this.view;
+    this.unwatchContext?.();
+    this.unwatchContext = undefined;
+    kept.dispose();
+    this.view = undefined;
+    // The owners are already there to draw.
+    this.mount()?.markAllChanged();
+    this.drawnStructures = "";
+    if (this.latest) this.placeStructures(this.latest);
   }
 
   /** The camera of the current view; another one after a switch. */
@@ -207,7 +259,7 @@ export class MapScene {
           wrapsX: map.wrapsX,
           relief: map.relief,
           latitudes: map.latitudes,
-          flat: accessibility().flatMap,
+          flat: this.flat,
           owners: this.owners,
           maxOwner: maxPlayer,
         },
@@ -373,6 +425,7 @@ export class MapScene {
       this.dirty = moving;
     }
     if (this.scale.frame(now, drawn)) this.rescaled = true;
+    if (this.scale.takeFloored()) this.lighten();
   }
 
   private placeShips(now: number): void {

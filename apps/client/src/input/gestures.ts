@@ -26,6 +26,9 @@ export interface MapCallbacks {
 /** Farther than this from where it started, a press becomes a drag and never a click. */
 export const DRAG_THRESHOLD_PX = 6;
 
+/** A finger rests on the glass wider than a pointer and wobbles: past this, its press becomes a drag. */
+export const FINGER_DRAG_THRESHOLD_PX = 12;
+
 /** Held still at least this long, a press opens the tile's menu instead of clicking it. */
 export const LONG_PRESS_MS = 500;
 
@@ -52,6 +55,8 @@ export class PointerGestures {
   private pressX = 0;
   private pressY = 0;
   private pressTime: number | undefined;
+  /** How far the press travels before it is a drag, by what pressed it. */
+  private threshold = DRAG_THRESHOLD_PX;
   private pinch: Pinch | undefined;
   private hovered: number | undefined;
   /** The hover comes from a finger: it ends with the press. */
@@ -76,6 +81,7 @@ export class PointerGestures {
       this.pressX = sample.x;
       this.pressY = sample.y;
       this.pressTime = sample.time;
+      this.threshold = sample.finger ? FINGER_DRAG_THRESHOLD_PX : DRAG_THRESHOLD_PX;
       // Fingers cannot hover: the one resting on the map shows whose land it is on.
       if (sample.finger) {
         this.touchHover = true;
@@ -98,7 +104,7 @@ export class PointerGestures {
     const { x, y } = sample;
     this.pointers.set(sample.id, { x, y });
     if (this.mode === "press") {
-      if (Math.hypot(x - this.pressX, y - this.pressY) > DRAG_THRESHOLD_PX) {
+      if (Math.hypot(x - this.pressX, y - this.pressY) > this.threshold) {
         this.mode = "pan";
         this.endTouchHover();
         this.camera.panBy(x - this.pressX, y - this.pressY);
@@ -121,7 +127,7 @@ export class PointerGestures {
     const click =
       this.mode === "press" &&
       this.pointers.size === 1 &&
-      Math.hypot(sample.x - this.pressX, sample.y - this.pressY) <= DRAG_THRESHOLD_PX;
+      Math.hypot(sample.x - this.pressX, sample.y - this.pressY) <= this.threshold;
     const held =
       sample.time !== undefined &&
       this.pressTime !== undefined &&

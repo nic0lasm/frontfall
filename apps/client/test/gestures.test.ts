@@ -26,6 +26,21 @@ describe("PointerGestures", () => {
     expect(gestures.active).toBe(0);
   });
 
+  it("lets a finger wobble farther than a mouse before a tap becomes a drag", () => {
+    const { camera, gestures, onTileClick } = setup();
+    const centre = camera.view().centerX;
+    gestures.down({ id: 1, x: 300, y: 200, finger: true });
+    gestures.move({ id: 1, x: 308, y: 205, finger: true });
+    gestures.up({ id: 1, x: 308, y: 205, finger: true });
+    expect(onTileClick).toHaveBeenCalledOnce();
+    expect(camera.view().centerX).toBe(centre);
+    // The same wobble of a mouse is a drag.
+    gestures.down({ id: 2, x: 300, y: 200 });
+    gestures.move({ id: 2, x: 308, y: 205 });
+    gestures.up({ id: 2, x: 308, y: 205 });
+    expect(onTileClick).toHaveBeenCalledOnce();
+  });
+
   it("says when a click is a finger's, which covers more of the screen than a mouse", () => {
     const { camera, gestures, onTileClick } = setup();
     gestures.down({ id: 1, x: 300, y: 200, time: 0, finger: true });

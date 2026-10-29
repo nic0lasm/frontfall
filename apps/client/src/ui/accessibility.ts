@@ -1,5 +1,6 @@
 import { applyTranslations } from "../i18n/index.ts";
 import { h } from "./dom.ts";
+import { GRAPHICS_MODES, type GraphicsMode } from "./graphics.ts";
 import { safeStorage } from "./setup.ts";
 
 /** Interface sizes on offer, as a percentage of the normal one. */
@@ -14,6 +15,8 @@ export interface AccessibilitySettings {
   highContrast: boolean;
   /** The map in square tiles, without smooth coasts and borders: lighter on older devices. */
   flatMap: boolean;
+  /** How the map is drawn: chosen by the device, light, or as sharp as it goes. */
+  graphics: GraphicsMode;
 }
 
 export const STORAGE_KEY = "frontfall.accessibility";
@@ -23,6 +26,7 @@ const DEFAULTS: AccessibilitySettings = {
   reduceMotion: false,
   highContrast: false,
   flatMap: false,
+  graphics: "auto",
 };
 
 /** What was stored, with anything unreadable or out of range put back to the default. */
@@ -38,6 +42,8 @@ export function parseSettings(raw: string | null | undefined): AccessibilitySett
     settings.reduceMotion = stored["reduceMotion"] === true;
     settings.highContrast = stored["highContrast"] === true;
     settings.flatMap = stored["flatMap"] === true;
+    const graphics = GRAPHICS_MODES.find((mode) => mode === stored["graphics"]);
+    if (graphics) settings.graphics = graphics;
   } catch {
     // Not JSON: the defaults stand.
   }
@@ -92,7 +98,7 @@ function apply(settings: AccessibilitySettings): void {
   root.toggleAttribute("data-high-contrast", settings.highContrast);
 }
 
-/** The "Accessibility" disclosure of the menu: interface size, motion, contrast, the flat map and, from the audio code, sound. */
+/** The "Accessibility" disclosure of the menu: interface size, graphics, motion, contrast, the flat map and, from the audio code, sound. */
 export function accessibilityPanel(): HTMLDetailsElement {
   const scale = h("select", { id: "ui-scale", "data-i18n-attr": "aria-label:a11y.scale" });
   for (const value of SCALES) {
@@ -102,6 +108,16 @@ export function accessibilityPanel(): HTMLDetailsElement {
   }
   scale.addEventListener("change", () => {
     updateAccessibility({ scale: Number(scale.value) as Scale });
+  });
+
+  const graphics = h("select", { id: "graphics", "data-i18n-attr": "aria-label:a11y.graphics" });
+  for (const mode of GRAPHICS_MODES) {
+    const option = h("option", { value: mode, "data-i18n": `a11y.graphics.${mode}` });
+    option.selected = mode === current.graphics;
+    graphics.append(option);
+  }
+  graphics.addEventListener("change", () => {
+    updateAccessibility({ graphics: graphics.value as GraphicsMode });
   });
 
   const toggle = (
@@ -131,11 +147,18 @@ export function accessibilityPanel(): HTMLDetailsElement {
         h("label", { for: "ui-scale", "data-i18n": "a11y.scale" }),
         scale,
       ),
+      h(
+        "div",
+        { class: "field" },
+        h("label", { for: "graphics", "data-i18n": "a11y.graphics" }),
+        graphics,
+      ),
       toggle("reduce-motion", "reduceMotion", "a11y.motion"),
       toggle("high-contrast", "highContrast", "a11y.contrast"),
       toggle("flat-map", "flatMap", "a11y.flatMap"),
       soundControls,
       h("p", { class: "accessibility-note", "data-i18n": "a11y.note" }),
+      h("p", { class: "accessibility-note", "data-i18n": "a11y.graphicsNote" }),
     ),
   );
   // The sound settings come with the audio code, apart from the first visit.

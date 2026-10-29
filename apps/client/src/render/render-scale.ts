@@ -36,9 +36,13 @@ export class RenderScale {
   private lastFrame: number | undefined;
   /** When the last step up was taken, to tell a failed one. */
   private raisedAt = -Infinity;
+  /** Frames were too slow with nothing left to lower, and nobody has been told yet. */
+  private floored = false;
+  private median = 0;
 
-  constructor(devicePixelRatio: number) {
-    const top = Math.min(MAX_PIXEL_RATIO, Math.max(devicePixelRatio, MIN_PIXEL_RATIO));
+  /** `cap` lowers the sharpest ratio the map is drawn at, for a profile that saves the GPU. */
+  constructor(devicePixelRatio: number, cap = MAX_PIXEL_RATIO) {
+    const top = Math.min(cap, MAX_PIXEL_RATIO, Math.max(devicePixelRatio, MIN_PIXEL_RATIO));
     this.levels = [top];
     for (let ratio = top * STEP; ratio > MIN_PIXEL_RATIO; ratio *= STEP) this.levels.push(ratio);
     if (top > MIN_PIXEL_RATIO) this.levels.push(MIN_PIXEL_RATIO);
@@ -46,6 +50,21 @@ export class RenderScale {
 
   get ratio(): number {
     return this.levels[this.level] as number;
+  }
+
+  /** Milliseconds of the median frame in the last window looked at, 0 before the first. */
+  get frameMs(): number {
+    return this.median;
+  }
+
+  /**
+   * Whether frames stayed too slow at the lowest ratio, which only a lighter
+   * picture can fix. True once, then again only after another slow window.
+   */
+  takeFloored(): boolean {
+    const floored = this.floored;
+    this.floored = false;
+    return floored;
   }
 
   /** Called every animation frame, `drawn` when the map was drawn in it. Whether the ratio changed. */
@@ -59,7 +78,9 @@ export class RenderScale {
     if (last === undefined || now - last > GAP_MS) return false;
     this.intervals.push(now - last);
     if (this.intervals.length < WINDOW) return false;
-    if (median(this.intervals.slice(-WINDOW)) > SLOW_MS && this.level < this.levels.length - 1) {
+    this.median = median(this.intervals.slice(-WINDOW));
+    if (this.median > SLOW_MS && this.level === this.levels.length - 1) this.floored = true;
+    if (this.median > SLOW_MS && this.level < this.levels.length - 1) {
       // The level just left was too slow after all: stay below it a while.
       if (now - this.raisedAt < HOLD_MS / 3) {
         this.ceiling = this.level + 1;

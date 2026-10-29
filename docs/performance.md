@@ -409,6 +409,16 @@ What these numbers do show:
   the 8.4 million of a full upload (16 MiB). An earlier version that uploaded
   one span per row, from the first to the last changed column, sent 670,518
   texels per tick in a quick run.
+- The picture is chosen by the **Graphics** setting of the menu (auto, light or
+  sharpest, [`ui/graphics.ts`](../apps/client/src/ui/graphics.ts)). In auto,
+  a weak device (2 GB or less of memory, two cores or fewer, or four or fewer
+  on a touch screen) gets the light picture: the flat map and a sharpest ratio
+  of 1. A phone with a finger and a screen under 600 px gets the full picture
+  capped at 1.5, any other device the full picture capped at 2. If frames
+  stay over 22 ms at the lowest ratio, the game switches to the light picture
+  on the spot and remembers it for this device (`frontfall.graphics.saver`);
+  choosing "Sharpest" in the menu overrides it. The caps are first guesses:
+  they stand until phones are measured (below).
 - GPU memory stays at a third of the budget on the largest map.
 
 What they do not show is frame rate on a real GPU: SwiftShader rasterises on
@@ -419,6 +429,14 @@ software almost all of the frame goes to the tiny unit triangles, which are
 smaller than a pixel when the whole world is on screen. Frame rate budgets
 will be checked with `pnpm bench:render -- --gpu` on a laptop and with
 `--serve` on a phone; this section will be updated with those runs.
+
+The simplest measure on a phone needs no computer: open the game with `?perf`
+added to its address (for example `https://nclsmgr.com/frontfall-next/?perf`),
+play a minute with moves and zooms, then press "Copy report". The panel at the
+bottom left shows the graphics chip, the screen, the profile chosen, the
+sharpness the map ended at and the median frame time, and the report pastes
+as a few lines of text. It is loaded only with `?perf`, so it costs a normal
+visit nothing.
 
 ### Full game rules
 
