@@ -530,9 +530,51 @@ it, the tool connects to `--url`. Every client sends its own `X-Client-IP`
 so that the per-address connection limit does not apply; behind a reverse
 proxy that overwrites the header, the limit applies to the whole run.
 
-All the clients run in one process. Its own event loop delay is printed: a
-client process that falls behind shows up as lateness that the server did
-not cause.
+By default all the clients run in one process. Its own event loop delay is
+printed: a client process that falls behind shows up as lateness that the
+server did not cause, and above 20 ms at p99 the tool suggests
+`--client-procs <n>`, which spreads the games over `n` forked processes and
+merges their histograms (the client loop delay is then the worst process's).
+
+The server line gives its CPU time as a share of one core, its RSS and V8
+heap used (current and peak), its event loop delay p99 and max, and the turn
+pass: the time `GameServer` spends closing one turn of every game, read from
+`frontfall_turn_duration_seconds` (the mean, and the p99 to the bucket).
+`--heap-mib 512` starts the server with `--max-old-space-size=512`, as in
+production.
+
+### Finding the breaking point
+
+```sh
+pnpm load -- --spawn-server --heap-mib 512 --client-procs 4 --ramp 50,100,200,300 --minutes 5
+pnpm load -- --spawn-server --games 50 --minutes 3 --rejoin-storm 60
+pnpm load -- --spawn-server --games 50 --minutes 3 --rejoin-storm 120 --rejoin-from-zero
+pnpm load -- --spawn-server --games 50 --minutes 30 --slow-clients 10
+```
+
+- **`--ramp a,b,c`** adds games to the same server step by step, each step
+  `--minutes` long, and measures each step on its own. A table gives per step
+  the players, server CPU, RSS, heap, loop delay p99, turn pass, lateness p95
+  and max, order to turn p95 and client loop delay p99, and flags the first
+  step where lateness p95 passes +20 ms or the server's loop delay p99 passes
+  50 ms as saturated. A step whose client loop p99 passes 20 ms is marked
+  "clients late": add client processes before trusting it.
+- **`--rejoin-storm <s>`**: after `s` seconds, every client drops its socket
+  without a close frame, connects again, says `hello` and sends `rejoin` with
+  its token and the first tick it did not receive (with `--rejoin-from-zero`,
+  tick 0, as a reloaded page without a snapshot). It retries on
+  `token_in_use` after 1 s, as the protocol asks. The tool reports the time
+  from the drop to holding the turn the server had closed last (p50, p95,
+  max) and fails if a client did not rejoin, or if a turn was lost, reordered
+  or came back with other orders than before (the "Changed" column, which
+  compares every turn across the clients of a game).
+- **`--slow-clients <p>`**: `p` % of the clients, spread over the games, stop
+  reading their socket once their game starts, like a frozen tab, so that what
+  the server sends them piles up. They are left out of the turn statistics,
+  and the server's RSS and heap are printed over time (every
+  `--sample-seconds`, 10 by default; always in `--json`). The kernel buffers
+  of a local socket hold the first megabytes, so the run must last long
+  enough to fill them.
 
 A 10-second run of 2 games of 8 players is part of `pnpm test`
 ([`bench/test/load.test.ts`](../bench/test/load.test.ts)): every client must
