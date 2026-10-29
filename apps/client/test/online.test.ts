@@ -9,6 +9,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   OnlineClient,
+  fullDelay,
   retryDelay,
   socketUrl,
   type OnlineEvents,
@@ -27,7 +28,35 @@ describe("socketUrl", () => {
 
 describe("retryDelay", () => {
   it("backs off exponentially up to ten seconds", () => {
-    expect([0, 1, 2, 3, 10].map(retryDelay)).toEqual([500, 1000, 2000, 4000, 10_000]);
+    expect([0, 1, 2, 3, 10].map((attempt) => retryDelay(attempt, () => 0.5))).toEqual([
+      500, 1000, 2000, 4000, 10_000,
+    ]);
+  });
+
+  it("stays within half to one and a half times the base delay", () => {
+    expect(retryDelay(2, () => 0)).toBe(1000);
+    expect(retryDelay(2, () => 0.999999)).toBeLessThanOrEqual(3000);
+    for (let i = 0; i < 200; i++) {
+      const delay = retryDelay(20);
+      expect(delay).toBeGreaterThanOrEqual(5000);
+      expect(delay).toBeLessThanOrEqual(15_000);
+    }
+  });
+});
+
+describe("fullDelay", () => {
+  it("starts at 15 s and doubles up to 60 s, jitter aside", () => {
+    expect([0, 1, 2, 9].map((attempt) => fullDelay(attempt, () => 0.5))).toEqual([
+      15_000, 30_000, 60_000, 60_000,
+    ]);
+  });
+
+  it("stays within half to one and a half times the base delay", () => {
+    for (let i = 0; i < 200; i++) {
+      const delay = fullDelay(0);
+      expect(delay).toBeGreaterThanOrEqual(7500);
+      expect(delay).toBeLessThanOrEqual(22_500);
+    }
   });
 });
 
@@ -116,6 +145,7 @@ function client(events: OnlineEvents = {}) {
       return socket;
     },
     setTimer: (callback, ms) => timers.push({ callback, ms }),
+    random: () => 0.5,
     events: {
       status: (status, retry) =>
         log.push(retry === undefined ? status : `${status}:${String(retry)}`),
@@ -545,6 +575,22 @@ describe("OnlineClient", () => {
     welcomed().drop(CloseCode.banned);
     expect(log.at(-1)).toBe("banned");
     expect(timers).toEqual([]);
+  });
+
+  it("says the server is full on close 4006 and tries again, ever more slowly", () => {
+    client();
+    welcomed().drop(CloseCode.full);
+    expect(log.at(-1)).toBe("full:15000");
+    expect(timers.at(-1)?.ms).toBeGreaterThanOrEqual(15_000);
+    timers.shift()?.callback();
+    latest().drop(CloseCode.full);
+    expect(log.at(-1)).toBe("full:30000");
+    for (let i = 0; i < 5; i++) {
+      timers.shift()?.callback();
+      latest().drop(CloseCode.full);
+    }
+    expect(log.at(-1)).toBe("full:60000");
+    expect(sockets.length).toBeGreaterThan(5);
   });
 
   it("sends a report of another player (R-MODE-06)", () => {

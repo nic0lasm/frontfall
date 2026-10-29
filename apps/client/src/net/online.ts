@@ -14,6 +14,8 @@ import {
 } from "@frontfall/protocol";
 
 const MAX_RETRY_DELAY_MS = 10_000;
+const FULL_RETRY_DELAY_MS = 15_000;
+const MAX_FULL_RETRY_DELAY_MS = 60_000;
 
 /** WebSocket URL next to the page, so the game works under any path prefix. */
 export function socketUrl(page: string): string {
@@ -24,8 +26,19 @@ export function socketUrl(page: string): string {
   return url.href;
 }
 
-export function retryDelay(attempt: number): number {
-  return Math.min(MAX_RETRY_DELAY_MS, 500 * 2 ** attempt);
+/** Spreads a delay over [0.5, 1.5) times itself, so pages do not come back in waves. */
+function jitter(base: number, random: () => number): number {
+  return Math.round(base * (0.5 + random()));
+}
+
+/** Delay before reconnecting after a network fault: exponential, then jittered. */
+export function retryDelay(attempt: number, random: () => number = Math.random): number {
+  return jitter(Math.min(MAX_RETRY_DELAY_MS, 500 * 2 ** attempt), random);
+}
+
+/** Delay before trying again when the server is full: 15 s, doubling up to 60 s, jittered. */
+export function fullDelay(attempt: number, random: () => number = Math.random): number {
+  return jitter(Math.min(MAX_FULL_RETRY_DELAY_MS, FULL_RETRY_DELAY_MS * 2 ** attempt), random);
 }
 
 export type LobbyState = Extract<ServerMessage, { type: "lobby" }>;
@@ -38,6 +51,8 @@ export type ConnectionStatus =
   | "online"
   /** The connection dropped; a new attempt starts after `retryInMs`. */
   | "offline"
+  /** The server holds all the connections it serves well; a new attempt starts after `retryInMs`. */
+  | "full"
   /** The server speaks another protocol version: the page must be reloaded. */
   | "outdated"
   /**
@@ -87,6 +102,8 @@ export interface OnlineOptions {
   events: OnlineEvents;
   createSocket?: (url: string) => SocketLike;
   setTimer?: (callback: () => void, ms: number) => unknown;
+  /** Source of the reconnect jitter, in [0, 1). */
+  random?: () => number;
 }
 
 /**
@@ -292,8 +309,10 @@ export class OnlineClient {
         this.options.events.status?.("banned");
         return;
       }
-      const delay = retryDelay(this.attempt++);
-      this.options.events.status?.("offline", delay);
+      const random = this.options.random ?? Math.random;
+      const full = code === CloseCode.full;
+      const delay = full ? fullDelay(this.attempt++, random) : retryDelay(this.attempt++, random);
+      this.options.events.status?.(full ? "full" : "offline", delay);
       this.setTimer(() => {
         // Closed by the page during the wait: no new connection.
         if (!this.closedByUser) this.open();

@@ -376,17 +376,20 @@ function warnIfUnsupported(): void {
  */
 function showConnection(state: ConnectionStatus, retryInMs?: number): void {
   const current = document.querySelector("#connection-status");
-  if (state !== "offline" && state !== "connecting") {
+  if (state !== "offline" && state !== "full" && state !== "connecting") {
     current?.remove();
     return;
   }
   // A notice that matters more, such as the end of the game, stays.
   if (!current && document.querySelector(".notice")) return;
   const notice = current ?? h("p", { class: "notice", id: "connection-status", role: "status" });
+  const seconds = Math.ceil((retryInMs ?? 0) / 1000);
   notice.textContent =
     state === "offline"
-      ? t("status.disconnected", { seconds: Math.ceil((retryInMs ?? 0) / 1000) })
-      : t("status.connecting");
+      ? t("status.disconnected", { seconds })
+      : state === "full"
+        ? t("status.full", { seconds })
+        : t("status.connecting");
   if (!current) document.body.append(notice);
 }
 
@@ -564,6 +567,7 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
       status(state, retryInMs) {
         if (state === "connecting") room.connecting();
         if (state === "offline") room.connecting(retryInMs ?? 0);
+        if (state === "full") room.full(retryInMs ?? 0);
         // In a game, the lobby is gone: the notice says the turns stopped, and why.
         if (game) showConnection(state, retryInMs);
         if (state === "outdated") {

@@ -341,6 +341,11 @@ export class LobbyScreen {
     else this.show("status.disconnected", { seconds: Math.ceil(retryInMs / 1000) });
   }
 
+  /** The server is full: the page tries again by itself in `retryInMs`. */
+  full(retryInMs: number): void {
+    this.show("status.full", { seconds: Math.ceil(retryInMs / 1000) });
+  }
+
   /** The server runs a newer version: this page cannot play until it reloads. */
   outdated(): void {
     this.lastLobby = undefined;

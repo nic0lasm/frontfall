@@ -3,6 +3,7 @@
   "status.waiting": "En attente de joueurs {players}/{capacity}",
   "status.starting": "Début dans {seconds} s, {players}/{capacity}",
   "status.disconnected": "Déconnecté, nouvelle tentative dans {seconds} s",
+  "status.full": "Le serveur est plein pour le moment. Nouvel essai dans {seconds} s.",
   "status.outdated": "Une nouvelle version est en ligne : rechargez la page",
   "status.refused": "{message}",
   "lobby.players.one": "{count} joueur",
