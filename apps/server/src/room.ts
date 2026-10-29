@@ -22,6 +22,12 @@ import { TurnLog } from "./turn-log.ts";
 /** The connection of one player, as the room sees it. */
 export interface Peer {
   send(frame: Frame): void;
+  /**
+   * Sends the frames of a catch-up, then `last` if any. A connection may pace
+   * them by what the client reads; the frames must then run on to the end of
+   * the log, and live turns it would get meanwhile are covered by them.
+   */
+  replay?(frames: Iterable<Frame>, last?: Frame): void;
   /** Asks the connection to prove it is alive, and drops it if it does not answer. */
   probe(): void;
 }
@@ -319,11 +325,16 @@ export class Room {
       return undefined;
     }
     peer.send(this.startedMessage(seat));
-    for (const frame of this.log.frames(Math.min(from, this.log.length))) peer.send(frame);
     // Replaying from the first turn rebuilds the game from scratch: the hashes
     // it reports next decide afresh. Otherwise the client keeps its old state.
     if (from === 0) this.desyncs.delete(seat);
     const desync = this.desyncs.get(seat);
+    const frames = this.log.frames(Math.min(from, this.log.length));
+    if (peer.replay) {
+      peer.replay(frames, desync);
+      return undefined;
+    }
+    for (const frame of frames) peer.send(frame);
     if (desync !== undefined) peer.send(desync);
     return undefined;
   }

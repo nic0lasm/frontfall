@@ -70,4 +70,16 @@ describe("TurnLog", () => {
     expect(refused.length).toBe(0);
     expect(new TurnLog().load(new Uint8Array(), new Uint32Array())).toBe(true);
   });
+
+  it("runs on to the turns logged while its frames are read", () => {
+    const log = new TurnLog();
+    for (let tick = 0; tick < 5; tick++) log.append([]);
+    const ticks: number[] = [];
+    for (const frame of log.frames(0, 3)) {
+      const decoded = decodeFrame(frame);
+      if (decoded.kind === "turns") ticks.push(...decoded.turns.map((turn) => turn.tick));
+      if (log.length < 9) log.append([]);
+    }
+    expect(ticks).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  });
 });

@@ -71,15 +71,19 @@ export class TurnLog {
     return true;
   }
 
-  /** Frames carrying every turn from `from` on, at most `perFrame` turns each. */
+  /**
+   * Frames carrying every turn from `from` on, at most `perFrame` turns each.
+   * Read lazily, they run on to the turns logged meanwhile.
+   */
   *frames(from: number, perFrame = 2000): Generator<Uint8Array> {
-    for (let start = from; start < this.count; start += perFrame) {
+    for (let start = from; start < this.count;) {
       const end = Math.min(this.count, start + perFrame);
       const bodies: Uint8Array[] = [];
       for (let tick = start; tick < end; tick++) {
         bodies.push(this.bytes.subarray(this.offsets[tick], this.offsets[tick + 1]));
       }
       yield encodeTurnsFrame(start, bodies);
+      start = end;
     }
   }
 }

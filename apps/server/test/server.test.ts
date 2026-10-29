@@ -43,7 +43,14 @@ afterEach(async () => {
 });
 
 async function start(options: Partial<ServerOptions> = {}): Promise<string> {
-  server = createGameServer({ staticRoot, version: "abc123", drainMs: 0, ...options });
+  server = createGameServer({
+    staticRoot,
+    version: "abc123",
+    drainMs: 0,
+    // Most tests read the list right after a change.
+    gameListMs: 0,
+    ...options,
+  });
   const http = server.http;
   await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
   return `127.0.0.1:${String((http.address() as AddressInfo).port)}`;
@@ -1046,11 +1053,35 @@ describe("WebSocket", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("refuses connections beyond the server-wide cap", async () => {
+  it("refuses connections beyond the server-wide cap with a code saying the server is full", async () => {
     const host = await start({ maxConnections: 1 });
     const first = open(host);
     await opened(first.socket);
-    await expect(opened(open(host).socket)).rejects.toThrow("503");
+    expect(await closed(open(host).socket)).toBe(CloseCode.full);
+    expect(server?.metrics.refused.get({ reason: "connections" })).toBe(1);
+  });
+
+  it("turns new players away once full, and still lets a player back into their game", async () => {
+    const host = await start({ maxPlayers: 2 });
+    const alice = await player(host, "Alice");
+    alice.send({ type: "create" });
+    const { game } = await alice.next("lobby");
+    const bob = await player(host, "Bob");
+    bob.send({ type: "join", game });
+    await bob.next("lobby");
+    alice.send({ type: "start" });
+    const { token } = await alice.next("started");
+    // The count is taken at the next tick.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const carol = await player(host, "Carol");
+    carol.send({ type: "play" });
+    expect((await carol.next("error")).code).toBe("too_many_games");
+    alice.socket.close();
+    await closed(alice.socket);
+    const back = await player(host, "Alice");
+    back.send({ type: "rejoin", token, from: 0 });
+    await back.next("started");
+    expect((await back.next("turns")).turns[0]?.tick).toBe(0);
   });
 
   it("caps the number of games open at once", async () => {
@@ -1299,7 +1330,8 @@ describe("WebSocket", () => {
     await bob.next("lobby");
 
     // No close frame, as when a phone goes to sleep.
-    alice.socket.terminate();
+    alice.socket.close();
+    await closed(alice.socket);
     const back = await player(host, "Alice");
     back.send({ type: "rejoin", token, from: 0 });
     const lobby = await back.next("lobby");

@@ -107,6 +107,8 @@ const server = createGameServer({
   })),
   ...optionalNumber("FRONTFALL_MAX_GAMES", (maxRooms) => ({ maxRooms })),
   ...optionalNumber("FRONTFALL_MAX_CONNECTIONS", (maxConnections) => ({ maxConnections })),
+  ...optionalNumber("FRONTFALL_MAX_PLAYERS", (maxPlayers) => ({ maxPlayers })),
+  ...optionalNumber("FRONTFALL_MAX_LOG_MIB", (mib) => ({ maxLogBytes: mib * 2 ** 20 })),
   drainMs: drainSeconds * 1000,
 });
 

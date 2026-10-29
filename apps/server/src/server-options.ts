@@ -26,6 +26,12 @@ export interface ServerOptions {
   /** Games not yet started, public or private, that one address may hold. */
   maxLobbiesPerAddress?: number;
   maxRooms?: number;
+  /** How long the public list of games is reused before it is built again; 1 s by default. */
+  gameListMs?: number;
+  /** Players seated at once; new ones get `too_many_games` beyond, those of running games still rejoin. */
+  maxPlayers?: number;
+  /** Bytes all turn logs may take together before new players are turned away. */
+  maxLogBytes?: number;
   /** Bots the host of a private game may add, within the map's player count. */
   maxBots?: number;
   /** /healthz fails once no turn has been closed for this long. */
@@ -95,5 +101,6 @@ export const DEFAULT_GAME: GameSettings = {
   lobbyTimeoutMs: 10 * 60 * 1000,
   maxOrdersPerTurn: 10,
   seatsPerAddress: 3,
-  maxLogBytes: 64 * 1024 * 1024,
+  // A busy 4-hour game logs about 2 MiB; the order limits allow ten times more.
+  maxLogBytes: 16 * 1024 * 1024,
 };

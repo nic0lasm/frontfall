@@ -15,6 +15,10 @@ export const MAX_LISTED_GAMES = 100;
 
 export interface DirectoryOptions {
   maxRooms: number;
+  /** Players seated at once, in every game; beyond, no new player is let in. */
+  maxPlayers?: number;
+  /** Bytes the turn logs of every game may take together; beyond, no new player is let in. */
+  maxLogBytes?: number;
   /** Games not yet started, public or private, that one owner may hold. */
   maxLobbiesPerOwner?: number;
   /** Public games opened by "play": they start on their own after a countdown. */
@@ -34,6 +38,9 @@ export class Directory {
   private readonly rooms = new Map<string, Room>();
   /** When each room opened, to list older games first among equals. */
   private readonly openedAt = new WeakMap<Room, number>();
+  /** Players seated and turn log bytes in every game, as of the last tick. */
+  private seated = 0;
+  private logBytes = 0;
   private opened = 0;
 
   constructor(private readonly options: DirectoryOptions) {}
@@ -137,7 +144,10 @@ export class Directory {
       this.options.observer ?? {},
       now,
     );
-    if (room) this.rooms.set(room.id, room);
+    if (room) {
+      this.rooms.set(room.id, room);
+      this.openedAt.set(room, this.opened++);
+    }
     return room;
   }
 
@@ -159,12 +169,43 @@ export class Directory {
     return undefined;
   }
 
-  /** Advances every game by one tick and forgets the finished ones. */
-  update(now: number): void {
+  /**
+   * Whether the server holds all the players it can serve well: new players
+   * are turned away, those of a game under way still come back. Counted at
+   * each tick, so a burst of arrivals may overshoot by a tick's worth.
+   */
+  get full(): boolean {
+    return (
+      this.seated >= (this.options.maxPlayers ?? Infinity) ||
+      this.logBytes >= (this.options.maxLogBytes ?? Infinity)
+    );
+  }
+
+  /** Players seated in every game, as of the last tick. */
+  get players(): number {
+    return this.seated;
+  }
+
+  /**
+   * Advances games by one tick and forgets the finished ones: every game, or
+   * with `slice`, the share of them whose turn falls in that pass. Spread over
+   * a tick, the sends of many games never hold the server for long at once.
+   */
+  update(now: number, slice?: { index: number; of: number }): void {
     for (const [id, room] of this.rooms) {
+      if (slice && (this.openedAt.get(room) ?? 0) % slice.of !== slice.index) continue;
       room.update(now);
       if (room.state === "finished") this.rooms.delete(id);
     }
+    if (slice && slice.index !== 0) return;
+    let seated = 0;
+    let logBytes = 0;
+    for (const room of this.rooms.values()) {
+      seated += room.playerCount;
+      logBytes += room.log.byteLength;
+    }
+    this.seated = seated;
+    this.logBytes = logBytes;
   }
 
   /** Forgets games that finished between two ticks, such as a lobby everyone left. */

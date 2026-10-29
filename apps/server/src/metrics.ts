@@ -3,7 +3,11 @@ const TURN_BUCKETS = [0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1];
 
 type Labels = Record<string, string>;
 
+const NO_LABELS: Labels = {};
+
 function key(labels: Labels): string {
+  // Unlabelled counters are bumped for every message received.
+  if (labels === NO_LABELS) return "";
   return Object.entries(labels)
     .map(([name, value]) => `${name}="${value.replace(/["\\\n]/g, "\\$&")}"`)
     .join(",");
@@ -17,12 +21,12 @@ class Counter {
     readonly help: string,
   ) {}
 
-  inc(labels: Labels = {}, by = 1): void {
+  inc(labels: Labels = NO_LABELS, by = 1): void {
     const id = key(labels);
     this.values.set(id, (this.values.get(id) ?? 0) + by);
   }
 
-  get(labels: Labels = {}): number {
+  get(labels: Labels = NO_LABELS): number {
     return this.values.get(key(labels)) ?? 0;
   }
 
@@ -111,6 +115,14 @@ export class Metrics {
     "frontfall_rejected_messages_total",
     "Connections closed for a message, by reason.",
   );
+  readonly refused = new Counter(
+    "frontfall_refused_connections_total",
+    "WebSocket connections refused before the hello, by reason.",
+  );
+  readonly slowClients = new Counter(
+    "frontfall_slow_clients_total",
+    "Connections dropped for leaving too much unread.",
+  );
   readonly reports = new Counter(
     "frontfall_reports_total",
     "Reports of a player by another, by reason.",
@@ -122,7 +134,7 @@ export class Metrics {
   );
   readonly turnDuration = new Histogram(
     "frontfall_turn_duration_seconds",
-    "Time to close and send one turn of every running game.",
+    "Time of one pass of the turn timer, which closes and sends the turns of a tenth of the games.",
   );
 
   /** `extra` are lines rendered elsewhere, such as the usage counts. */
@@ -147,6 +159,8 @@ export class Metrics {
       ...this.rejoins.render(),
       ...this.messages.render(),
       ...this.rejected.render(),
+      ...this.refused.render(),
+      ...this.slowClients.render(),
       ...this.reports.render(),
       ...this.gameMinutes.render(),
       ...this.turnDuration.render(),

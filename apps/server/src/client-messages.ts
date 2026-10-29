@@ -229,6 +229,12 @@ export function messageHandler(ctx: MessageContext): {
           reply(session, "restarting");
           return;
         }
+        // A full server keeps serving the players it has: only newcomers wait.
+        if (ctx.games.full && message.type !== "rejoin") {
+          ctx.metrics.refused.inc({ reason: "players" });
+          reply(session, "too_many_games");
+          return;
+        }
         if (message.type === "play") {
           const name = gameName(message.name, session.name);
           enter(session, ctx.games.quickMatch(session.address, name), "too_many_games");

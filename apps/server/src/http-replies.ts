@@ -72,6 +72,17 @@ export function sendJson(response: ServerResponse, body: unknown, caching = "no-
     .end(JSON.stringify(body));
 }
 
+/** A JSON body and its ETag, worked out once for every request that gets it. */
+export interface CachedJson {
+  readonly text: string;
+  readonly etag: string;
+}
+
+export function cachedJson(body: unknown): CachedJson {
+  const text = JSON.stringify(body);
+  return { text, etag: `"${createHash("sha1").update(text).digest("base64url").slice(0, 16)}"` };
+}
+
 /**
  * A JSON answer with an ETag, so that a menu asking every few seconds gets
  * an empty 304 while nothing changed.
@@ -79,10 +90,9 @@ export function sendJson(response: ServerResponse, body: unknown, caching = "no-
 export function sendCachedJson(
   request: IncomingMessage,
   response: ServerResponse,
-  body: unknown,
+  body: CachedJson,
 ): void {
-  const text = JSON.stringify(body);
-  const etag = `"${createHash("sha1").update(text).digest("base64url").slice(0, 16)}"`;
+  const { text, etag } = body;
   const headers = { etag, "cache-control": "no-cache" };
   if (matchesEtag(request.headers["if-none-match"], etag)) {
     response.writeHead(304, headers).end();

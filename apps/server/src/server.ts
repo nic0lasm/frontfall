@@ -18,7 +18,14 @@ import { clientAddress, isLocalRequest, isLoopbackRequest } from "./address.ts";
 import { isAllowedOrigin } from "./origin.ts";
 import { AddressRate, TokenBucket } from "./rate-limit.ts";
 import type { RoomObserver } from "./room.ts";
-import { SECURITY_HEADERS, sendCachedJson, sendJson, serveStatic } from "./http-replies.ts";
+import {
+  cachedJson,
+  SECURITY_HEADERS,
+  sendCachedJson,
+  sendJson,
+  serveStatic,
+  type CachedJson,
+} from "./http-replies.ts";
 import {
   DEFAULT_GAME,
   DEFAULT_PING_INTERVAL_MS,
@@ -45,6 +52,23 @@ export { statusPage, type ServerStatus } from "./status-page.ts";
 
 /** Largest frame a client may send. Orders take a few bytes, hello a few dozen. */
 const MAX_PAYLOAD_BYTES = 1024;
+
+/**
+ * A client that leaves this much unread, a sleeping tab or a stalled network,
+ * is dropped: it rejoins from its last turn, and its backlog never weighs on the
+ * server. A 4-hour game sent whole takes about 1.5 MiB, in frames paced apart.
+ */
+const MAX_BUFFERED_BYTES = 4 * 2 ** 20;
+
+/** Passes of the turn timer in one tick, each over a share of the games. */
+const TURN_PASSES = 10;
+
+/**
+ * Players seated at once by default, and bytes of turn logs: what one core and
+ * the 512 MiB heap of the image serve with room to spare (docs/capacity.md).
+ */
+const DEFAULT_MAX_PLAYERS = 3000;
+const DEFAULT_MAX_LOG_BYTES = 192 * 2 ** 20;
 
 export interface GameServer {
   readonly http: Server;
@@ -73,6 +97,7 @@ export function createGameServer(options: ServerOptions): GameServer {
   const upgradeRate = options.upgradeRate ?? { perSecond: 0.5, burst: 40 };
   const stallAfterMs = options.stallAfterMs ?? 5000;
   const drainMs = options.drainMs ?? 20_000;
+  const gameListMs = options.gameListMs ?? 1000;
   /** End of the last pass of the turn timer, and whether close() has begun. */
   let lastTurnAt = performance.now();
   let stopping = false;
@@ -117,6 +142,8 @@ export function createGameServer(options: ServerOptions): GameServer {
   const maxBots = options.maxBots ?? 25;
   const games = new Directory({
     maxRooms: options.maxRooms ?? 500,
+    maxPlayers: options.maxPlayers ?? DEFAULT_MAX_PLAYERS,
+    maxLogBytes: options.maxLogBytes ?? DEFAULT_MAX_LOG_BYTES,
     maxLobbiesPerOwner: options.maxLobbiesPerAddress ?? 3,
     publicGame,
     privateGame,
@@ -192,6 +219,8 @@ export function createGameServer(options: ServerOptions): GameServer {
     if (!unanswered.has(socket)) unanswered.set(socket, now);
     socket.ping();
   };
+  /** The last public list sent, and when it was built. */
+  let gameList: { at: number; body: CachedJson } | undefined;
   const connectionsByAddress = new Map<string, number>();
   const upgrades = new AddressRate(upgradeRate.perSecond, upgradeRate.burst, Date.now());
 
@@ -241,7 +270,15 @@ export function createGameServer(options: ServerOptions): GameServer {
       return;
     }
     if (path === "/api/games") {
-      sendCachedJson(request, response, { games: games.publicGames(), running: running() });
+      // Every menu asks every few seconds: the list is built once a second at most.
+      const now = performance.now();
+      if (gameList === undefined || now - gameList.at >= gameListMs) {
+        gameList = {
+          at: now,
+          body: cachedJson({ games: games.publicGames(), running: running() }),
+        };
+      }
+      sendCachedJson(request, response, gameList.body);
       return;
     }
     if (path === "/api/status") {
@@ -291,12 +328,18 @@ export function createGameServer(options: ServerOptions): GameServer {
       return;
     }
     if (sockets.clients.size >= maxConnections) {
-      socket.end("HTTP/1.1 503 Service Unavailable\r\n\r\n");
+      // Opened and closed at once with a code the page understands: it says the
+      // server is full and waits longer, where a refused handshake looks like a network fault.
+      metrics.refused.inc({ reason: "connections" });
+      sockets.handleUpgrade(request, socket, head, (ws) => {
+        ws.close(CloseCode.full, "server full");
+      });
       return;
     }
     const address = clientAddress(request);
     const connections = connectionsByAddress.get(address) ?? 0;
     if (connections >= maxConnectionsPerAddress || !upgrades.take(address, Date.now())) {
+      metrics.refused.inc({ reason: "address" });
       socket.end("HTTP/1.1 429 Too Many Requests\r\n\r\n");
       return;
     }
@@ -332,6 +375,21 @@ export function createGameServer(options: ServerOptions): GameServer {
   const sessions = new Set<Session>();
 
   sockets.on("connection", (socket: WebSocket, request: IncomingMessage) => {
+    /** A catch-up under way: the frames left, and the messages held until its end. */
+    let replaying: { frames: Iterator<Frame>; held: Frame[] } | undefined;
+    // One frame at a time, the next once the last is handed to the network: a
+    // rejoin from the first turn of a long game never piles up in memory.
+    const pump = (): void => {
+      const current = replaying;
+      if (!current || socket.readyState !== socket.OPEN) return;
+      const next = current.frames.next();
+      if (next.done !== true) {
+        socket.send(next.value, pump);
+        return;
+      }
+      replaying = undefined;
+      for (const frame of current.held) socket.send(frame);
+    };
     const session: Session = {
       socket,
       address: clientAddress(request),
@@ -345,7 +403,22 @@ export function createGameServer(options: ServerOptions): GameServer {
       closing: false,
       peer: {
         send(frame) {
-          if (socket.readyState === socket.OPEN) socket.send(frame);
+          if (socket.readyState !== socket.OPEN) return;
+          if (replaying) {
+            // The catch-up runs on to the newest turn; other messages wait for its end.
+            if (typeof frame === "string") replaying.held.push(frame);
+            return;
+          }
+          if (socket.bufferedAmount > MAX_BUFFERED_BYTES) {
+            metrics.slowClients.inc();
+            socket.terminate();
+            return;
+          }
+          socket.send(frame);
+        },
+        replay(frames, last) {
+          replaying = { frames: frames[Symbol.iterator](), held: last === undefined ? [] : [last] };
+          pump();
         },
         probe() {
           const sentAt = Date.now();
@@ -399,12 +472,24 @@ export function createGameServer(options: ServerOptions): GameServer {
     });
   });
 
-  const ticker = setInterval(() => {
+  // Each pass closes the turns of a tenth of the games: every game still gets
+  // one turn per tick, and the server answers in between. Passes keep to a
+  // fixed schedule, so that the delays of timers never add up into slower games.
+  const passMs = 1000 / TICK_RATE / TURN_PASSES;
+  let pass = 0;
+  let passAt = performance.now();
+  let ticker: NodeJS.Timeout;
+  const turnPass = (): void => {
     const started = performance.now();
-    games.update(Date.now());
+    games.update(Date.now(), { index: pass % TURN_PASSES, of: TURN_PASSES });
+    pass++;
     lastTurnAt = performance.now();
     metrics.turnDuration.observe((lastTurnAt - started) / 1000);
-  }, 1000 / TICK_RATE);
+    // Late by more than a tick, as after a stall, the schedule starts afresh.
+    passAt = Math.max(passAt + passMs, lastTurnAt - passMs * TURN_PASSES);
+    ticker = setTimeout(turnPass, Math.max(0, passAt - lastTurnAt));
+  };
+  ticker = setTimeout(turnPass, passMs);
 
   /**
    * Games a restart would cut short: started, with a player connected or
@@ -631,7 +716,7 @@ export function createGameServer(options: ServerOptions): GameServer {
             logger.warn("reports_not_saved", { error: (error as Error).message });
           }
           clearInterval(heartbeat);
-          clearInterval(ticker);
+          clearTimeout(ticker);
           keepGames();
           games.stopAll("restart");
           for (const socket of sockets.clients) socket.close(1012, "server restarting");

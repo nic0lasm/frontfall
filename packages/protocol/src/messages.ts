@@ -45,6 +45,8 @@ export const CloseCode = {
   replaced: 4004,
   /** The operator of the server banned this address (R-MODE-06): do not reconnect. */
   banned: 4005,
+  /** The server holds as many players as it serves well: try again in a while. */
+  full: 4006,
 } as const;
 
 /** Error codes of the `error` message. */
