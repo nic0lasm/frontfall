@@ -57,12 +57,12 @@ export function attackPreview(
   return { target, troops, perTile, tiles, capGain: tiles * balance.popPerTile };
 }
 
-/** Gold a player earns each second from troops alone, trade left out (R-ECO-03, R-ECO-07). */
+/** Gold a player earns each second from the base income and troops, trade left out (R-ECO-03, R-ECO-07, B-GOLD-BASE). */
 export function goldPerSecond(
   player: Pick<PlayerView, "troops" | "workShare">,
   balance: Balance = DEFAULT_BALANCE,
 ): number {
   const workers = player.troops - soldiersOf(player);
   const earning = player.troops + workers * (balance.workGoldFactor - 1);
-  return (earning * balance.goldPerThousandTroops) / 1000;
+  return (earning * balance.goldPerThousandTroops) / 1000 + balance.goldBase;
 }

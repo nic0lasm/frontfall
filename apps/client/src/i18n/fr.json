@@ -304,6 +304,7 @@
   "diplo.eventLandmark": "{a} a pris {landmark} : {effect}",
   "diplo.eventLandmarkFrom": "{a} a pris {landmark} à {b} : {effect}",
   "feed.landmark": "{landmark} : {effect} pour qui l'occupe",
+  "feed.landmarks": "Monuments de cette carte : {names}. Pointez-en un pour voir ce qu'il apporte.",
   "landmark.gold": "20 % d'or en plus",
   "landmark.growth": "troupes 15 % plus rapides à grandir",
   "landmark.fortress": "les terres autour coûtent deux fois plus cher à prendre",

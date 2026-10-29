@@ -15,7 +15,7 @@ const TEXTS: Record<Language, Record<string, string>> = {
     workHint:
       "Share of your troops at home who work: {factor} times the gold of a soldier, but they neither attack nor defend.",
     goldRate: "+{rate}/s",
-    goldRateHint: "Gold your troops earn each second; trade comes on top.",
+    goldRateHint: "Gold you earn each second: the base income and your troops; trade comes on top.",
     previewTiles: "≈ {count} tiles",
     previewTile: "≈ {count} tile",
     previewSend: "{troops} soldiers, {cost} a tile",
@@ -31,7 +31,8 @@ const TEXTS: Record<Language, Record<string, string>> = {
     workHint:
       "Part de vos troupes à la maison qui travaillent : {factor} fois l'or d'un soldat, mais elles n'attaquent ni ne défendent.",
     goldRate: "+{rate}/s",
-    goldRateHint: "L'or que vos troupes rapportent chaque seconde, commerce en plus.",
+    goldRateHint:
+      "L'or que vous gagnez chaque seconde : le revenu de base et vos troupes, commerce en plus.",
     previewTiles: "≈ {count} cases",
     previewTile: "≈ {count} case",
     previewSend: "{troops} soldats, {cost} par case",

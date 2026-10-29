@@ -874,6 +874,8 @@ export class GameScreen {
   private showEnd(update: GameUpdate): void {
     // A solo game waits behind the end screen, so its record ends where the game did.
     if (!this.link) this.overlays.pause();
+    // The guide and the attacks in progress mean nothing once the game is decided.
+    this.element.classList.add("decided");
     // Fetched long before, unless the game ended within moments of its start.
     if (this.endScreen) this.openEnd(this.endScreen, update);
     else {

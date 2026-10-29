@@ -129,6 +129,18 @@ export class SoloGame {
     };
   }
 
+  /**
+   * The game as it stands, whole, without playing a tick: what a page shows
+   * of a game taken back from a snapshot while it waits in pause.
+   */
+  current(): GameUpdate {
+    const update = gameUpdate(this.game, this.you, this.labelSpace);
+    update.owners = this.game.territory.owners.slice();
+    update.changedTiles = new Int32Array(0);
+    update.changedOwners = new Uint16Array(0);
+    return update;
+  }
+
   /** Lowest id of the nations, or one past the last player when there are none. */
   get firstNation(): number {
     return this.nationIds[0] ?? Math.max(...this.players.map((player) => player.id)) + 1;

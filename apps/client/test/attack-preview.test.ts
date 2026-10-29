@@ -11,6 +11,7 @@ const balance = {
   traitorDefensePercent: 50,
   goldPerThousandTroops: 5,
   workGoldFactor: 4,
+  goldBase: 0,
 };
 
 function player(id: number, troops: number, tiles: number, workShare = 0): PlayerView {
@@ -66,6 +67,10 @@ describe("attack preview", () => {
     expect(attackPreview(update(players, { teammates: [3] }), 3, 50, balance)).toBeUndefined();
     const spawn = { ...update(players), phase: "spawn" } as GameUpdate;
     expect(attackPreview(spawn, 2, 50, balance)).toBeUndefined();
+  });
+
+  it("counts the base income every player earns (B-GOLD-BASE)", () => {
+    expect(goldPerSecond({ troops: 1000, workShare: 0 }, { ...balance, goldBase: 500 })).toBe(505);
   });
 
   it("splits soldiers and workers, and pays workers B-WORK-GOLD times", () => {

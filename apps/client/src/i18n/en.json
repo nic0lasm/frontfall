@@ -304,6 +304,7 @@
   "diplo.eventLandmark": "{a} took {landmark}: {effect}",
   "diplo.eventLandmarkFrom": "{a} took {landmark} from {b}: {effect}",
   "feed.landmark": "{landmark}: {effect} for whoever holds it",
+  "feed.landmarks": "Landmarks on this map: {names}. Point at one to see what it gives.",
   "landmark.gold": "20 % more gold",
   "landmark.growth": "troops grow 15 % faster",
   "landmark.fortress": "the land around it costs twice as much to take",

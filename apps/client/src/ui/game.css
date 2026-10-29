@@ -242,6 +242,11 @@
   padding: 6px 8px;
 }
 
+.decided .guide,
+.decided .attack-list {
+  display: none;
+}
+
 .attack-list {
   display: grid;
   gap: 4px;

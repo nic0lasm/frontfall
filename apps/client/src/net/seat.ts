@@ -96,6 +96,17 @@ export function awaySeat(now = Date.now()): AwaySeat | undefined {
   return now - seat.seenAt < SEAT_HELD_MS ? undefined : seat;
 }
 
+/**
+ * How long until a seat left by a closed tab stops looking held by another
+ * tab, when it does now: the menu offers the game again then.
+ */
+export function seatHeldFor(now = Date.now()): number | undefined {
+  const seat = readAway();
+  if (!seat || now - seat.seenAt >= SEAT_KEPT_MS || seat.seenAt > now) return undefined;
+  const left = SEAT_HELD_MS - (now - seat.seenAt);
+  return left > 0 ? left : undefined;
+}
+
 export function forgetSeat(): void {
   try {
     storage()?.removeItem(KEY);

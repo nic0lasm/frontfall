@@ -400,6 +400,9 @@ test("a reload takes a solo game back where it was, and leaving forgets it", asy
   // Taken back paused, for the player to find their bearings, from the snapshot and not the start.
   const paused = page.locator(".overlay.paused");
   await expect(paused).toBeVisible();
+  // The game shows as it stands while it waits: no map still loading behind the pause.
+  await expect(page.locator(".goal-clock")).toHaveText(/^\d+:\d\d /);
+  await expect(page.getByText("Loading the map")).toHaveCount(0);
   await paused.click();
   await expect(paused).toHaveCount(0);
   await expect(page.locator(".goal-clock")).toHaveText(/^\d+:\d\d /);

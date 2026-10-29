@@ -13,7 +13,7 @@ import {
 import { fetchMaps, warmMap, type MapInfo } from "./game/maps.ts";
 import { readReplayFile, replayFile, replayFileName } from "./game/replay-file.ts";
 import { BUILD } from "./net/build.ts";
-import { awaySeat, forgetSeat, saveSeat, seatIn, touchSeat } from "./net/seat.ts";
+import { awaySeat, forgetSeat, saveSeat, seatHeldFor, seatIn, touchSeat } from "./net/seat.ts";
 import {
   forgetSnapshot,
   forgetSoloGame,
@@ -385,28 +385,44 @@ function offerResume(kind: "online" | "solo", onResume: () => void, onDrop: () =
 }
 
 /**
+ * Offers the online game a closed tab left, if the server keeps its seat. A
+ * seat another tab seems to hold is offered again once that doubt is over.
+ */
+function offerAwaySeat(): boolean {
+  const seat = awaySeat();
+  if (!seat) {
+    const held = seatHeldFor();
+    if (held !== undefined) {
+      const shown = menu;
+      setTimeout(() => {
+        if (menu === shown && !document.querySelector(".notice")) offerAwaySeat();
+      }, held + 250);
+    }
+    return false;
+  }
+  offerResume(
+    "online",
+    () => {
+      void storedSnapshot(seat.game).then((snapshot) => {
+        saveSeat(seat.game, seat.token);
+        goOnline({ type: "resume", game: seat.game, token: seat.token }, setup, snapshot);
+      });
+    },
+    () => {
+      forgetSeat();
+      void forgetSnapshot();
+    },
+  );
+  return true;
+}
+
+/**
  * The menu, and a game left behind to take back: a reload goes straight
  * back to a solo game, a page opened again asks first.
  */
 function showMenuOrResume(): void {
   showMenu();
-  const seat = awaySeat();
-  if (seat) {
-    offerResume(
-      "online",
-      () => {
-        void storedSnapshot(seat.game).then((snapshot) => {
-          saveSeat(seat.game, seat.token);
-          goOnline({ type: "resume", game: seat.game, token: seat.token }, setup, snapshot);
-        });
-      },
-      () => {
-        forgetSeat();
-        void forgetSnapshot();
-      },
-    );
-    return;
-  }
+  if (offerAwaySeat()) return;
   void storedSoloGame().then((saved) => {
     // The player went on in the meantime.
     if (!saved || !menu) return;

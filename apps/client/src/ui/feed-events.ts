@@ -139,7 +139,17 @@ export class FeedWatcher {
     }
     this.threat = threat;
     // R-LAND-01: what each landmark of the map gives, once, as the game opens.
-    if (!this.started) {
+    // Several at once would push one another out of the feed: they go in one line.
+    if (!this.started && this.landmarks.length > 1) {
+      entries.push({
+        key: "landmarkIntro",
+        tone: "info",
+        text: t("feed.landmarks", {
+          names: this.landmarks.map((landmark) => landmark.name[getLanguage()]).join(", "),
+        }),
+        mine: false,
+      });
+    } else if (!this.started) {
       this.landmarks.forEach((landmark, index) => {
         entries.push({
           key: `landmarkIntro:${String(index)}`,

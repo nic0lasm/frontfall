@@ -50,6 +50,26 @@ describe("landLost", () => {
 });
 
 describe("FeedWatcher", () => {
+  it("presents several landmarks in one line, so that they do not push one another out", () => {
+    const landmark = (id: string, tile: number, en: string) => ({
+      id,
+      tile,
+      effect: "gold" as const,
+      name: { en, fr: en },
+    });
+    const watcher = new FeedWatcher(true, [
+      landmark("a", 1, "The Louvre"),
+      landmark("b", 2, "Eiffel Tower"),
+      landmark("c", 3, "The Pencil"),
+      landmark("d", 4, "Parc des Princes"),
+    ]);
+    const opening = watcher.observe(update(), new Map(), mine);
+    expect(opening).toHaveLength(1);
+    for (const name of ["The Louvre", "Eiffel Tower", "The Pencil", "Parc des Princes"]) {
+      expect(opening[0]?.text).toContain(name);
+    }
+  });
+
   it("presents the landmarks as the game opens, then tells who takes them (R-LAND)", () => {
     const louvre = {
       id: "louvre",

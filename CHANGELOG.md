@@ -4,6 +4,14 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- **The gold a second counts the base income.** The bar showed +13/s while you earned over 500: it left out the 500 gold every player gets. It now counts it, and its tooltip says so.
+- **A game taken back shows itself at once.** After a reload, the solo game waiting in pause now shows its map, figures and first-steps card as they stand, instead of an empty screen and "Loading the map…" until you pressed P. The game is also kept every 15 seconds instead of 30.
+- **An online game offered back sooner.** Reopen the game within 15 seconds of closing a tab and the menu used to offer nothing; it now offers "Resume" as soon as the seat is free.
+- **Landmarks announced together.** On Paris and Lyon, the five landmarks of the map open the game in one line of the feed instead of pushing each other out.
+- **A clean end screen.** The first-steps card and the attack line no longer stay behind the victory window.
+
 ## [0.9.0] - 2026-10-29
 
 Smooth and quick: a lighter picture for phones and dense screens, orders that answer at once, new sounds and a score, a guided start and games you can take back, two city maps, and a server that holds thousands of players.

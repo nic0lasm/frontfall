@@ -743,6 +743,22 @@ describe("SoloGame online", () => {
     expect(resumed.snapshot().history).toEqual([spawn]);
   });
 
+  it("shows a game taken back whole, without playing a tick", () => {
+    const tile = firstLand(online.map);
+    const spawn = { tick: 0, orders: [{ player: 1, order: { type: "spawn" as const, tile } }] };
+    const original = newGame(online);
+    original.playTurns([
+      spawn,
+      ...Array.from({ length: 50 }, (_, i) => ({ tick: 1 + i, orders: [] })),
+    ]);
+    const resumed = newGame({ ...online, snapshot: original.snapshot() });
+    const update = resumed.current();
+    expect(update.tick).toBe(51);
+    expect(resumed.game.tick).toBe(51);
+    expect(update.owners?.[tile]).toBe(1);
+    expect(update.players.find((p) => p.id === 1)?.tiles).toBeGreaterThan(0);
+  });
+
   it("starts from the first tick when its snapshot cannot be loaded", () => {
     const game = newGame(online);
     game.playTurns(Array.from({ length: 60 }, (_, tick) => ({ tick, orders: [] })));
