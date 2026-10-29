@@ -1,3 +1,4 @@
+import type { Landmark } from "./landmarks.ts";
 import type { Topology } from "./topology.ts";
 
 /** What a tile is made of (R-MAP-01, R-MAP-02). Stored as one byte per tile. */
@@ -17,14 +18,17 @@ const HIGHEST_KIND: number = TileKind.Impassable;
 export class Terrain {
   readonly topology: Topology;
   readonly kinds: Uint8Array;
+  /** Landmarks of the map (R-LAND-01), in the order of its manifest; none on most maps. */
+  readonly landmarks: readonly Landmark[];
   private landmasses: Int32Array | undefined;
   private ocean: Uint8Array | undefined;
   private ownable = -1;
   private readonly around = new Int32Array(4);
 
-  constructor(topology: Topology, kinds: Uint8Array) {
+  constructor(topology: Topology, kinds: Uint8Array, landmarks: readonly Landmark[] = []) {
     this.topology = topology;
     this.kinds = kinds;
+    this.landmarks = landmarks;
     if (kinds.length !== topology.size) {
       throw new RangeError(
         `terrain has ${String(kinds.length)} tiles, the map ${String(topology.size)}`,

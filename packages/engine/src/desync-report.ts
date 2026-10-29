@@ -139,8 +139,10 @@ export function readGame(report: Record<string, unknown>): RecordedGame {
   const balance = readObject(report.balance, "balance");
   for (const key of Object.keys(DEFAULT_BALANCE) as (keyof Balance)[]) {
     const expected = DEFAULT_BALANCE[key];
-    // Records from before capital mode leave its values out: they take the defaults.
-    if (key.startsWith("capital") && balance[key] === undefined) balance[key] = expected;
+    // Records from before capital mode or landmarks leave their values out: they take the defaults.
+    if ((key.startsWith("capital") || key.startsWith("landmark")) && balance[key] === undefined) {
+      balance[key] = expected;
+    }
     const actual = balance[key];
     const ok = Array.isArray(expected)
       ? Array.isArray(actual) &&

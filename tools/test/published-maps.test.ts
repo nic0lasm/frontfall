@@ -209,6 +209,20 @@ describe("city maps", () => {
     expect(magnitude(tile)).toBeLessThan(MOUNTAINS_FROM);
   });
 
+  it.each([
+    ["paris", ["louvre", "parc-des-princes", "sacre-coeur", "eiffel-tower", "arc-de-triomphe"]],
+    ["lyon", ["crayon", "ol-stadium", "fourviere", "edouard-herriot"]],
+  ])("places %s's landmarks on land a player can own (R-LAND-01)", (id, ids) => {
+    const map = cities.find((m) => m.definition.id === id);
+    const landmarks = map?.manifest.landmarks ?? [];
+    expect(landmarks.map((l) => l.id)).toEqual(ids);
+    for (const landmark of landmarks) {
+      const tile = map?.tiles[landmark.tile] as number;
+      expect(isLand(tile), landmark.id).toBe(true);
+      expect(magnitude(tile), landmark.id).toBeLessThan(MAGNITUDE_IMPASSABLE);
+    }
+  });
+
   it("keeps the Île de la Cité and the Presqu'île as plains", () => {
     expect(at("paris", 2.3499, 48.853)).toBe(TILE_LAND);
     expect(at("lyon", 4.832, 45.7578)).toBe(TILE_LAND);

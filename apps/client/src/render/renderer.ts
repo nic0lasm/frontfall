@@ -25,8 +25,9 @@ export interface UnitMark {
 export interface StructureMark {
   readonly x: number;
   readonly y: number;
-  /** A building, or a player's capital (R-CAP-01). */
-  readonly type: "city" | "palace" | "fort" | "port" | "silo" | "airDefense" | "capital";
+  /** A building, a player's capital (R-CAP-01), or a landmark of the map (R-LAND-01). */
+  readonly type:
+    "city" | "palace" | "fort" | "port" | "silo" | "airDefense" | "capital" | "landmark";
   /** Colour of the player who owns it, for the plate; white when left out. */
   readonly color?: string;
   /** Drawn faded while it is being built. */

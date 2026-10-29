@@ -115,6 +115,11 @@ with these bytes.
 }
 ```
 
+- `landmarks`, on the city maps only, lists their landmarks (R-LAND-01):
+  each has an `id`, a `name` in every language of the interface, an
+  `effect` (`gold`, `growth`, `fortress`, `trade`, `shield` or `assault`)
+  and the `tile` it stands on, land a player can own. A reader that does not
+  know the field ignores it.
 - `version` is the version of this map, not of the format. Any change to the
   terrain bytes needs a new version; CI enforces it (see [`maps.md`](maps.md)).
   A change to the nations alone needs one too: a replay only plays on the

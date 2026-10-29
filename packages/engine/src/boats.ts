@@ -103,7 +103,7 @@ export function installBoats(game: Game): void {
       return;
     }
     const defender = owner === NEUTRAL ? undefined : game.player(owner);
-    const cost = captureCost(game, boat.target, defender);
+    const cost = captureCost(game, boat.target, defender, player.id);
     // Too few troops to take the beach: they are lost.
     if (boat.troops < cost) return;
     if (defender) defender.troops -= defenderLoss(game, boat.target, defender);

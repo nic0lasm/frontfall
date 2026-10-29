@@ -149,6 +149,20 @@ A special rule (`R-MODE-08`), off by default, in private and solo games. Every p
 - **R-CAP-05** A capital is under threat while a player attacking its owner holds land within `B-CAPITAL-ALERT` of it. Interfaces warn its owner, and name the attacker.
 - **R-CAP-06** Capitals stand only after `B-CAPITAL-GRACE` of play: before, a capital whose tile is taken simply moves to the tile its owner holds closest to it, at no cost, and no capital is under threat. Interfaces count down to the moment capitals stand.
 
+### Landmarks
+
+Some maps, Paris and Lyon, have landmarks: famous places of the city, each with an effect of its own.
+
+- **R-LAND-01** A map may list landmarks, each on a tile of land a player can own, with a name and one effect. Every player sees every landmark. A landmark belongs to whoever holds its tile, and changes hands with it, by attack, landing, encirclement or a missile; nobody holds it before.
+- **R-LAND-02** While a player holds a landmark, they get its effect, and once more for each other landmark of the same effect they hold:
+  - gold: `B-LANDMARK-GOLD` more gold from their troops and workers (`R-ECO-03`, `R-ECO-07`);
+  - growth: their troops grow `B-LANDMARK-GROWTH` faster (`R-ECO-02`), never past the cap;
+  - fortress: attackers pay `B-LANDMARK-FORTRESS` of the usual price for the holder's tiles within `B-LANDMARK-FORTRESS-RADIUS` of it; where a fort or a capital covers the same tile, only the strongest applies (`R-BUILD-03`, `R-CAP-02`);
+  - trade: `B-LANDMARK-TRADE` more gold from each trade ship that pays them (`R-UNIT-03`);
+  - shield: on the tick a missile of a player who is neither the holder nor their ally first flies within `B-LANDMARK-SHIELD-RADIUS` of it, it stops the missile at `B-LANDMARK-SHIELD-CHANCE`, drawn from the game's seed, after any air defense has tried (`R-BUILD-05`); every player is told, as for an air defense;
+  - assault: each tile the holder's attacks and ships take costs them `B-LANDMARK-ASSAULT` less (`R-ATTACK-03`).
+- **R-LAND-03** Every player is told when a landmark changes hands, who took it and from whom.
+
 ## 10. Fairness and determinism
 
 - **R-FAIR-01** Every client simulates the same game from the same seed and the same ordered list of player orders. The server checks orders but never decides outcomes.

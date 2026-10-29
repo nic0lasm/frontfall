@@ -50,6 +50,35 @@ describe("landLost", () => {
 });
 
 describe("FeedWatcher", () => {
+  it("presents the landmarks as the game opens, then tells who takes them (R-LAND)", () => {
+    const louvre = {
+      id: "louvre",
+      tile: 77,
+      effect: "gold" as const,
+      name: { en: "The Louvre", fr: "Le Louvre" },
+    };
+    const watcher = new FeedWatcher(true, [louvre]);
+    const opening = watcher.observe(update(), new Map(), mine);
+    expect(opening).toEqual([
+      expect.objectContaining({ key: "landmarkIntro:0", tone: "info", tile: 77, mine: false }),
+    ]);
+    expect(opening[0]?.text).toContain("The Louvre");
+    const taken = watcher.observe(
+      update({ events: [{ type: "landmark", a: 1, b: 0, landmark: 0, tile: 77 }] }),
+      new Map(),
+      mine,
+    );
+    expect(taken).toEqual([expect.objectContaining({ tone: "good", tile: 77, mine: true })]);
+    expect(taken[0]?.text).toContain("The Louvre");
+    const lost = watcher.observe(
+      update({ events: [{ type: "landmark", a: 2, b: 1, landmark: 0, tile: 77 }] }),
+      new Map(),
+      mine,
+    );
+    expect(lost).toEqual([expect.objectContaining({ tone: "bad", tile: 77, player: 2 })]);
+    expect(lost[0]?.text).toContain("Ada");
+  });
+
   it("warns once when a front reaches the player's capital, and tells of a capital taken (R-CAP)", () => {
     const watcher = new FeedWatcher(true);
     const capitals = (threat: number) => ({ falls: [], threat, standsIn: 0 });

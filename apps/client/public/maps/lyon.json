@@ -6,107 +6,160 @@
     "fr": "Lyon"
   },
   "version": 1,
-  "width": 576,
+  "width": 780,
   "height": 532,
   "topology": "flat",
   "projection": {
     "type": "equirectangular",
     "west": 4.765,
-    "east": 4.935,
+    "east": 4.995,
     "south": 45.69,
     "north": 45.805
   },
   "terrain": {
     "file": "lyon.bin",
-    "bytes": 306448,
-    "sha256": "b3e7efd905e94d336d515ea465131e8280a36e75a2ee6025bc98f5d623f5025c"
+    "bytes": 414976,
+    "sha256": "4554a0846318206a6cf1e183f74278af637a2af9bbf06f9e2039b19715b23d02"
   },
   "thumbnail": "lyon.png",
   "players": {
     "min": 2,
-    "recommended": 8,
-    "max": 16
+    "recommended": 10,
+    "max": 19
   },
   "nations": [
     {
       "name": "Croix-Rousse",
       "capital": "Mairie du 4e",
-      "tile": 74514
+      "tile": 100830
     },
     {
       "name": "Monplaisir",
       "capital": "Mairie du 8e",
-      "tile": 186977
+      "tile": 253073
     },
     {
       "name": "Vaise",
       "capital": "Mairie du 9e",
-      "tile": 80774
+      "tile": 109334
     },
     {
       "name": "Villeurbanne",
       "capital": "Hôtel de ville de Villeurbanne",
-      "tile": 102915
+      "tile": 139228
     },
     {
       "name": "Fourvière",
       "capital": "Mairie du 5e",
-      "tile": 126262
+      "tile": 170938
     },
     {
       "name": "Guillotière",
       "capital": "Mairie du 7e",
-      "tile": 158085
+      "tile": 213982
     },
     {
       "name": "Brotteaux",
       "capital": "Mairie du 6e",
-      "tile": 95904
+      "tile": 129768
     },
     {
       "name": "Presqu'île",
       "capital": "Mairie du 2e",
-      "tile": 136723
+      "tile": 185071
     },
     {
       "name": "Part-Dieu",
       "capital": "Mairie du 3e",
-      "tile": 120658
+      "tile": 163295
     },
     {
       "name": "Pentes de la Croix-Rousse",
       "capital": "Mairie du 1er",
-      "tile": 96985
+      "tile": 131257
     },
     {
       "name": "Caluire-et-Cuire",
       "capital": "Hôtel de ville de Caluire-et-Cuire",
-      "tile": 25043
+      "tile": 33815
     },
     {
       "name": "Bron",
       "capital": "Hôtel de ville de Bron",
-      "tile": 176181
+      "tile": 238401
     },
     {
       "name": "Oullins",
       "capital": "Hôtel de ville d'Oullins",
-      "tile": 242064
+      "tile": 327744
     },
     {
       "name": "Vénissieux",
       "capital": "Hôtel de ville de Vénissieux",
-      "tile": 287833
+      "tile": 389630
     },
     {
       "name": "Sainte-Foy-lès-Lyon",
       "capital": "Hôtel de ville de Sainte-Foy-lès-Lyon",
-      "tile": 189026
+      "tile": 255938
     },
     {
       "name": "Vaulx-en-Velin",
       "capital": "Hôtel de ville de Vaulx-en-Velin",
-      "tile": 71952
+      "tile": 97249
+    },
+    {
+      "name": "Décines-Charpieu",
+      "capital": "Hôtel de ville de Décines-Charpieu",
+      "tile": 130137
+    },
+    {
+      "name": "Chassieu",
+      "capital": "Hôtel de ville de Chassieu",
+      "tile": 220655
+    },
+    {
+      "name": "Saint-Priest",
+      "capital": "Hôtel de ville de Saint-Priest",
+      "tile": 393727
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "crayon",
+      "name": {
+        "en": "Le Crayon",
+        "fr": "Le Crayon"
+      },
+      "effect": "gold",
+      "tile": 157087
+    },
+    {
+      "id": "ol-stadium",
+      "name": {
+        "en": "OL Stadium",
+        "fr": "Stade de l'OL"
+      },
+      "effect": "growth",
+      "tile": 143476
+    },
+    {
+      "id": "fourviere",
+      "name": {
+        "en": "Fourvière Basilica",
+        "fr": "Basilique de Fourvière"
+      },
+      "effect": "fortress",
+      "tile": 153855
+    },
+    {
+      "id": "edouard-herriot",
+      "name": {
+        "en": "Port Édouard-Herriot",
+        "fr": "Port Édouard-Herriot"
+      },
+      "effect": "trade",
+      "tile": 283353
     }
   ],
   "credits": [

@@ -1,5 +1,6 @@
 import type { GameRules } from "../../game/messages.ts";
 import type { GameUpdate } from "../../game/game-view.ts";
+import type { MapLandmarkData } from "../../game/maps.ts";
 import { EventsFeed, type FeedTarget } from "../events-feed.ts";
 import { FeedWatcher, landLost, type LandLost } from "../feed-events.ts";
 import { PlayerTip } from "../player-tip.ts";
@@ -25,8 +26,9 @@ export class FeedHost {
     /** False in a replay, where nobody is the player. */
     personal: boolean,
     go: (target: FeedTarget) => void,
+    landmarks: readonly MapLandmarkData[] = [],
   ) {
-    this.watcher = new FeedWatcher(personal);
+    this.watcher = new FeedWatcher(personal, landmarks);
     this.feed = new EventsFeed(
       go,
       window.matchMedia("(width < 720px)"),

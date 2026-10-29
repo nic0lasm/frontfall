@@ -24,6 +24,15 @@ export const MapNation = z.object({
 });
 export type MapNation = z.infer<typeof MapNation>;
 
+/** A place that gives its effect to whoever holds its tile (R-LAND-01). */
+export const MapLandmark = z.object({
+  id: mapId,
+  name: MapName,
+  effect: z.enum(["gold", "growth", "fortress", "trade", "shield", "assault"]),
+  tile: z.number().int().nonnegative(),
+});
+export type MapLandmark = z.infer<typeof MapLandmark>;
+
 /** Description of a map, published next to its terrain file as `<id>.json`. */
 export const MapManifest = z
   .object({
@@ -51,6 +60,8 @@ export const MapManifest = z
     thumbnail: fileName,
     players: MapPlayers,
     nations: z.array(MapNation),
+    /** Landmarks (R-LAND-01), on the city maps only; none when left out. */
+    landmarks: z.array(MapLandmark).optional(),
     credits: z.array(z.object({ title: z.string(), url: z.url(), license: z.string() })).min(1),
   })
   .superRefine((map, context) => {
@@ -83,6 +94,15 @@ export const MapManifest = z
         context.addIssue({
           code: "custom",
           path: ["nations", index, "tile"],
+          message: "tile outside the map",
+        });
+      }
+    });
+    map.landmarks?.forEach((landmark, index) => {
+      if (landmark.tile >= tiles) {
+        context.addIssue({
+          code: "custom",
+          path: ["landmarks", index, "tile"],
           message: "tile outside the map",
         });
       }

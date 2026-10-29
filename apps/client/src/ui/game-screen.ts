@@ -335,6 +335,7 @@ export class GameScreen {
                 (target) => {
                   this.centre(target);
                 },
+                info.map.landmarks,
               );
               this.feed.setRules(info.rules);
             },

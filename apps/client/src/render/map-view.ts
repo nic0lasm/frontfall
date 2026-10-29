@@ -54,6 +54,7 @@ const PIECE_MIN_PIXELS = {
   structure: 16,
   palace: 19,
   capital: 22,
+  landmark: 20,
 } as const;
 
 /** Structures drawn at once; each player's land rarely holds more than a few. */
@@ -233,7 +234,7 @@ export class MapView implements Renderer {
         return marker;
       };
       const minPixels =
-        kind === "palace" || kind === "capital"
+        kind === "palace" || kind === "capital" || kind === "landmark"
           ? PIECE_MIN_PIXELS[kind]
           : PIECE_MIN_PIXELS.structure;
       return pieces
@@ -254,6 +255,7 @@ export class MapView implements Renderer {
       airDefense: layers("airDefense", 12, 4),
       // Without the pieces, a star of a shape; drawn after the buildings, so on top.
       capital: layers("capital", 5, 6.5, 0.1),
+      landmark: layers("landmark", 4, 6, 0.05),
     };
     this.vignette = addVignette(this.scene);
     this.camera.position.z = 10;
@@ -376,6 +378,7 @@ export class MapView implements Renderer {
       "silo",
       "airDefense",
       "capital",
+      "landmark",
     ] as const) {
       const { outline, fill } = this.structures[type];
       let count = 0;

@@ -226,6 +226,53 @@
         "capital": "Hôtel de ville de Saint-Mandé",
         "at": [2.4186, 48.8424]
       }
+    ],
+    "landmarks": [
+      {
+        "id": "louvre",
+        "name": {
+          "en": "The Louvre",
+          "fr": "Le Louvre"
+        },
+        "effect": "gold",
+        "at": [2.3376, 48.8606]
+      },
+      {
+        "id": "parc-des-princes",
+        "name": {
+          "en": "Parc des Princes",
+          "fr": "Parc des Princes"
+        },
+        "effect": "growth",
+        "at": [2.253, 48.8414]
+      },
+      {
+        "id": "sacre-coeur",
+        "name": {
+          "en": "Sacré-Cœur",
+          "fr": "Sacré-Cœur"
+        },
+        "effect": "fortress",
+        "at": [2.3431, 48.8867]
+      },
+      {
+        "id": "eiffel-tower",
+        "name": {
+          "en": "Eiffel Tower",
+          "fr": "Tour Eiffel"
+        },
+        "effect": "shield",
+        "at": [2.2945, 48.8584]
+      },
+      {
+        "id": "arc-de-triomphe",
+        "name": {
+          "en": "Arc de Triomphe",
+          "fr": "Arc de Triomphe"
+        },
+        "effect": "assault",
+        "at": [2.295, 48.8738]
+      }
     ]
   }
 }

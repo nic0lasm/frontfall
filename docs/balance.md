@@ -244,6 +244,21 @@ With ships for everyone, a scripted player that also sails (free land first, the
 
 Like a fort's, the radius and the alert distance grow with the spawn radius on larger maps. A capital is harder to take than a fort, but it cannot be moved or rebuilt, and it costs everything once lost: the only way to keep it is to keep the fronts away from it.
 
+## Landmarks
+
+| Key                          | Value | Unit       | Used by     | Notes                                                       |
+| ---------------------------- | ----: | ---------- | ----------- | ----------------------------------------------------------- |
+| `B-LANDMARK-GOLD`            |    20 | %          | `R-LAND-02` | More gold from troops and workers, for each gold landmark   |
+| `B-LANDMARK-GROWTH`          |    15 | %          | `R-LAND-02` | Faster troop growth, never past the cap                     |
+| `B-LANDMARK-FORTRESS-RADIUS` |    12 | tiles      | `R-LAND-02` | On a map of 2^19 tiles, growing with larger maps like forts |
+| `B-LANDMARK-FORTRESS`        |   200 | % of price | `R-LAND-02` | Paid inside the radius; a fort or a capital does not add    |
+| `B-LANDMARK-TRADE`           |    50 | %          | `R-LAND-02` | More gold from each trade ship, sent or received            |
+| `B-LANDMARK-SHIELD-RADIUS`   |    40 | tiles      | `R-LAND-02` | On a map of 2^19 tiles                                      |
+| `B-LANDMARK-SHIELD-CHANCE`   |    50 | %          | `R-LAND-02` | Per missile, on the tick it comes within the radius         |
+| `B-LANDMARK-ASSAULT`         |    10 | %          | `R-LAND-02` | Less paid for each tile the holder's attacks and ships take |
+
+First values. A landmark is worth a detour but not a game: a gold landmark is about what a city adds to a mid-sized empire's income, and the fortress doubles the price of the land around Sacré-Cœur or Fourvière, less than a fort. With them, the scripted average player wins 8 games of 24 against normal nations on Paris and 5 on Lyon (`pnpm balance -- --map paris --bots normal:4 --nations normal --average --seeds 1-24`); nations do not seek landmarks out yet, they take them as their fronts reach them.
+
 ## Victory
 
 | Key           | Value | Unit              | Used by    | Notes |

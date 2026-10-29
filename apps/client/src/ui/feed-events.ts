@@ -1,5 +1,6 @@
 import type { DiplomacyEvent, GameUpdate, StructureType } from "../game/game-view.ts";
-import { t, type MessageKey } from "../i18n/index.ts";
+import type { MapLandmarkData } from "../game/maps.ts";
+import { getLanguage, t, type MessageKey } from "../i18n/index.ts";
 
 /** How a feed entry looks and how it is read: bad news, good news, a plain fact, or a question for you. */
 export type FeedTone = "bad" | "good" | "info" | "ask";
@@ -38,6 +39,7 @@ const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
   collapsed: "diplo.eventCollapsed",
   capital: "diplo.eventCapital",
   razed: "diplo.eventRazed",
+  landmark: "diplo.eventLandmark",
 };
 
 const STRUCTURE_TEXT: Readonly<Record<StructureType, MessageKey>> = {
@@ -85,7 +87,11 @@ export class FeedWatcher {
   private threat = 0;
 
   /** `personal` is false in a replay, where nobody is the player. */
-  constructor(private readonly personal: boolean) {}
+  constructor(
+    private readonly personal: boolean,
+    /** The map's landmarks, which "landmark" events name by index (R-LAND-03). */
+    private readonly landmarks: readonly MapLandmarkData[] = [],
+  ) {}
 
   /** Players allied with `id` that the events of this game told of, not counting the player at this screen. */
   alliesOf(id: number): number[] {
@@ -130,6 +136,21 @@ export class FeedWatcher {
       });
     }
     this.threat = threat;
+    // R-LAND-01: what each landmark of the map gives, once, as the game opens.
+    if (!this.started) {
+      this.landmarks.forEach((landmark, index) => {
+        entries.push({
+          key: `landmarkIntro:${String(index)}`,
+          tone: "info",
+          text: t("feed.landmark", {
+            landmark: landmark.name[getLanguage()],
+            effect: t(`landmark.${landmark.effect}`),
+          }),
+          tile: landmark.tile,
+          mine: false,
+        });
+      });
+    }
     if (this.started && this.personal) {
       for (const from of requests) {
         if (this.requests.has(from)) continue;
@@ -212,6 +233,8 @@ export class FeedWatcher {
         return target ? "bad" : "good";
       case "razed":
         return "bad";
+      case "landmark":
+        return target ? "bad" : "good";
       case "ended":
       case "quick":
         return "info";
@@ -229,17 +252,22 @@ export class FeedWatcher {
     const other = event.a === you ? event.b : event.a;
     const tone = mine ? this.tone(event, you) : "info";
     // Told from the player's side: the attacker's front gave way, or the player's own did.
+    const landmark = event.landmark === undefined ? undefined : this.landmarks[event.landmark];
     const key: MessageKey =
       event.type === "collapsed" && event.b === you
         ? "feed.collapsedYours"
-        : EVENT_TEXT[event.type];
+        : event.type === "landmark" && event.b !== 0
+          ? "diplo.eventLandmarkFrom"
+          : EVENT_TEXT[event.type];
     const text = t(key, {
       a: name(event.a),
       b: name(event.b),
       phrase: event.phrase === undefined ? "" : t(`quick.${String(event.phrase)}` as MessageKey),
+      landmark: landmark?.name[getLanguage()] ?? "",
+      effect: landmark ? t(`landmark.${landmark.effect}`) : "",
     });
     return {
-      key: `${event.type}:${String(event.a)}:${String(event.b)}:${String(event.phrase ?? "")}`,
+      key: `${event.type}:${String(event.a)}:${String(event.b)}:${String(event.phrase ?? event.landmark ?? "")}`,
       tone,
       text,
       ...(event.tile === undefined ? {} : { tile: event.tile }),

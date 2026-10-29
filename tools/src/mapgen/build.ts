@@ -8,7 +8,13 @@ import {
   sha256Hex,
   type Topology,
 } from "@frontfall/engine";
-import { MapManifest, MapName, MapPlayers, type MapCatalog } from "@frontfall/protocol";
+import {
+  MapManifest,
+  MapName,
+  MapPlayers,
+  type MapCatalog,
+  type MapLandmark,
+} from "@frontfall/protocol";
 import { z } from "zod";
 import { CityDefinition, buildCityTerrain, type Raster } from "./city.ts";
 import { nearestOwnable, pickNations, type Country, type Nation } from "./nations.ts";
@@ -171,6 +177,9 @@ export function buildMap(
     thumbnail: `${definition.id}.png`,
     players: definition.players,
     nations,
+    ...(city && city.landmarks.length > 0
+      ? { landmarks: placeLandmarks(grid, topology, tiles, city.landmarks) }
+      : {}),
     credits: drawn ? [DRAWN_CREDIT] : (citySources?.credits ?? [dataset]),
   });
   return { manifest, terrain, thumbnail: thumbnail(grid, tiles) };
@@ -205,6 +214,21 @@ function placeNations(
     const start = tile === undefined ? undefined : nearestOwnable(topology, tiles, tile);
     if (start === undefined) throw new Error(`nation ${name} has no land near ${at.join(", ")}`);
     return { name, capital, tile: start };
+  });
+}
+
+/** Landmarks of a city map, in the order written, each on the nearest tile a player can own. */
+function placeLandmarks(
+  grid: GridSpec,
+  topology: Topology,
+  tiles: Uint8Array,
+  landmarks: CityDefinition["landmarks"],
+): MapLandmark[] {
+  return landmarks.map(({ id, name, effect, at }) => {
+    const tile = tileAt(grid, at[0], at[1]);
+    const start = tile === undefined ? undefined : nearestOwnable(topology, tiles, tile);
+    if (start === undefined) throw new Error(`landmark ${id} has no land near ${at.join(", ")}`);
+    return { id, name, effect, tile: start };
   });
 }
 

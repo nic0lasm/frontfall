@@ -3,6 +3,7 @@ import { divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
 import { isAllied, isTraitor, logEvent } from "./diplomacy.ts";
 import { soldiers } from "./economy.ts";
 import { capitalsStand, guardedByCapital } from "./capitals.ts";
+import { LandmarkEffect, guardedByLandmark, heldLandmarks } from "./landmarks.ts";
 import { spawnSettings } from "./spawn.ts";
 import { fortRadius, fortified, isReady, StructureKind } from "./structures.ts";
 import { TileKind } from "./terrain.ts";
@@ -171,8 +172,8 @@ export function installAttacks(game: Game): void {
     return false;
   }
 
-  const tileCost = (tile: number, defender: Player | undefined): number =>
-    captureCost(game, tile, defender);
+  const tileCost = (tile: number, defender: Player | undefined, attacker: number): number =>
+    captureCost(game, tile, defender, attacker);
 
   // R-ATTACK-06: a player calls back one of their own attacks, losing part of its troops.
   game.onOrder((_, player, order) => {
@@ -236,7 +237,7 @@ export function installAttacks(game: Game): void {
     for (const tile of tiles) {
       // Another attack, or an encirclement, may have taken it earlier in the tick.
       if (territory.ownerOf(tile) !== attack.target) continue;
-      const cost = tileCost(tile, defender);
+      const cost = tileCost(tile, defender, attack.player);
       if (attack.troops < cost) {
         finish(attack);
         break;
@@ -306,7 +307,7 @@ export function installAttacks(game: Game): void {
       for (const tile of collapseFill.tiles()) {
         const cost = Math.max(
           1,
-          mulDiv(tileCost(tile, defender), balance.collapseCostPercent, 100),
+          mulDiv(tileCost(tile, defender, attack.player), balance.collapseCostPercent, 100),
         );
         if (attack.troops < cost) break;
         attack.troops -= cost;
@@ -420,11 +421,18 @@ function cancelOpposingAttacks(attacks: Attack[]): void {
 }
 
 /**
- * Troops it costs to take one tile (R-ATTACK-03, R-ATTACK-04, R-MAP-06),
- * more within reach of one of the defender's forts (R-BUILD-03) or of their
- * capital (R-CAP-02): the stronger of the two applies, not both.
+ * Troops it costs `attacker` to take one tile (R-ATTACK-03, R-ATTACK-04,
+ * R-MAP-06), more within reach of one of the defender's forts (R-BUILD-03),
+ * of their capital (R-CAP-02) or of a fortress landmark they hold
+ * (R-LAND-02): the strongest applies, not all. An attacker holding an assault
+ * landmark pays less (R-LAND-02).
  */
-export function captureCost(game: Game, tile: number, defender: Player | undefined): number {
+export function captureCost(
+  game: Game,
+  tile: number,
+  defender: Player | undefined,
+  attacker: number = NEUTRAL,
+): number {
   const { balance, terrain } = game;
   const kind = terrain.kind(tile);
   const relief =
@@ -432,10 +440,20 @@ export function captureCost(game: Game, tile: number, defender: Player | undefin
   const density = defender ? defensePerTile(game, defender) : 0;
   const base = balance.neutralCost + mulDiv(density, balance.defenseDensityTenths, 10);
   let cost = Math.max(1, mulDiv(base, relief, 10));
+  const assaults = heldLandmarks(game, attacker, LandmarkEffect.Assault);
+  if (assaults > 0) {
+    cost = Math.max(
+      1,
+      mulDiv(cost, Math.max(0, 100 - assaults * balance.landmarkAssaultPercent), 100),
+    );
+  }
   if (!defender) return cost;
   const fort = fortified(game, tile, defender.id) ? balance.fortStrengthPercent : 100;
   const capital = guardedByCapital(game, tile, defender.id) ? balance.capitalStrengthPercent : 100;
-  const strength = Math.max(fort, capital);
+  const landmark = guardedByLandmark(game, tile, defender.id)
+    ? balance.landmarkFortressPercent
+    : 100;
+  const strength = Math.max(fort, capital, landmark);
   if (strength !== 100) cost = mulDiv(cost, strength, 100);
   // R-DIPLO-04: a traitor's land is cheaper to take while the mark lasts.
   if (isTraitor(game, defender)) cost = mulDiv(cost, balance.traitorDefensePercent, 100);

@@ -214,6 +214,53 @@
       "tile": 213337
     }
   ],
+  "landmarks": [
+    {
+      "id": "louvre",
+      "name": {
+        "en": "The Louvre",
+        "fr": "Le Louvre"
+      },
+      "effect": "gold",
+      "tile": 151658
+    },
+    {
+      "id": "parc-des-princes",
+      "name": {
+        "en": "Parc des Princes",
+        "fr": "Parc des Princes"
+      },
+      "effect": "growth",
+      "tile": 215920
+    },
+    {
+      "id": "sacre-coeur",
+      "name": {
+        "en": "Sacré-Cœur",
+        "fr": "Sacré-Cœur"
+      },
+      "effect": "fortress",
+      "tile": 64890
+    },
+    {
+      "id": "eiffel-tower",
+      "name": {
+        "en": "Eiffel Tower",
+        "fr": "Tour Eiffel"
+      },
+      "effect": "shield",
+      "tile": 159210
+    },
+    {
+      "id": "arc-de-triomphe",
+      "name": {
+        "en": "Arc de Triomphe",
+        "fr": "Arc de Triomphe"
+      },
+      "effect": "assault",
+      "tile": 107756
+    }
+  ],
   "credits": [
     {
       "title": "ESA WorldCover 10 m 2021 v200",

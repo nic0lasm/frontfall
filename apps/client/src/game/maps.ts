@@ -1,4 +1,4 @@
-import { TileKind, WorldGrid, loadMap } from "@frontfall/engine";
+import { TileKind, WorldGrid, loadMap, type LandmarkEffect } from "@frontfall/engine";
 import { MapCatalog, MapManifest } from "@frontfall/protocol";
 import { generateLand } from "../terrain.ts";
 
@@ -16,8 +16,18 @@ export interface MapData {
   readonly latitudes?: readonly [south: number, north: number];
   /** Nations of a published map, in the manifest's order; none on a generated map. */
   readonly nations: readonly { readonly name: string; readonly tile: number }[];
+  /** Landmarks of a published map (R-LAND-01), in the manifest's order; none on most maps. */
+  readonly landmarks: readonly MapLandmarkData[];
   /** Published maps only: what pins the terrain, for a desync report. */
   readonly source?: { readonly format: number; readonly version: number; readonly sha256: string };
+}
+
+/** A landmark as the game and the screen need it: what the engine reads, and its name. */
+export interface MapLandmarkData {
+  readonly id: string;
+  readonly tile: number;
+  readonly effect: LandmarkEffect;
+  readonly name: { readonly en: string; readonly fr: string };
 }
 
 export type MapGroup = "world" | "quick";
@@ -167,6 +177,7 @@ export async function fetchMapData(
     throw new Error(`map ${info.id}: HTTP ${String(terrainResponse.status)}`);
   const bytes = new Uint8Array(await terrainResponse.arrayBuffer());
   const { topology, terrain, magnitude } = loadMap(bytes, manifest);
+  const names = new Map((manifest.landmarks ?? []).map(({ id, name }) => [id, name]));
   return {
     id: info.id,
     width: topology.width,
@@ -176,6 +187,12 @@ export async function fetchMapData(
     relief: magnitude,
     latitudes: [manifest.projection.south, manifest.projection.north],
     nations: manifest.nations.map(({ name, tile }) => ({ name, tile })),
+    landmarks: terrain.landmarks.map(({ id, tile, effect }) => ({
+      id,
+      tile,
+      effect,
+      name: names.get(id) ?? { en: id, fr: id },
+    })),
     source: {
       format: manifest.format,
       version: manifest.version,
@@ -202,6 +219,7 @@ export function generateMap(id: string): MapData {
     kinds,
     relief,
     nations: [],
+    landmarks: [],
   };
 }
 

@@ -2,6 +2,7 @@ import { embargoed } from "./diplomacy.ts";
 import type { Game } from "./game.ts";
 import { DrawUsage, derivedRandom } from "./random.ts";
 import { mulDiv } from "./integer-math.ts";
+import { LandmarkEffect, withLandmarks } from "./landmarks.ts";
 import { SeaRoutes } from "./sea-routes.ts";
 import { spawnSettings } from "./spawn.ts";
 import { StructureKind, isReady, type Structure } from "./structures.ts";
@@ -134,7 +135,14 @@ export function installTrade(game: Game): void {
     const sender = game.player(ship.player);
     const receiver = game.player(ports.get(ship.to)?.player ?? 0);
     if (!sender || !receiver) return;
-    sender.gold += gain;
-    receiver.gold += gain;
+    const { landmarkTradePercent } = balance;
+    sender.gold += withLandmarks(game, sender.id, LandmarkEffect.Trade, landmarkTradePercent, gain);
+    receiver.gold += withLandmarks(
+      game,
+      receiver.id,
+      LandmarkEffect.Trade,
+      landmarkTradePercent,
+      gain,
+    );
   }
 }

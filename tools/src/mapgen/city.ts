@@ -36,6 +36,17 @@ export const CityDefinition = z.object({
   mountains: z.number(),
   /** Starts, in the order written, each on the nearest land a player can own. */
   nations: z.array(z.object({ name: z.string(), capital: z.string(), at: LonLat })).min(1),
+  /** Landmarks (R-LAND-01), each on the nearest land a player can own. */
+  landmarks: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.object({ en: z.string(), fr: z.string() }),
+        effect: z.enum(["gold", "growth", "fortress", "trade", "shield", "assault"]),
+        at: LonLat,
+      }),
+    )
+    .default([]),
 });
 export type CityDefinition = z.infer<typeof CityDefinition>;
 

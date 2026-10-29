@@ -10,6 +10,7 @@ describe("pieces", () => {
         "city",
         "fort",
         "heavyMissile",
+        "landmark",
         "missile",
         "palace",
         "port",

@@ -1,3 +1,4 @@
+import { LANDMARK_EFFECTS, type Landmark, type LandmarkEffect } from "../landmarks.ts";
 import { Terrain, TileKind } from "../terrain.ts";
 import { WorldGrid } from "../world-grid.ts";
 import {
@@ -9,6 +10,9 @@ import {
   decodeMapFile,
 } from "./map-file.ts";
 import { sha256Hex } from "./sha256.ts";
+
+const isLandmarkEffect = (effect: string): effect is LandmarkEffect =>
+  (LANDMARK_EFFECTS as readonly string[]).includes(effect);
 
 /** Lowest land magnitude counted as hills, then as mountains (docs/map-format.md). */
 export const HILLS_FROM = 10;
@@ -23,6 +27,14 @@ export interface MapDescription {
   readonly height: number;
   readonly topology: "flat" | "cylinder";
   readonly terrain: { readonly sha256: string };
+  /** Landmarks of the map (R-LAND-01): an effect by name and the tile that holds it. */
+  readonly landmarks?:
+    | readonly {
+        readonly id: string;
+        readonly tile: number;
+        readonly effect: string;
+      }[]
+    | undefined;
 }
 
 export interface LoadedMap {
@@ -62,7 +74,18 @@ export function loadMap(bytes: Uint8Array, description: MapDescription): LoadedM
     shore[i] = (tile & TILE_SHORE) >>> 6;
   }
   const topology = new WorldGrid(file.width, file.height, { wrapsX: file.wrapsX });
-  return { topology, terrain: new Terrain(topology, kinds), shore, magnitude };
+  const landmarks = (description.landmarks ?? []).map(({ id, tile, effect }): Landmark => {
+    if (!isLandmarkEffect(effect)) throw new MapFileError(`landmark ${id} has no effect ${effect}`);
+    if (!Number.isSafeInteger(tile) || tile < 0 || tile >= size) {
+      throw new MapFileError(`landmark ${id} is off the map`);
+    }
+    const kind = kinds[tile];
+    if (kind === TileKind.Water || kind === TileKind.Impassable) {
+      throw new MapFileError(`landmark ${id} is not on land a player can own`);
+    }
+    return { id, tile, effect };
+  });
+  return { topology, terrain: new Terrain(topology, kinds, landmarks), shore, magnitude };
 }
 
 /** Tile kind of every possible tile byte, so loading a map is one lookup per tile. */

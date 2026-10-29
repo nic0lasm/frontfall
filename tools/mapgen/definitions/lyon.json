@@ -5,12 +5,12 @@
     "fr": "Lyon"
   },
   "version": 1,
-  "width": 576,
+  "width": 780,
   "height": 532,
   "topology": "flat",
   "bounds": {
     "west": 4.765,
-    "east": 4.935,
+    "east": 4.995,
     "south": 45.69,
     "north": 45.805
   },
@@ -22,11 +22,11 @@
   "minLakeTiles": 30,
   "players": {
     "min": 2,
-    "recommended": 8,
-    "max": 16
+    "recommended": 10,
+    "max": 19
   },
   "nations": {
-    "count": 16,
+    "count": 19,
     "minDistance": 0
   },
   "city": {
@@ -37,7 +37,7 @@
     "woodsShare": 0.5,
     "minWoodsTiles": 150,
     "smoothTiles": 4,
-    "hills": 215,
+    "hills": 225,
     "mountains": 275,
     "nations": [
       {
@@ -119,6 +119,59 @@
         "name": "Vaulx-en-Velin",
         "capital": "Hôtel de ville de Vaulx-en-Velin",
         "at": [4.921, 45.778]
+      },
+      {
+        "name": "Décines-Charpieu",
+        "capital": "Hôtel de ville de Décines-Charpieu",
+        "at": [4.959, 45.769]
+      },
+      {
+        "name": "Chassieu",
+        "capital": "Hôtel de ville de Chassieu",
+        "at": [4.97, 45.744]
+      },
+      {
+        "name": "Saint-Priest",
+        "capital": "Hôtel de ville de Saint-Priest",
+        "at": [4.944, 45.696]
+      }
+    ],
+    "landmarks": [
+      {
+        "id": "crayon",
+        "name": {
+          "en": "Le Crayon",
+          "fr": "Le Crayon"
+        },
+        "effect": "gold",
+        "at": [4.8556, 45.7614]
+      },
+      {
+        "id": "ol-stadium",
+        "name": {
+          "en": "OL Stadium",
+          "fr": "Stade de l'OL"
+        },
+        "effect": "growth",
+        "at": [4.9822, 45.7653]
+      },
+      {
+        "id": "fourviere",
+        "name": {
+          "en": "Fourvière Basilica",
+          "fr": "Basilique de Fourvière"
+        },
+        "effect": "fortress",
+        "at": [4.8226, 45.7623]
+      },
+      {
+        "id": "edouard-herriot",
+        "name": {
+          "en": "Port Édouard-Herriot",
+          "fr": "Port Édouard-Herriot"
+        },
+        "effect": "trade",
+        "at": [4.828, 45.7265]
       }
     ]
   }

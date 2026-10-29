@@ -161,6 +161,22 @@ export interface Balance {
   capitalGraceTicks: number;
   /** B-CAPITAL-ALERT, in tiles on a map of 2^19 tiles: an enemy front this close threatens a capital */
   capitalAlert: number;
+  /** B-LANDMARK-GOLD, percent more gold from troops for each gold landmark held */
+  landmarkGoldPercent: number;
+  /** B-LANDMARK-GROWTH, percent faster troop growth for each growth landmark held */
+  landmarkGrowthPercent: number;
+  /** B-LANDMARK-FORTRESS-RADIUS, in tiles on a map of 2^19 tiles */
+  landmarkFortressRadius: number;
+  /** B-LANDMARK-FORTRESS, percent of the usual price an attacker pays for a tile near a fortress landmark */
+  landmarkFortressPercent: number;
+  /** B-LANDMARK-TRADE, percent more gold from each trade ship for each trade landmark held */
+  landmarkTradePercent: number;
+  /** B-LANDMARK-SHIELD-RADIUS, in tiles on a map of 2^19 tiles */
+  landmarkShieldRadius: number;
+  /** B-LANDMARK-SHIELD-CHANCE, percent chance a shield landmark stops a missile */
+  landmarkShieldChancePercent: number;
+  /** B-LANDMARK-ASSAULT, percent less the holder's attacks pay for each tile, for each assault landmark held */
+  landmarkAssaultPercent: number;
   /** B-WIN-SHARE, percent of all ownable land */
   winSharePercent: number;
   /** B-MAX-DURATION, in ticks */
@@ -247,6 +263,14 @@ export const DEFAULT_BALANCE: Balance = {
   capitalRazePercent: 50,
   capitalAlert: 30,
   capitalGraceTicks: 180 * 10,
+  landmarkGoldPercent: 20,
+  landmarkGrowthPercent: 15,
+  landmarkFortressRadius: 12,
+  landmarkFortressPercent: 200,
+  landmarkTradePercent: 50,
+  landmarkShieldRadius: 40,
+  landmarkShieldChancePercent: 50,
+  landmarkAssaultPercent: 10,
   winSharePercent: 75,
   maxDurationTicks: 3600 * 10,
 };

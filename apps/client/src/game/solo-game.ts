@@ -66,7 +66,11 @@ export class SoloGame {
     private readonly map: MapData,
   ) {
     const grid = new WorldGrid(map.width, map.height, { wrapsX: map.wrapsX });
-    const terrain = new Terrain(grid, map.kinds);
+    const terrain = new Terrain(
+      grid,
+      map.kinds,
+      map.landmarks.map(({ id, tile, effect }) => ({ id, tile, effect })),
+    );
     const { record } = options;
     const { players, botIds, nationIds, balance } = record
       ? {

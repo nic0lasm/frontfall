@@ -86,6 +86,7 @@ export const DrawUsage = {
   TradeDestination: 1,
   WarshipPatrol: 2,
   Interception: 3,
+  LandmarkShield: 4,
 } as const;
 
 export type RandomState = readonly [number, number, number, number];

@@ -31,7 +31,11 @@ const FRONT_MS = FRONT_SECONDS * 1000 + 50;
 /** Size of a tile on screen once the view closes in on the player's start. */
 const START_TILE_PIXELS = 6;
 
+/** Plate of a landmark nobody holds yet (R-LAND-01). */
+const LANDMARK_UNHELD = "#a8875a";
+
 /** What the map is drawn with, known once the game starts. */
+
 export interface SceneStart {
   readonly map: MapData;
   readonly you: number;
@@ -398,12 +402,15 @@ export class MapScene {
    */
   private placeStructures(update: GameUpdate): void {
     const capitals = update.players.filter((p) => p.alive && p.capital !== undefined);
+    const landmarks = this.shown?.map.landmarks ?? [];
     const key =
       update.structures
         .map((s) => `${String(s.id)}:${String(s.player)}:${s.ready ? "1" : "0"}`)
         .join(",") +
       "|" +
-      capitals.map((p) => `${String(p.id)}:${String(p.capital)}`).join(",");
+      capitals.map((p) => `${String(p.id)}:${String(p.capital)}`).join(",") +
+      "|" +
+      landmarks.map((l) => String(this.ownerAt(l.tile))).join(",");
     if (!this.view || !this.shown || key === this.drawnStructures) return;
     this.drawnStructures = key;
     const { width } = this.mapSize;
@@ -423,6 +430,17 @@ export class MapScene {
         type: "capital",
         ready: true,
         color: colorOf(player.id, firstNation, teams),
+      });
+    }
+    // R-LAND-01: in its holder's colour, bronze while nobody holds it.
+    for (const landmark of landmarks) {
+      const holder = this.ownerAt(landmark.tile);
+      this.structureMarks.push({
+        x: landmark.tile % width,
+        y: Math.floor(landmark.tile / width),
+        type: "landmark",
+        ready: true,
+        color: holder === 0 ? LANDMARK_UNHELD : colorOf(holder, firstNation, teams),
       });
     }
     this.drawStructures();

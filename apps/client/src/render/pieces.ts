@@ -37,6 +37,12 @@ const GLYPHS = {
     cut: "M10.7 12.6a1.3 1.3 0 1 1 2.6 0 1.3 1.3 0 0 1-2.6 0z",
     accent: "M12 .8l1.3 1.6L12 4 10.7 2.4z",
   },
+  /** R-LAND-01: a monument's front, a pediment on three columns, for the landmarks of a city map. */
+  landmark: {
+    solid:
+      "M12 2.8 21.5 8.6h-19zM3.5 9.8h17v1.9h-17zM5 12.8h2.6v5.4H5zM10.7 12.8h2.6v5.4h-2.6zM16.4 12.8H19v5.4h-2.6zM2.5 19.2h19v2.1h-19z",
+    accent: "M12 4.6a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2z",
+  },
   fort: {
     solid: "M3.5 20.5V5h4.2v3h2.4V5h3.8v3h2.4V5h4.2v15.5z",
     cut: "M9.9 20.5v-4.6a2.1 2.1 0 0 1 4.2 0v4.6zM11.2 9.8h1.6v2.8h-1.6z",

@@ -57,8 +57,11 @@ function scriptedGame(ticks: number): Game {
 describe("Game.hash", () => {
   it("tells apart games that differ in any balance value, whatever the key order", () => {
     const grid = new WorldGrid(8, 8);
-    const terrain = new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains));
-    // Capital mode's values count only in a game played with it (R-MODE-08).
+    // Capital mode's values count only in a game played with it (R-MODE-08), and
+    // landmarks' only on a map that has one (R-LAND-01).
+    const terrain = new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains), [
+      { id: "tower", tile: 9, effect: "gold" },
+    ]);
     const hashWith = (balance: Balance) =>
       new Game({
         terrain,
@@ -76,6 +79,16 @@ describe("Game.hash", () => {
         typeof value === "number" ? value + 1 : value.map((v, i) => (i === 0 ? v + 1 : v));
       expect(hashWith({ ...DEFAULT_BALANCE, [key]: changed }), key).not.toBe(reference);
     }
+  });
+
+  it("leaves the landmarks' balance out of the hash of a map without any (R-LAND-01)", () => {
+    const grid = new WorldGrid(8, 8);
+    const terrain = new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains));
+    const hashWith = (balance: Balance) =>
+      new Game({ terrain, seed: 1, players: [{ id: 1, name: "Ada" }], balance }).hash();
+    expect(hashWith({ ...DEFAULT_BALANCE, landmarkGoldPercent: 99 })).toBe(
+      hashWith(DEFAULT_BALANCE),
+    );
   });
 
   it("is the same for the same game, and changes with any part of the state", () => {

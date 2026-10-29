@@ -2,6 +2,7 @@ import { isAllied, logEvent } from "./diplomacy.ts";
 import type { Game, Player } from "./game.ts";
 import { isqrt, mulDiv } from "./integer-math.ts";
 import { DrawUsage, derivedRandom } from "./random.ts";
+import { shieldedBy } from "./landmarks.ts";
 import { spawnSettings } from "./spawn.ts";
 import { StructureKind, isReady, type Structure } from "./structures.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
@@ -232,9 +233,20 @@ export function installMissiles(game: Game): void {
     missiles.length = kept;
   });
 
-  /** Gives every air defense in range its one try; whether one stopped the missile. */
+  /** Gives every air defense in range its one try, then shield landmarks (R-LAND-02); whether one stopped the missile. */
   function intercepted(missile: Missile): boolean {
     const at = missileTile(game, missile, game.tick + 1);
+    if (byAirDefense(missile, at)) return true;
+    if (game.terrain.landmarks.length === 0) return false;
+    const previous =
+      game.tick > missile.launchedAt ? missileTile(game, missile, game.tick) : undefined;
+    const holder = shieldedBy(game, missile, at, previous);
+    if (holder === NEUTRAL) return false;
+    logEvent(game, { tick: game.tick, type: "stopped", a: holder, b: missile.player });
+    return true;
+  }
+
+  function byAirDefense(missile: Missile, at: number): boolean {
     const radius = airDefenseRadius(game);
     const reach = radius * radius;
     for (const defense of game.structures) {

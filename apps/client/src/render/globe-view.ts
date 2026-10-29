@@ -101,6 +101,7 @@ export class GlobeView implements Renderer {
       silo: { outline: markers(6, 5, 2), fill: markers(4.5, 5, 3), size: 4.5 },
       airDefense: { outline: markers(5.5, 12, 2), fill: markers(4, 12, 3), size: 4 },
       capital: { outline: markers(8.5, 5, 2), fill: markers(6.5, 5, 3), size: 6.5 },
+      landmark: { outline: markers(8, 3, 2), fill: markers(6, 3, 3), size: 6 },
     };
   }
 
@@ -171,6 +172,7 @@ export class GlobeView implements Renderer {
       "silo",
       "airDefense",
       "capital",
+      "landmark",
     ] as const) {
       const { outline, fill } = this.structures[type];
       let count = 0;

@@ -56,7 +56,9 @@ export {
   type GameRecord,
 } from "./game-record.ts";
 export {
+  goldEarning,
   installEconomy,
+  playerGrowth,
   populationCap,
   soldiers,
   troopGrowth,
@@ -64,6 +66,17 @@ export {
   workers,
 } from "./economy.ts";
 export { GiftError, giftError, giftedTroops, installGifts } from "./gifts.ts";
+export {
+  LANDMARK_EFFECTS,
+  LandmarkEffect,
+  guardedByLandmark,
+  heldLandmarks,
+  installLandmarks,
+  landmarkFortressRadius,
+  landmarkHolder,
+  landmarkShieldRadius,
+  type Landmark,
+} from "./landmarks.ts";
 export {
   QUICK_MESSAGES,
   QUICK_MESSAGE_TICKS,
