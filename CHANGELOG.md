@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-29
+
+Easier to start and to sign in: nations that accept alliances, every level eased and games that start at easy, one account for Discord, Google and email, and a handful of fixes to taking a game back.
+
 ### Added
 
 - **One account, several ways to sign in.** Signed in, open your profile and add Google, Discord or an email address to the same account, then sign in with whichever you like. If the one you add already has an account of its own, the game asks before merging the two: you keep your current name and the achievements of both, and the other name becomes free. Nothing is ever joined without you, and a way to sign in can be taken off as long as another is left.
@@ -484,7 +488,9 @@ The first playable beta: a solo game in the browser against bots on a map of the
 - The server trusts the `X-Client-IP` header only from a proxy on a private address, and accepts WebSocket connections without an `Origin` header, as sent by bots and tools.
 - A client that cannot read a turn asks for a reload instead of playing on out of step, and one that notices a gap in its turns rejoins to fetch the missing ones.
 
-[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/nic0lasm/frontfall/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/nic0lasm/frontfall/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nic0lasm/frontfall/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nic0lasm/frontfall/compare/v0.6.4...v0.7.0
 [0.6.4]: https://github.com/nic0lasm/frontfall/compare/v0.6.3...v0.6.4
