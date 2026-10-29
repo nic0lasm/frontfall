@@ -11,7 +11,9 @@
 | `FRONTFALL_ORIGINE`                                            | unset                                   | Only pages from this origin may open a WebSocket, such as `https://nclsmgr.com`. Unset allows any                                                                                                                                                                                                                                                                  |
 | `FRONTFALL_VERSION`                                            | `dev`                                   | Build identifier returned by `/healthz`; the image sets it to the commit                                                                                                                                                                                                                                                                                           |
 | `FRONTFALL_MAX_GAMES`                                          | `500`                                   | Games open or running at once                                                                                                                                                                                                                                                                                                                                      |
-| `FRONTFALL_MAX_CONNECTIONS`                                    | `5000`                                  | Open WebSocket connections at once                                                                                                                                                                                                                                                                                                                                 |
+| `FRONTFALL_MAX_CONNECTIONS`                                    | `5000`                                  | Open WebSocket connections at once; further ones are closed with code `4006`, and the page says the server is full                                                                                                                                                                                                                                                 |
+| `FRONTFALL_MAX_PLAYERS`                                        | `3000`                                  | Players seated in games at once; further `play`, `create` and `join` requests get `too_many_games`, while players of a running game still rejoin ([capacity.md](capacity.md))                                                                                                                                                                                      |
+| `FRONTFALL_MAX_LOG_MIB`                                        | `192`                                   | Mebibytes the turn logs of every game may take together before new players are turned away the same way                                                                                                                                                                                                                                                            |
 | `NODE_OPTIONS`                                                 | `--max-old-space-size=512` in the image | Caps the JavaScript heap; raise it with the container's memory limit                                                                                                                                                                                                                                                                                               |
 | `FRONTFALL_COUNTDOWN_SECONDS`                                  | `60`                                    | Countdown of a game opened by "Play now", from its first player; 1 at least                                                                                                                                                                                                                                                                                        |
 | `FRONTFALL_DRAIN_SECONDS`                                      | `20`                                    | After `SIGTERM`, how long running games may go on; keep it below the container's stop grace period                                                                                                                                                                                                                                                                 |
@@ -27,28 +29,32 @@
 
 ## Games
 
-| Setting                        | Value                      | Notes                                                                                                        |
-| ------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Players per game               | 2 to 16, set by the host   | A game set to start when full (the default) starts as its last seat is taken                                 |
-| Players to start a public game | 2                          | The host starts it; any number for a private game                                                            |
-| "Play now" countdown           | 60 seconds                 | From the first player, 30 s at least after the second; alone at the end, the map's default bots fill in      |
-| Host away                      | 2 minutes                  | With other players waiting, the role goes to the one seen most recently                                      |
-| Seat kept after a drop         | 5 minutes                  | The player rejoins with their token and every missed turn                                                    |
-| Lobby seat kept after a drop   | 30 seconds                 | The player gets their place back, and the host keeps the role (see below)                                    |
-| Longest game                   | 4 hours                    | Then the game ends with reason `timeout`                                                                     |
-| Games at once                  | 500                        | Further `play` and `create` requests get `too_many_games`                                                    |
-| Bots in a game                 | 25                         | Seats shrink to fit the map's `players.max`, never below the players present                                 |
-| Game not started               | 10 minutes after it opened | Then the game ends with reason `expired`                                                                     |
-| Lobbies per address            | 3 not yet started          | Public and private; further `create` requests get `too_many_lobbies`                                         |
-| Seats per address              | 3 in a public game         | Private games have none; further `join` requests get `too_many_seats`, and "Play now" looks for another game |
-| Removed players                | Until the game starts      | The host removes a player with `kick`; their address then gets `removed` from that game                      |
-| Public games listed            | 100                        | Waiting ones first, the fewest free seats first, then the oldest                                             |
+| Setting                        | Value                      | Notes                                                                                                               |
+| ------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Players per game               | 2 to 16, set by the host   | A game set to start when full (the default) starts as its last seat is taken                                        |
+| Players to start a public game | 2                          | The host starts it; any number for a private game                                                                   |
+| "Play now" countdown           | 60 seconds                 | From the first player, 30 s at least after the second; alone at the end, the map's default bots fill in             |
+| Host away                      | 2 minutes                  | With other players waiting, the role goes to the one seen most recently                                             |
+| Seat kept after a drop         | 5 minutes                  | The player rejoins with their token and every missed turn                                                           |
+| Lobby seat kept after a drop   | 30 seconds                 | The player gets their place back, and the host keeps the role (see below)                                           |
+| Longest game                   | 4 hours                    | Then the game ends with reason `timeout`                                                                            |
+| Games at once                  | 500                        | Further `play` and `create` requests get `too_many_games`                                                           |
+| Players at once                | 3000                       | Further `play`, `create` and `join` requests get `too_many_games`; a seat taken back with `rejoin` is always served |
+| Turn log of one game           | 16 MiB                     | Then the game ends with reason `timeout`; a busy 4-hour game logs about 2 MiB                                       |
+| Bots in a game                 | 25                         | Seats shrink to fit the map's `players.max`, never below the players present                                        |
+| Game not started               | 10 minutes after it opened | Then the game ends with reason `expired`                                                                            |
+| Lobbies per address            | 3 not yet started          | Public and private; further `create` requests get `too_many_lobbies`                                                |
+| Seats per address              | 3 in a public game         | Private games have none; further `join` requests get `too_many_seats`, and "Play now" looks for another game        |
+| Removed players                | Until the game starts      | The host removes a player with `kick`; their address then gets `removed` from that game                             |
+| Public games listed            | 100                        | Waiting ones first, the fewest free seats first, then the oldest                                                    |
 
 A connection that drops without a close frame, as when a phone goes to sleep or the network fails, keeps its seat in a lobby for 30 seconds: the client takes it back with the token of the `lobby` message, or lands in the game if it started meanwhile. A page that closes its socket itself, on a reload or when the tab closes, gives its lobby seat up at once.
 
 A game is freed as soon as it ends: when its last player leaves before the start, when it has not started ten minutes after it opened, when every player has been gone for five minutes, or at the time limit. Its turn log, about one byte per quiet tick, goes with it.
 
-All running games share one timer that closes a turn every 100 ms. The `frontfall_turn_duration_seconds` histogram measures how long one pass over every game takes.
+All running games share one timer that closes a turn of each every 100 ms. It runs ten passes a tick, on a fixed schedule, each over a tenth of the games, so that the sends of thousands of players never hold the server for long at once. The `frontfall_turn_duration_seconds` histogram measures how long one pass takes.
+
+A player who rejoins gets the turns they missed one frame of 2000 turns at a time, the next once the last has gone out to the network. A connection that leaves more than 4 MiB unread, such as a tab asleep on a stalled network, is dropped and counted in `frontfall_slow_clients_total`: the page rejoins from its last turn.
 
 Games offer the maps listed in `maps/index.json` of the built client, read once at start. Without that file, only the default map, World, can be picked.
 
@@ -152,23 +158,25 @@ Client addresses never appear in clear. `client` is a keyed hash of the address:
 curl -s localhost:8080/metrics
 ```
 
-| Metric                                                | Type      | Meaning                                                                      |
-| ----------------------------------------------------- | --------- | ---------------------------------------------------------------------------- |
-| `frontfall_games{state}`                              | gauge     | Games `open`, `starting` (counting down) and `running`                       |
-| `frontfall_players`                                   | gauge     | Players seated in a game with an open connection                             |
-| `frontfall_connections`                               | gauge     | Open WebSocket connections                                                   |
-| `frontfall_games_started_total{visibility,map,teams}` | counter   | Games that started                                                           |
-| `frontfall_games_finished_total{reason}`              | counter   | Games that finished: `abandoned`, `timeout`, `expired`, `empty`              |
-| `frontfall_desyncs_total`                             | counter   | Games in which a client's state hash differed from the majority's            |
-| `frontfall_rejoins_total`                             | counter   | Players who took their seat back after a dropped connection                  |
-| `frontfall_messages_received_total`                   | counter   | Messages received from clients                                               |
-| `frontfall_rejected_messages_total{reason}`           | counter   | Connections closed: `invalid`, `oversized`, `rate_limited`, `idle`, `banned` |
-| `frontfall_reports_total{reason}`                     | counter   | Reports of a player by another                                               |
-| `frontfall_game_duration_minutes`                     | histogram | Length of the games that finished                                            |
-| `frontfall_turn_duration_seconds`                     | histogram | Time to close and send one turn of every running game                        |
-| `frontfall_usage_total{dimension,value}`              | counter   | Reports of players' pages ([privacy.md](privacy.md))                         |
-| `process_resident_memory_bytes`                       | gauge     | Resident memory of the process                                               |
-| `process_cpu_seconds_total`                           | counter   | CPU time used by the process                                                 |
+| Metric                                                | Type      | Meaning                                                                                                      |
+| ----------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------ |
+| `frontfall_games{state}`                              | gauge     | Games `open`, `starting` (counting down) and `running`                                                       |
+| `frontfall_players`                                   | gauge     | Players seated in a game with an open connection                                                             |
+| `frontfall_connections`                               | gauge     | Open WebSocket connections                                                                                   |
+| `frontfall_games_started_total{visibility,map,teams}` | counter   | Games that started                                                                                           |
+| `frontfall_games_finished_total{reason}`              | counter   | Games that finished: `abandoned`, `timeout`, `expired`, `empty`                                              |
+| `frontfall_desyncs_total`                             | counter   | Games in which a client's state hash differed from the majority's                                            |
+| `frontfall_rejoins_total`                             | counter   | Players who took their seat back after a dropped connection                                                  |
+| `frontfall_messages_received_total`                   | counter   | Messages received from clients                                                                               |
+| `frontfall_rejected_messages_total{reason}`           | counter   | Connections closed: `invalid`, `oversized`, `rate_limited`, `idle`, `banned`                                 |
+| `frontfall_reports_total{reason}`                     | counter   | Reports of a player by another                                                                               |
+| `frontfall_game_duration_minutes`                     | histogram | Length of the games that finished                                                                            |
+| `frontfall_turn_duration_seconds`                     | histogram | Time of one pass of the turn timer, a tenth of the games                                                     |
+| `frontfall_refused_connections_total{reason}`         | counter   | Players turned away: `connections` (code `4006`), `players` (`too_many_games` while full), `address` (`429`) |
+| `frontfall_slow_clients_total`                        | counter   | Connections dropped for leaving 4 MiB unread                                                                 |
+| `frontfall_usage_total{dimension,value}`              | counter   | Reports of players' pages ([privacy.md](privacy.md))                                                         |
+| `process_resident_memory_bytes`                       | gauge     | Resident memory of the process                                                                               |
+| `process_cpu_seconds_total`                           | counter   | CPU time used by the process                                                                                 |
 
 ## HTTP routes
 

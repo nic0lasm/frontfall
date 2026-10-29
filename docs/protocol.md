@@ -357,16 +357,17 @@ The server restarts for an update in `inMs` milliseconds. A server with a data d
 
 ## Close codes
 
-| Code   | Meaning                                                          |
-| ------ | ---------------------------------------------------------------- |
-| `1009` | A frame was larger than 1 KiB                                    |
-| `1012` | The server restarted: reconnect, and rejoin a game that was kept |
-| `4000` | Another protocol version or build: reload the page               |
-| `4001` | A frame could not be decoded or broke a rule                     |
-| `4002` | More than 20 messages per second on average, or bursts above 40  |
-| `4003` | No `hello` within 10 seconds, or out of any game for 5 minutes   |
-| `4004` | Another connection took over this player (reserved)              |
-| `4005` | The operator banned this address: do not reconnect               |
+| Code   | Meaning                                                             |
+| ------ | ------------------------------------------------------------------- |
+| `1009` | A frame was larger than 1 KiB                                       |
+| `1012` | The server restarted: reconnect, and rejoin a game that was kept    |
+| `4000` | Another protocol version or build: reload the page                  |
+| `4001` | A frame could not be decoded or broke a rule                        |
+| `4002` | More than 20 messages per second on average, or bursts above 40     |
+| `4003` | No `hello` within 10 seconds, or out of any game for 5 minutes      |
+| `4004` | Another connection took over this player (reserved)                 |
+| `4005` | The operator banned this address: do not reconnect                  |
+| `4006` | The server is full: try again in a while, longer than after a fault |
 
 ## Binary frames
 
