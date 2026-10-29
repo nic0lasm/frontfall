@@ -230,9 +230,9 @@ export class OnlineClient {
 
   /**
    * Host: map, bots, seats and, for a public game, its name, until the start;
-   * for the operator of the server, their own gold bonus too (R-MODE-09).
+   * for the operator of the server, their own bonuses too (R-MODE-09).
    */
-  configure(options: GameOptions, name?: string, operatorGold?: boolean): void {
+  configure(options: GameOptions, name?: string, operatorBonuses?: number): void {
     const token = this.lobbySeat?.token ?? "";
     if (this.configures.token !== token) this.configures = { token, sent: 0 };
     this.configures.sent += 1;
@@ -240,7 +240,7 @@ export class OnlineClient {
       type: "configure",
       options,
       ...(name !== undefined && { name }),
-      ...(operatorGold !== undefined && { operatorGold }),
+      ...(operatorBonuses !== undefined && { operatorBonuses }),
       seq: this.configures.sent,
     });
   }

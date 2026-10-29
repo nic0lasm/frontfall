@@ -74,11 +74,45 @@ export interface GameSetup {
   /** Special rules this game plays with (R-MODE-08); each one left out is off. */
   rules?: Partial<GameRules>;
   /**
-   * The player whose gold the operator's test bonus doubles (R-MODE-09); 0 or
-   * left out for none, as in every game but a private one of the operator.
+   * The operator's test bonuses (R-MODE-09): the player who has them and the
+   * `OperatorBonus` bits they turned on. Left out, as in every game but a
+   * private one of the operator, nobody has any.
    */
-  goldBonus?: number;
+  operator?: OperatorBonuses;
 }
+
+/**
+ * What the operator of a server may give themselves in their private games,
+ * to test (R-MODE-09), one bit each.
+ */
+export const OperatorBonus = {
+  /** Twice the gold from troops, workers and the base income. */
+  Gold: 1 << 0,
+  /** Twice the population cap and twice the troop growth. */
+  Troops: 1 << 1,
+  /** Structures at half their price. */
+  Building: 1 << 2,
+  /** Land twice as costly to take from them. */
+  Defense: 1 << 3,
+} as const;
+/**
+ * How much each operator's bonus does (R-MODE-09): twice the gold, troops and
+ * defense, half the price. Not a balance value: it never applies to a game
+ * anyone but the operator plays to win, and the balance digest stays as it was.
+ */
+export const OPERATOR_FACTOR = 2;
+/** Every `OperatorBonus` bit. */
+export const OPERATOR_BONUS_ALL = 0xf;
+
+export interface OperatorBonuses {
+  /** The player who has the bonuses. */
+  readonly player: number;
+  /** `OperatorBonus` bits; 0 for none. */
+  readonly bonuses: number;
+}
+
+/** No operator's bonus at all. */
+export const NO_OPERATOR: OperatorBonuses = { player: 0, bonuses: 0 };
 
 /** Special rules a game can be played with (R-MODE-08), all off unless the setup turns them on. */
 export interface GameRules {
@@ -93,8 +127,8 @@ export const NO_RULES: GameRules = { capitals: false, collapsingFronts: false };
 
 /** Marks the special rules in the state hash. */
 const RULES_TAG = 0x72756c65;
-/** Marks the operator's gold bonus in the state hash (R-MODE-09). */
-const GOLD_BONUS_TAG = 0x676f6c64;
+/** Marks the operator's bonuses in the state hash (R-MODE-09). */
+const OPERATOR_TAG = 0x6f706572;
 
 /** One bit per special rule that is on, for the state hash and the setup digest; 0 with none. */
 export function ruleBits(rules: GameRules): number {
@@ -238,8 +272,8 @@ export class Game {
   readonly disabled: number;
   /** Special rules of this game (R-MODE-08). */
   readonly rules: GameRules;
-  /** The player whose gold income is doubled by the operator's test bonus (R-MODE-09), 0 for none. */
-  readonly goldBonus: number;
+  /** The operator's test bonuses (R-MODE-09); `NO_OPERATOR` in nearly every game. */
+  readonly operator: OperatorBonuses;
   /** Capitals taken or razed, oldest first (R-CAP-03, R-CAP-04). Owned by the capital rules. */
   readonly capitalFalls: CapitalFall[] = [];
   /**
@@ -313,11 +347,14 @@ export class Game {
       this.rules,
       setup.terrain.landmarks.length > 0,
     );
-    const goldBonus = setup.goldBonus ?? 0;
-    if (goldBonus !== 0 && !this.playersById.has(goldBonus)) {
-      throw new RangeError(`gold bonus for unknown player ${String(goldBonus)}`);
+    const { player: bonusPlayer, bonuses } = setup.operator ?? NO_OPERATOR;
+    if (!(Number.isInteger(bonuses) && bonuses >= 0 && bonuses <= OPERATOR_BONUS_ALL)) {
+      throw new RangeError(`invalid operator bonuses ${String(bonuses)}`);
     }
-    this.goldBonus = goldBonus;
+    if (bonuses !== 0 && !this.playersById.has(bonusPlayer)) {
+      throw new RangeError(`operator bonuses for unknown player ${String(bonusPlayer)}`);
+    }
+    this.operator = bonuses === 0 ? NO_OPERATOR : { player: bonusPlayer, bonuses };
     // R-MODE-02: dealt in turn, so team sizes differ by one at most.
     this.sortedPlayers = [...this.playersById.values()]
       .sort((a, b) => a.id - b.id)
@@ -506,9 +543,10 @@ export class Game {
       hash = mix(hash, ruleBits(this.rules));
     }
     // And games without the operator's gold bonus.
-    if (this.goldBonus !== 0) {
-      hash = mix(hash, GOLD_BONUS_TAG);
-      hash = mix(hash, this.goldBonus);
+    if (this.operator.bonuses !== 0) {
+      hash = mix(hash, OPERATOR_TAG);
+      hash = mix(hash, this.operator.player);
+      hash = mix(hash, this.operator.bonuses);
     }
     for (const c of this.quickCooldowns) {
       if (this.currentTick < c.until) {
@@ -592,11 +630,17 @@ export class Game {
     mix(this.teams);
     mix(this.disabled);
     if (ruleBits(this.rules) !== 0) mix(ruleBits(this.rules));
-    if (this.goldBonus !== 0) {
-      mix(GOLD_BONUS_TAG);
-      mix(this.goldBonus);
+    if (this.operator.bonuses !== 0) {
+      mix(OPERATOR_TAG);
+      mix(this.operator.player);
+      mix(this.operator.bonuses);
     }
     return hash >>> 0;
+  }
+
+  /** Whether `player` has the operator's bonus `bonus`, an `OperatorBonus` bit (R-MODE-09). */
+  hasBonus(player: number, bonus: number): boolean {
+    return player === this.operator.player && (this.operator.bonuses & bonus) !== 0;
   }
 
   /** Valid orders are offered to handlers in turn until one carries them out. */

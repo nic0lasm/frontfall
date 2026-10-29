@@ -28,7 +28,7 @@
 | `FRONTFALL_OAUTH_GOOGLE_ID`, `FRONTFALL_OAUTH_GOOGLE_SECRET`   | unset                                   | Client id and secret of a Google OAuth client: sign-in with Google ([Accounts](#accounts))                                                                                                                                                                                                                                                                         |
 | `FRONTFALL_SMTP_FILE`                                          | unset                                   | JSON file of the mailbox sign-in links are sent from: sign-in by email ([Accounts](#sign-in-by-email))                                                                                                                                                                                                                                                             |
 | `FRONTFALL_EMAIL_DAILY_LIMIT`                                  | `150`                                   | Sign-in links sent in a day, all players together; keep it under the mailbox's own limit ([Accounts](#sign-in-by-email))                                                                                                                                                                                                                                           |
-| `FRONTFALL_OPERATOR_ACCOUNTS`                                  | unset                                   | Ids of the operator's accounts, separated by commas or spaces: each may double their own gold in their private games, to test ([Operator gold bonus](#operator-gold-bonus)). Unset, no one can                                                                                                                                                                     |
+| `FRONTFALL_OPERATOR_ACCOUNTS`                                  | unset                                   | Ids of the operator's accounts, separated by commas or spaces: each may give themselves bonuses in their private games, to test ([Operator bonuses](#operator-bonuses)). Unset, no one can                                                                                                                                                                         |
 
 ## Games
 
@@ -261,19 +261,19 @@ Each account keeps the first way it was made with, and the others in `links`, ea
 
 Signed in, the menu posts the device's achievements to `/api/me/achievements` (8 KiB at most) and keeps what comes back, so that they follow the player. The server adds them to the account's: each achievement keeps its higher level and earlier day, each count its larger value, and nothing is ever taken away; at most 64 achievements and 8 counts, with ids of lowercase letters, digits and dashes. Two devices played apart between two visits to the menu keep the larger count, not their sum. They are counted by the page, as before: an account only carries them. Deleting the account deletes them.
 
-## Operator gold bonus
+## Operator bonuses
 
-The operator of a server may want to try a long game, a late-game structure or a balance change without playing an hour to afford it. `FRONTFALL_OPERATOR_ACCOUNTS` lists the ids of their accounts ([Accounts](#accounts)), or of accounts merged into them; a player signed in to one of them, host of a private game, then sees "Operator's test: double my gold" among the lobby's settings (`R-MODE-09`, [protocol](protocol.md#configure)). Ticked, it doubles the gold that player earns from their troops and workers, never anyone else's, for the whole game.
+The operator of a server may want to try a long game, a late-game structure or a balance change without playing an hour to afford it. `FRONTFALL_OPERATOR_ACCOUNTS` lists the ids of their accounts ([Accounts](#accounts)), or of accounts merged into them, separated by commas; a player signed in to one of them, host of a private game, then sees "Operator's test" among the lobby's settings (`R-MODE-09`, [protocol](protocol.md#configure)), with four boxes: double gold (from troops, workers and the base income), double troops (population cap and growth), structures at half price, and double defense (their land costs twice the troops to take). Each ticked box applies to that player alone, never to anyone else, for the whole game.
 
-It is never offered in a public game or "Play now", nor to a guest, nor by name: only the signed-in account counts, so nobody can claim it by taking a name. It is not hidden from the other players either: the lobby and the end screen of that game say who has it, and the game counts towards no player's statistics or achievements. Every client simulates the bonus, as it is part of the game's setup (`goldBonus` in `started`), so it changes no rule of other games, and a game without it plays and hashes as it did before the bonus existed. The server logs `operator_gold` with the game's id when it is turned on, and `server_started` gives the number of operator accounts it read.
+They are never offered in a public game or "Play now", nor to a guest, nor by name: only the signed-in account counts, so nobody can claim them by taking a name. They are not hidden from the other players either: the lobby and the end screen of that game say who has which, and the game counts towards no player's statistics or achievements. Every client simulates the bonuses, as they are part of the game's setup (`operatorBonuses` in `started`), so they change no rule of other games, and a game without them plays and hashes as it did before they existed. The server logs `operator_bonuses` with the game's id and the bonuses when they are set, and `server_started` gives the number of operator accounts it read.
 
-An account's id is in `accounts/accounts.json` under the data directory. From the host, inside the container (the name may differ on yours), for the account that plays as Nico:
+An account's id is in `accounts/accounts.json` under the data directory, next to the service it signs in with, the name it plays under and the day it last signed in. From the host, inside the container (the name may differ on yours):
 
 ```sh
-docker exec frontfall-frontfall-1 node -e 'const f=process.env.FRONTFALL_DATA+"/accounts/accounts.json";for(const a of JSON.parse(require("fs").readFileSync(f,"utf8")).accounts)if(a.name.toLowerCase()===process.argv[1].toLowerCase())console.log(a.id)' Nico
+docker exec frontfall-frontfall-1 node -e 'const f=JSON.parse(require("fs").readFileSync(process.env.FRONTFALL_DATA+"/accounts/accounts.json","utf8"));for(const a of f.accounts)console.log(a.id,a.provider,new Date(a.seenAt).toISOString().slice(0,10),a.name)'
 ```
 
-Set `FRONTFALL_OPERATOR_ACCOUNTS` to that id in the container's environment, and restart it.
+Set `FRONTFALL_OPERATOR_ACCOUNTS` to those ids in the container's environment, and restart it.
 
 ## Health check
 

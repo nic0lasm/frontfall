@@ -1,4 +1,4 @@
-import { Disable, type Game, type Player } from "./game.ts";
+import { Disable, OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
 import { divFloor, mulDiv } from "./integer-math.ts";
 import { spawnSettings } from "./spawn.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
@@ -85,6 +85,12 @@ export function cityShare(game: Game, player: number): number {
  * what the next two would (R-BUILD-08).
  */
 export function structureCost(game: Game, player: number, kind: StructureKind): number {
+  const cost = fullCost(game, player, kind);
+  // R-MODE-09: the operator's building bonus halves every price.
+  return game.hasBonus(player, OperatorBonus.Building) ? Math.floor(cost / OPERATOR_FACTOR) : cost;
+}
+
+function fullCost(game: Game, player: number, kind: StructureKind): number {
   if (kind === StructureKind.City || kind === StructureKind.Palace) {
     const owned = cityShare(game, player);
     const next = grownCost(game, game.balance.cityCost, owned);

@@ -7,6 +7,11 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### Added
 
 - **One account, several ways to sign in.** Signed in, open your profile and add Google, Discord or an email address to the same account, then sign in with whichever you like. If the one you add already has an account of its own, the game asks before merging the two: you keep your current name and the achievements of both, and the other name becomes free. Nothing is ever joined without you, and a way to sign in can be taken off as long as another is left.
+- **More operator's tests.** Next to double gold, the operator of a server can now give themselves double troops, structures at half price and double defense in a private game they host, each on its own box. As before, nobody else can have them, the lobby and the end screen tell every player of that game, and such a game counts for no statistics or achievements.
+
+### For self-hosters and contributors
+
+- **Protocol 25.** `configure` takes `operatorBonuses`, a sum of bonuses, in place of `operatorGold`, and `lobby` and `started` carry `operatorBonuses` in place of `goldBonus` ([R-MODE-09](docs/rules.md), [protocol](docs/protocol.md)). Pages from before this release reload on their next connection.
 
 ### Fixed
 

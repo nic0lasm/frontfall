@@ -14,6 +14,7 @@ import {
 import { MAP_GROUPS, type MapInfo } from "../game/maps.ts";
 import { MAX_BOTS } from "../game/solo-game.ts";
 import { activeRuleNames, defaultRules, rulesFieldset } from "./rules-fieldset.ts";
+import { OPERATOR_BONUSES, operatorBonusLine } from "./operator-bonuses.ts";
 import { LEFT_OUT, TEAM_CHOICES } from "./setup.ts";
 import { applyTranslations, getLanguage, t, type MessageKey, type Params } from "../i18n/index.ts";
 import type { LobbyState } from "../net/online.ts";
@@ -48,9 +49,9 @@ export interface LobbyActions {
   onStart(): void;
   /**
    * Host: new options and, for a public game, a new name; for the operator,
-   * whether their gold bonus is on (R-MODE-09).
+   * the bonuses they give themselves (R-MODE-09).
    */
-  onConfigure(options: GameOptions, name?: string, operatorGold?: boolean): void;
+  onConfigure(options: GameOptions, name?: string, operatorBonuses?: number): void;
   /** Host of a quick game: stop the countdown. */
   onHold(): void;
   /** Host: remove another player from the game (R-MODE-05). */
@@ -154,13 +155,19 @@ export class LobbyScreen {
     this.onRulesChange();
   });
   private onRulesChange = (): void => undefined;
-  /** The operator's test bonus (R-MODE-09): offered only to them, in a private game. */
-  private readonly operatorGold = h("input", { id: "lobby-operator-gold", type: "checkbox" });
-  private readonly operatorGoldToggle = h(
-    "label",
-    { class: "toggle lobby-operator-gold", for: "lobby-operator-gold", hidden: true },
-    this.operatorGold,
-    h("span", { "data-i18n": "online.operatorGold" }),
+  /** The operator's test bonuses (R-MODE-09): offered only to them, in a private game. */
+  private readonly operatorBonuses = OPERATOR_BONUSES.map(({ bit, key }) => ({
+    bit,
+    key,
+    input: h("input", { id: `lobby-operator-${String(bit)}`, type: "checkbox" }),
+  }));
+  private readonly operatorGroup = h(
+    "fieldset",
+    { class: "rules-set lobby-operator", hidden: true },
+    h("legend", { "data-i18n": "operator.title" }),
+    ...this.operatorBonuses.map(({ input, key }) =>
+      h("label", { class: "toggle" }, input, h("span", { "data-i18n": key })),
+    ),
   );
   private readonly settings = h(
     "div",
@@ -202,13 +209,13 @@ export class LobbyScreen {
       ),
     ),
     this.rules.element,
-    this.operatorGoldToggle,
+    this.operatorGroup,
   );
   private readonly summary = h("p", { class: "lobby-summary", id: "lobby-summary" });
   /** The special rules of the game, for those who do not set them. */
   private readonly rulesLine = h("p", { class: "lobby-summary", id: "lobby-rules-line" });
   /** Every player of the game is told when the operator doubles their own gold (R-MODE-09). */
-  private readonly goldLine = h("p", { class: "lobby-summary", id: "lobby-operator-gold-line" });
+  private readonly operatorLine = h("p", { class: "lobby-summary", id: "lobby-operator-line" });
   private shown: { key: MessageKey; params: Params } = { key: "status.connecting", params: {} };
   /** Countdown of a public game: when it starts, by this page's clock. */
   private startsAt: number | undefined;
@@ -259,8 +266,13 @@ export class LobbyScreen {
         // A public game always plays the default rules; the server refuses others.
         ...(this.lastLobby.visibility === "private" ? { rules: this.rules.read() } : {}),
       };
-      const operatorGold = this.operatorGoldToggle.hidden ? undefined : this.operatorGold.checked;
-      actions.onConfigure(options, name, operatorGold);
+      const operatorBonuses = this.operatorGroup.hidden
+        ? undefined
+        : this.operatorBonuses.reduce(
+            (bits, { bit, input }) => bits | (input.checked ? bit : 0),
+            0,
+          );
+      actions.onConfigure(options, name, operatorBonuses);
     };
     // The name goes out once typed: on Enter or when the field loses focus.
     this.gameName.addEventListener("change", () => {
@@ -287,7 +299,7 @@ export class LobbyScreen {
     this.teams.addEventListener("change", reconfigure);
     this.speed.addEventListener("change", reconfigure);
     this.onRulesChange = reconfigure;
-    this.operatorGold.addEventListener("change", reconfigure);
+    for (const { input } of this.operatorBonuses) input.addEventListener("change", reconfigure);
     for (const { input } of this.allowed) input.addEventListener("change", reconfigure);
     this.bots.addEventListener("input", () => {
       this.botsValue.textContent = this.bots.value;
@@ -325,7 +337,7 @@ export class LobbyScreen {
         this.status,
         this.summary,
         this.rulesLine,
-        this.goldLine,
+        this.operatorLine,
         this.settings,
         this.players,
         this.invitation,
@@ -522,9 +534,12 @@ export class LobbyScreen {
     const played = activeRuleNames(lobby.rules);
     this.rulesLine.textContent = t("setup.rules.played", { rules: played.join(", ") });
     this.rulesLine.hidden = Boolean(editable) || played.length === 0;
-    const bonus = lobby.players.find((player) => player.id === lobby.goldBonus);
-    this.goldLine.textContent = bonus ? t("online.operatorGoldOn", { name: bonus.name }) : "";
-    this.goldLine.hidden = !bonus;
+    this.operatorLine.textContent = operatorBonusLine(
+      "online.operatorOn",
+      lobby.operatorBonuses,
+      lobby.players,
+    );
+    this.operatorLine.hidden = this.operatorLine.textContent === "";
     // An answer to an earlier change would undo the later ones, and the next change would send it back.
     if (!editable || this.behind) return;
     // Only maps that seat every player already in.
@@ -572,8 +587,9 @@ export class LobbyScreen {
     this.nations.checked = lobby.nations;
     // A public game plays the default rules, shown but not offered for change.
     this.rules.show(lobby.rules, lobby.visibility === "private");
-    this.operatorGoldToggle.hidden = !lobby.operator;
-    this.operatorGold.checked = lobby.goldBonus === lobby.you;
+    this.operatorGroup.hidden = !lobby.operator;
+    const mine = lobby.operatorBonuses?.player === lobby.you ? lobby.operatorBonuses.bonuses : 0;
+    for (const { bit, input } of this.operatorBonuses) input.checked = (mine & bit) !== 0;
     this.teams.replaceChildren(
       ...TEAM_CHOICES.map((teams) =>
         h("option", { value: teams }, t(`mode.${String(teams)}` as MessageKey)),

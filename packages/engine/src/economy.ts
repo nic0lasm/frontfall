@@ -1,5 +1,5 @@
 import type { Balance } from "./balance.ts";
-import type { Game, Player } from "./game.ts";
+import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
 import { logEvent } from "./diplomacy.ts";
 import { mulDiv, percentOf } from "./integer-math.ts";
 import { LandmarkEffect, withLandmarks } from "./landmarks.ts";
@@ -23,7 +23,9 @@ export function populationCap(game: Game, player: Player): number {
   const full = Math.min(tiles, mulDiv(game.terrain.ownableCount, popFalloffSharePercent, 100));
   const land = full * popPerTile + mulDiv((tiles - full) * popPerTile, popFalloffPercent, 100);
   const cities = workingCities(game, player);
-  return base + land + mulDiv(land, cities * popPerCityPercent, 100);
+  const cap = base + land + mulDiv(land, cities * popPerCityPercent, 100);
+  // R-MODE-09: the operator's troop bonus doubles the cap.
+  return game.hasBonus(player.id, OperatorBonus.Troops) ? cap * OPERATOR_FACTOR : cap;
 }
 
 /** R-ECO-07: troops at home who work, earning gold, and neither attack nor defend. */
@@ -43,13 +45,6 @@ export function workError(game: Game, share: number): string | undefined {
   }
   return undefined;
 }
-
-/**
- * How many times their usual gold the player of the operator's test bonus
- * earns (R-MODE-09). Not a balance value: it never applies to a game anyone
- * but the operator plays to win, and the balance digest stays as it was.
- */
-export const OPERATOR_GOLD_FACTOR = 2;
 
 /**
  * Growth of troops and gold every tick of play (R-ECO-01 to R-ECO-05), and
@@ -80,7 +75,7 @@ export function installEconomy(game: Game): void {
       // R-ECO-07: a worker earns B-WORK-GOLD times what a soldier does.
       const earning = goldEarning(game, player);
       // R-MODE-09: the operator's test bonus doubles one player's income.
-      const bonus = player.id === game.goldBonus ? OPERATOR_GOLD_FACTOR : 1;
+      const bonus = game.hasBonus(player.id, OperatorBonus.Gold) ? OPERATOR_FACTOR : 1;
       // B-GOLD-BASE: gold per second for every player, in the same units.
       const income = earning * game.balance.goldPerThousandTroops + game.balance.goldBase * 1000;
       const earned = income * bonus + player.goldRemainder;
@@ -148,7 +143,11 @@ export function playerGrowth(game: Game, player: Player, cap: number): number {
     landmarkGrowthPercent,
     gain,
   );
-  return Math.min(boosted, cap - player.troops);
+  // R-MODE-09: and the growth.
+  const grown = game.hasBonus(player.id, OperatorBonus.Troops)
+    ? boosted * OPERATOR_FACTOR
+    : boosted;
+  return Math.min(grown, cap - player.troops);
 }
 
 /**

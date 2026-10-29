@@ -429,7 +429,7 @@ async function playerSocket(base: string, name: string, cookie?: string) {
   return { socket, next, send };
 }
 
-describe("operator's gold bonus (R-MODE-09)", () => {
+describe("operator's bonuses (R-MODE-09)", () => {
   const options = {
     map: "world",
     bots: 0,
@@ -441,7 +441,7 @@ describe("operator's gold bonus (R-MODE-09)", () => {
     autoStart: false,
   } as const;
 
-  it("is offered to a listed account only, and doubles that player's gold alone", async () => {
+  it("is offered to a listed account only, and goes to that player alone", async () => {
     const operators = new Set<string>();
     const base = await start({ operatorAccounts: operators });
     const { session = "" } = await signIn(base);
@@ -454,7 +454,7 @@ describe("operator's gold bonus (R-MODE-09)", () => {
     const before = await playerSocket(base, "x", `frontfall_session=${session}`);
     before.send({ type: "create", visibility: "private" });
     expect((await before.next("lobby")).operator).toBe(false);
-    before.send({ type: "configure", options, operatorGold: true });
+    before.send({ type: "configure", options, operatorBonuses: 0b1001 });
     expect(await before.next("error")).toMatchObject({ code: "not_operator" });
     before.socket.close();
 
@@ -462,15 +462,21 @@ describe("operator's gold bonus (R-MODE-09)", () => {
     const nico = await playerSocket(base, "x", `frontfall_session=${session}`);
     nico.send({ type: "create", visibility: "private" });
     const lobby = await nico.next("lobby");
-    expect(lobby).toMatchObject({ operator: true, goldBonus: null });
-    nico.send({ type: "configure", options, operatorGold: true });
-    expect((await nico.next("lobby")).goldBonus).toBe(lobby.you);
+    expect(lobby).toMatchObject({ operator: true, operatorBonuses: null });
+    nico.send({ type: "configure", options, operatorBonuses: 0b1001 });
+    expect((await nico.next("lobby")).operatorBonuses).toEqual({
+      player: lobby.you,
+      bonuses: 0b1001,
+    });
 
     const guest = await playerSocket(base, "Guest");
     guest.send({ type: "join", game: lobby.game });
-    expect(await guest.next("lobby")).toMatchObject({ operator: false, goldBonus: lobby.you });
+    expect(await guest.next("lobby")).toMatchObject({
+      operator: false,
+      operatorBonuses: { player: lobby.you, bonuses: 0b1001 },
+    });
     nico.send({ type: "start" });
-    expect((await guest.next("started")).goldBonus).toBe(1);
+    expect((await guest.next("started")).operatorBonuses).toEqual({ player: 1, bonuses: 0b1001 });
     nico.socket.close();
     guest.socket.close();
   });
@@ -486,7 +492,7 @@ describe("operator's gold bonus (R-MODE-09)", () => {
     const nico = await playerSocket(base, "x", `frontfall_session=${session}`);
     nico.send({ type: "create", visibility: "public", name: "Open game" });
     expect((await nico.next("lobby")).operator).toBe(false);
-    nico.send({ type: "configure", options, operatorGold: true });
+    nico.send({ type: "configure", options, operatorBonuses: 0b1001 });
     expect(await nico.next("error")).toMatchObject({ code: "not_operator" });
     nico.socket.close();
   });

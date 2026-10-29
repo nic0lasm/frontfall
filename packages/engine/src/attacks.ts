@@ -1,4 +1,4 @@
-import type { Game, Player } from "./game.ts";
+import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
 import { divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
 import { isAllied, isTraitor, logEvent } from "./diplomacy.ts";
 import { soldiers } from "./economy.ts";
@@ -524,6 +524,8 @@ export function captureCost(
     : 100;
   const strength = Math.max(fort, capital, landmark);
   if (strength !== 100) cost = mulDiv(cost, strength, 100);
+  // R-MODE-09: the operator's defense bonus doubles the price of their land.
+  if (game.hasBonus(defender.id, OperatorBonus.Defense)) cost *= OPERATOR_FACTOR;
   // R-DIPLO-04: a traitor's land is cheaper to take while the mark lasts.
   if (isTraitor(game, defender)) cost = mulDiv(cost, balance.traitorDefensePercent, 100);
   // R-CAP-02: the capital itself holds a share of its owner's whole army.

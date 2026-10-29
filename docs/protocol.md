@@ -1,6 +1,6 @@
 # Network protocol
 
-Version 24. Clients and the game server talk over one WebSocket per player. The schemas live in [`packages/protocol`](../packages/protocol/src), which the client and the server both import; this page describes them for anyone writing a bot, a replay tool or another client.
+Version 25. Clients and the game server talk over one WebSocket per player. The schemas live in [`packages/protocol`](../packages/protocol/src), which the client and the server both import; this page describes them for anyone writing a bot, a replay tool or another client.
 
 The server never simulates the game ([ADR 0001](adr/0001-deterministic-lockstep.md)). It fills games with players, gives every player a number, then closes the orders it receives into one numbered turn every 100 ms and sends the same turns to every player. Each client runs the engine on those turns and reaches the same state.
 
@@ -21,7 +21,7 @@ The server pings every 25 seconds and drops a connection that missed the previou
 
 ```text
 client                                   server
-  | -- hello { version: 24, name } ----------> |
+  | -- hello { version: 25, name } ----------> |
   | <------------------ welcome { version } -- |
   | -- play ---------------------------------> |   or create, or join { game }
   | <-------------- lobby { players, ... } --- |   again after every change
@@ -55,7 +55,7 @@ Before a game starts, a dropped connection keeps its seat for 30 seconds, unless
 ### `hello`
 
 ```json
-{ "type": "hello", "version": 24, "name": "Léa", "build": "0d25e267bbae" }
+{ "type": "hello", "version": 25, "name": "Léa", "build": "0d25e267bbae" }
 ```
 
 First message of every connection. `version` is `PROTOCOL_VERSION`. A server running another version closes the connection with `4000`: the page is out of date and must be reloaded. This message keeps the same shape in every version of the protocol, so the mismatch can always be reported.
@@ -117,7 +117,7 @@ Takes back a seat after a dropped connection; see [Reconnecting](#reconnecting).
   },
   "name": "Europe 2v2",
   "seq": 3,
-  "operatorGold": false
+  "operatorBonuses": 0
 }
 ```
 
@@ -125,7 +125,7 @@ The host sets the game's map, its number of bots, how hard computer players play
 
 `seq`, optional, numbers the player's `configure` messages, from 1 for each seat and again from 1 after a reconnection: `rejoin` sets `configured` back to 0. The server echoes the last one it handled as `configured` in `lobby`, so that a host who changes several settings in a row can tell an answer to an earlier change from the answer to the latest one, and keeps the form as filled until then. A refused `configure` that carries `seq` is followed by `lobby` to that player alone, with the settings that hold and `configured` set to that `seq`.
 
-`operatorGold`, optional, is the operator's test bonus (`R-MODE-09`): `true` doubles the gold its sender earns, `false` stops it; left out, it stays as it was. Only a host whose `lobby` says `operator: true` may send it, that is a player signed in to an account listed in `FRONTFALL_OPERATOR_ACCOUNTS` ([server.md](server.md#operator-gold-bonus)), in a private game; anyone else gets `not_operator` and nothing changes. The bonus goes to the player who turned it on, never to the others, and leaves with them if they leave the lobby.
+`operatorBonuses`, optional, are the operator's test bonuses (`R-MODE-09`) its sender gives themselves, as a sum of 1 for twice the gold, 2 twice the troops (population cap and growth), 4 structures at half price and 8 land twice as costly to take, 0 for none; left out, they stay as they were. Only a host whose `lobby` says `operator: true` may send it, that is a player signed in to an account listed in `FRONTFALL_OPERATOR_ACCOUNTS` ([server.md](server.md#operator-bonuses)), in a private game; anyone else gets `not_operator` and nothing changes. The bonuses go to the player who set them, never to the others, and leave with them if they leave the lobby.
 
 ### `start`
 
@@ -212,7 +212,7 @@ Tiles are indexes in the map, below 2^31. The server checks only the shape of an
 ### `welcome`
 
 ```json
-{ "type": "welcome", "version": 24 }
+{ "type": "welcome", "version": 25 }
 ```
 
 The hello was accepted.
@@ -247,11 +247,11 @@ The hello was accepted.
   "token": "q8Vb1aV9mN3x0WcY2tLk4Q",
   "configured": 0,
   "operator": false,
-  "goldBonus": null
+  "operatorBonuses": null
 }
 ```
 
-The game being filled, sent after every change, the host's `configure` included. `name` is the listed name of a public game, `null` for a private one. `host` is the number of the player who sets the options and starts the game. `minPlayers` is how many players `start` needs. `startsIn` is the time left before the start in milliseconds, or `null` while no countdown runs; `holdable` says whether the host can still stop it. `token` takes this seat back after a dropped connection, before the start and after; it is the same as in `started`. `configured` is the `seq` of the last `configure` from this player the server handled, applied or refused, 0 before any. `speed` is the game's pace, always 1 in a public game, and `rules` its special rules (`R-MODE-08`). `operator` says whether this player may send `operatorGold` in `configure`, and `goldBonus` is the number of the player whose gold the operator's test bonus doubles (`R-MODE-09`), or `null`: every player of the game sees it.
+The game being filled, sent after every change, the host's `configure` included. `name` is the listed name of a public game, `null` for a private one. `host` is the number of the player who sets the options and starts the game. `minPlayers` is how many players `start` needs. `startsIn` is the time left before the start in milliseconds, or `null` while no countdown runs; `holdable` says whether the host can still stop it. `token` takes this seat back after a dropped connection, before the start and after; it is the same as in `started`. `configured` is the `seq` of the last `configure` from this player the server handled, applied or refused, 0 before any. `speed` is the game's pace, always 1 in a public game, and `rules` its special rules (`R-MODE-08`). `operator` says whether this player may send `operatorBonuses` in `configure`, and `operatorBonuses` gives the number of the player who has the operator's test bonuses and which (`R-MODE-09`), as `{ "player": 1, "bonuses": 3 }`, or `null`: every player of the game sees it.
 
 ### `started`
 
@@ -269,7 +269,7 @@ The game being filled, sent after every change, the host's `configure` included.
   "tickRate": 10,
   "speed": 1,
   "rules": { "collapsingFronts": true, "capitals": false },
-  "goldBonus": null,
+  "operatorBonuses": null,
   "players": [
     { "id": 1, "name": "Nico" },
     { "id": 2, "name": "Léa" }
@@ -279,7 +279,7 @@ The game being filled, sent after every change, the host's `configure` included.
 }
 ```
 
-Everything a client needs to create the same game as the others: map, seed, players, the number of bots each client adds and runs itself, whether it adds the map's nations, all at `difficulty`, what the game leaves out (`disabled`), its special rules (`rules`, `R-MODE-08`), the player whose gold every client doubles for the operator's test (`goldBonus`, `R-MODE-09`, `null` in nearly every game), and the number of `teams`, into which every client deals humans, bots and nations in id order (`R-MODE-02`). Bots take the numbers after the last player, then nations those after the last bot, in the order of the map's manifest. The server relays only human orders. `tickRate` is the server's beats per second and `speed` the turns of each beat, so turns come `tickRate` × `speed` per second (`R-MODE-07`); a client plays them at that pace. `token` is secret: it lets this player rejoin after a dropped connection. The message is sent again after a successful `rejoin`.
+Everything a client needs to create the same game as the others: map, seed, players, the number of bots each client adds and runs itself, whether it adds the map's nations, all at `difficulty`, what the game leaves out (`disabled`), its special rules (`rules`, `R-MODE-08`), the operator's test bonuses every client plays with (`operatorBonuses`, `R-MODE-09`, `null` in nearly every game), and the number of `teams`, into which every client deals humans, bots and nations in id order (`R-MODE-02`). Bots take the numbers after the last player, then nations those after the last bot, in the order of the map's manifest. The server relays only human orders. `tickRate` is the server's beats per second and `speed` the turns of each beat, so turns come `tickRate` × `speed` per second (`R-MODE-07`); a client plays them at that pace. `token` is secret: it lets this player rejoin after a dropped connection. The message is sent again after a successful `rejoin`.
 
 ### `turns`
 
@@ -344,7 +344,7 @@ A request was refused; the connection stays open. `message` is for people, `code
 | `token_in_use`       | `rejoin`                                       | Another connection holds the seat; retry in 1 s                                                                            |
 | `restarting`         | `play`, `create`, `join`                       | The server is about to restart; try again in a minute                                                                      |
 | `too_many_reports`   | `report`                                       | This address sent too many reports lately; try again in a few minutes                                                      |
-| `not_operator`       | `configure`                                    | Only the operator, signed in, may turn on the gold bonus, in a private game                                                |
+| `not_operator`       | `configure`                                    | Only the operator, signed in, may give themselves bonuses, in a private game                                               |
 
 ### `reported`
 
@@ -422,7 +422,7 @@ A turn with 32 orders takes about a tenth of its JSON size (214 bytes against 2,
 
 ## Versioning
 
-Client and server ship together in one image, so a mismatch only affects pages loaded before a deployment. Two checks catch them, both answered with close code `4000` and a reload. `PROTOCOL_VERSION` changes when a message changes shape or an order kind is added: version 2 added `retreat` and `embark`, version 3 the game options (`configure`, `bots` and `difficulty` in `lobby`, `difficulty` in `started`), version 4 the hashes in `desync`, version 5 `build` and `demolish`, version 6 `ally` and `betray`, version 7 `nations` in the game options, `lobby` and `started`, version 8 `teams` in the same three places, version 9 `embargo`, version 10 `warship` and `patrol`, version 11 `missile`, version 12 `gift` and `disabled` in the game options, `lobby` and `started`, version 13 `quick`, version 14 `token` in `lobby`, `rejoin` before the start, the `restart` reason of `ended`, the `restarting` error and `maintenance`, version 15 `5`, the palace, among the structures of `build`, version 16 `visibility` and `name` in `create` for public games of one's own, `name` in `play` and `configure`, `capacity` and `autoStart` in the game options, `hold` and `active`, and `seq` in `configure`, and `name`, `autoStart`, `minPlayers`, `holdable`, `configured` and a host for every game in `lobby`, version 17 `kick`, the `removed` reason of `ended`, and the `removed` and `too_many_seats` errors, version 18 `report` and `reported`, the `too_many_reports` error and close code `4005`, version 19 `speed` in the game options, `lobby` and `started`, with as many turns per frame, version 20 `work`, version 22 `rules`, the special rules, in the game options, `lobby` and `started`, version 23 `capitals` among them, version 24 `operatorGold` in `configure`, `operator` and `goldBonus` in `lobby`, `goldBonus` in `started` and the `not_operator` error. The `build` sent in `hello` catches everything else, such as a change of the engine or the balance, which leaves the protocol as it is but would desynchronise an older page. The protocol makes no promise of compatibility between simulation builds: an older page of another one is always sent away.
+Client and server ship together in one image, so a mismatch only affects pages loaded before a deployment. Two checks catch them, both answered with close code `4000` and a reload. `PROTOCOL_VERSION` changes when a message changes shape or an order kind is added: version 2 added `retreat` and `embark`, version 3 the game options (`configure`, `bots` and `difficulty` in `lobby`, `difficulty` in `started`), version 4 the hashes in `desync`, version 5 `build` and `demolish`, version 6 `ally` and `betray`, version 7 `nations` in the game options, `lobby` and `started`, version 8 `teams` in the same three places, version 9 `embargo`, version 10 `warship` and `patrol`, version 11 `missile`, version 12 `gift` and `disabled` in the game options, `lobby` and `started`, version 13 `quick`, version 14 `token` in `lobby`, `rejoin` before the start, the `restart` reason of `ended`, the `restarting` error and `maintenance`, version 15 `5`, the palace, among the structures of `build`, version 16 `visibility` and `name` in `create` for public games of one's own, `name` in `play` and `configure`, `capacity` and `autoStart` in the game options, `hold` and `active`, and `seq` in `configure`, and `name`, `autoStart`, `minPlayers`, `holdable`, `configured` and a host for every game in `lobby`, version 17 `kick`, the `removed` reason of `ended`, and the `removed` and `too_many_seats` errors, version 18 `report` and `reported`, the `too_many_reports` error and close code `4005`, version 19 `speed` in the game options, `lobby` and `started`, with as many turns per frame, version 20 `work`, version 22 `rules`, the special rules, in the game options, `lobby` and `started`, version 23 `capitals` among them, version 24 `operatorGold` in `configure`, `operator` and `goldBonus` in `lobby`, `goldBonus` in `started` and the `not_operator` error, version 25 `operatorBonuses` in their place. The `build` sent in `hello` catches everything else, such as a change of the engine or the balance, which leaves the protocol as it is but would desynchronise an older page. The protocol makes no promise of compatibility between simulation builds: an older page of another one is always sent away.
 
 ### Simulation build
 

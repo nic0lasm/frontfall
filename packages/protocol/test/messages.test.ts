@@ -69,7 +69,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
     holdable: true,
     configured: 0,
     operator: false,
-    goldBonus: null,
+    operatorBonuses: null,
   },
   {
     type: "started",
@@ -84,7 +84,7 @@ const SERVER_MESSAGES: ServerMessage[] = [
     tickRate: 10,
     speed: 2,
     rules: { collapsingFronts: false, capitals: true },
-    goldBonus: 1,
+    operatorBonuses: { player: 1, bonuses: 3 },
     players: [{ id: 1, name: "Nico" }],
     you: 1,
     token: "0123456789abcdefABCDEF",

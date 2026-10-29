@@ -1526,6 +1526,15 @@ input::placeholder {
   grid-column: 1 / -1;
 }
 
+/* R-MODE-09: the names also read inside a sentence, so they start in lower case. */
+.lobby-operator .toggle span {
+  display: inline-block;
+}
+
+.lobby-operator .toggle span::first-letter {
+  text-transform: uppercase;
+}
+
 .end-rules {
   margin: 0;
   color: var(--ff-slate-300);

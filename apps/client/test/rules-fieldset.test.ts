@@ -3,6 +3,11 @@ import { setLanguage } from "../src/i18n/index.ts";
 import { GENERATED_MAPS as maps } from "../src/game/maps.ts";
 import { activeRuleNames, defaultRules, SPECIAL_RULES } from "../src/ui/rules-fieldset.ts";
 import { defaultSetup } from "../src/ui/setup.ts";
+import {
+  OPERATOR_BONUSES,
+  operatorBonusLine,
+  operatorBonusNames,
+} from "../src/ui/operator-bonuses.ts";
 
 describe("special rules (R-MODE-08)", () => {
   it("lists every rule the engine knows, each with a label and a hint", () => {
@@ -23,5 +28,19 @@ describe("special rules (R-MODE-08)", () => {
   it("hands a solo game the default rules, which the solo options carry on", () => {
     const options = { ...defaultSetup(maps), seed: 1 };
     expect(options.rules).toEqual(defaultRules());
+  });
+});
+
+describe("operator's bonuses (R-MODE-09)", () => {
+  it("names the bonuses in the line every player of the game reads", () => {
+    const players = [
+      { id: 1, name: "Nico" },
+      { id: 2, name: "Léa" },
+    ];
+    expect(operatorBonusLine("online.operatorOn", { player: 1, bonuses: 0b0101 }, players)).toBe(
+      "Operator's test for Nico: double gold, structures at half price. This game counts for no stats or achievements.",
+    );
+    expect(operatorBonusLine("online.operatorOn", null, players)).toBe("");
+    expect(operatorBonusNames(0b1111)).toHaveLength(OPERATOR_BONUSES.length);
   });
 });

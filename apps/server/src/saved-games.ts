@@ -9,7 +9,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { GameOptions, GameRules, GameSpeed, MAX_NAME_LENGTH } from "@frontfall/protocol";
+import {
+  GameOptions,
+  GameRules,
+  GameSpeed,
+  MAX_NAME_LENGTH,
+  OperatorBonuses,
+} from "@frontfall/protocol";
 import { z } from "zod";
 import type { RoomSettings, SavedRoom } from "./room.ts";
 
@@ -41,7 +47,7 @@ const SETTINGS_KEYS = [
   "disabled",
   "speed",
   "rules",
-  "goldBonus",
+  "operatorBonuses",
 ] as const satisfies readonly (keyof RoomSettings)[];
 
 export type SavedSettings = Pick<RoomSettings, (typeof SETTINGS_KEYS)[number]>;
@@ -69,8 +75,8 @@ const SavedFile = z
             (saved) => ({ collapsingFronts: false, capitals: false, ...(saved ?? {}) }),
             GameRules,
           ),
-          // Saved before the operator's gold bonus of R-MODE-09: such a game had none.
-          goldBonus: z.number().int().min(0).max(0xffff).default(0),
+          // Saved before the operator's bonuses of R-MODE-09: such a game had none.
+          operatorBonuses: OperatorBonuses.nullable().default(null),
         }),
         elapsedMs: z.number().min(0),
         seats: z

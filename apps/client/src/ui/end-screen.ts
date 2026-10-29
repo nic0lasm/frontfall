@@ -10,6 +10,8 @@ import { feedbackBlock } from "./vote.ts";
 import { formatDuration, formatPercent } from "./format.ts";
 import type { StatsHistory } from "./screen/stats-history.ts";
 import { activeRuleNames } from "./rules-fieldset.ts";
+import { operatorBonusLine } from "./operator-bonuses.ts";
+import type { OperatorBonuses } from "@frontfall/engine";
 import { statsChart } from "./stats-chart.ts";
 
 export interface EndScreenActions {
@@ -42,8 +44,8 @@ export interface GameSummary {
   color: (player: number) => string;
   /** Special rules the game was played with (R-MODE-08); none shows nothing. */
   special?: Readonly<Record<string, boolean>>;
-  /** The player of the operator's gold bonus (R-MODE-09), said to everyone; 0 or none for a game without. */
-  goldBonus?: number;
+  /** The operator's bonuses (R-MODE-09), said to everyone; none for a game without. */
+  operator?: OperatorBonuses;
   /** Where the game was played: the first button plays it again or goes back to the lobby. */
   kind: "solo" | "online" | "replay";
 }
@@ -119,7 +121,7 @@ export function endScreen(
       ...(played.length > 0
         ? [h("p", { class: "end-rules" }, t("setup.rules.played", { rules: played.join(", ") }))]
         : []),
-      ...goldBonusLine(update, summary.goldBonus),
+      ...operatorLine(update, summary.operator),
       ...(update.capitals ? capitalStory(update, summary.ticksPerSecond) : []),
       ...present(
         statsChart({
@@ -236,9 +238,8 @@ function newAchievements(gains: readonly Gain[]): HTMLElement {
   );
 }
 
-/** R-MODE-09: a game where the operator doubled their own gold says so, to every player. */
-function goldBonusLine(update: GameUpdate, player: number | undefined): HTMLElement[] {
-  if (!player) return [];
-  const name = update.players.find((p) => p.id === player)?.name ?? "";
-  return [h("p", { class: "end-rules end-operator-gold" }, t("end.operatorGold", { name }))];
+/** R-MODE-09: a game where the operator gave themselves bonuses says so, to every player. */
+function operatorLine(update: GameUpdate, operator: OperatorBonuses | undefined): HTMLElement[] {
+  const line = operatorBonusLine("end.operator", operator, update.players);
+  return line === "" ? [] : [h("p", { class: "end-rules end-operator" }, line)];
 }

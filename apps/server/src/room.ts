@@ -11,6 +11,7 @@ import {
   type Frame,
   type GameOptions,
   type GameRules,
+  type OperatorBonuses,
   type Order,
   type PlayerInfo,
   type ServerMessage,
@@ -81,10 +82,10 @@ export interface RoomSettings {
   /** A game whose turn log grows past this many bytes is stopped. */
   maxLogBytes: number;
   /**
-   * From the start, the player whose gold every client doubles: the
-   * operator's test bonus of a private game (R-MODE-09); 0 for none.
+   * From the start, the operator's test bonuses of a private game, which
+   * every client plays with (R-MODE-09); null for none.
    */
-  goldBonus: number;
+  operatorBonuses: OperatorBonuses | null;
 }
 
 export type RoomState = "open" | "starting" | "running" | "finished";
@@ -169,7 +170,9 @@ export class Room {
   /** Addresses of the players the host removed: they cannot join this game again. */
   private readonly removed = new Set<string>();
   /** Before the start, the operator who turned on their gold bonus (R-MODE-09). */
-  private goldBonusSeat: Seat | undefined;
+  private operatorSeat: Seat | undefined;
+  /** The `OperatorBonus` bits that operator turned on. */
+  private operatorBits = 0;
   readonly log = new TurnLog();
 
   constructor(
@@ -311,7 +314,7 @@ export class Room {
     this.seats.splice(this.seats.indexOf(seat), 1);
     seat.gone = true;
     seat.peer = undefined;
-    if (this.goldBonusSeat === seat) this.goldBonusSeat = undefined;
+    if (this.operatorSeat === seat) this.operatorSeat = undefined;
     if (this.host === seat) this.host = this.nextHost();
     if (this.seats.length === 0) {
       this.finish("empty");
@@ -392,23 +395,30 @@ export class Room {
 
   /**
    * Host: map, bots, difficulty, seats and, for a public game, its name, until
-   * the start. `operatorGold` turns the operator's gold bonus on or off for
-   * the host themselves, in a private game only (R-MODE-09).
+   * the start. `operatorBonuses` sets the operator's bonuses, as
+   * `OperatorBonus` bits, for the host themselves, in a private game only
+   * (R-MODE-09).
    */
   configure(
     seat: Seat,
     options: GameOptions & { name?: string; soloBots?: number },
     now: number,
     seq?: number,
-    operatorGold?: boolean,
+    operatorBonuses?: number,
   ): ErrorCode | undefined {
     const refused = this.hostOnly(seat);
     if (refused) return refused;
-    if (operatorGold !== undefined && (!seat.operator || this.settings.visibility !== "private")) {
+    if (
+      operatorBonuses !== undefined &&
+      (!seat.operator || this.settings.visibility !== "private")
+    ) {
       return "not_operator";
     }
     if (seq !== undefined) seat.configured = seq;
-    if (operatorGold !== undefined) this.goldBonusSeat = operatorGold ? seat : undefined;
+    if (operatorBonuses !== undefined) {
+      this.operatorSeat = operatorBonuses === 0 ? undefined : seat;
+      this.operatorBits = operatorBonuses;
+    }
     const { name, ...rest } = options;
     Object.assign(this.settings, rest);
     if (name !== undefined && this.settings.visibility === "public") this.settings.name = name;
@@ -652,7 +662,7 @@ export class Room {
     this.seats.forEach((seat, index) => {
       seat.id = index + 1;
     });
-    this.settings.goldBonus = this.goldBonusSeat?.id ?? 0;
+    this.settings.operatorBonuses = this.lobbyBonuses();
     for (const seat of this.seats) seat.peer?.send(this.startedMessage(seat));
     this.observer.started?.(this);
   }
@@ -756,7 +766,7 @@ export class Room {
       holdable: startsIn !== null && !this.held,
       configured: seat.configured,
       operator: seat.operator && this.settings.visibility === "private",
-      goldBonus: this.goldBonusSeat?.id ?? null,
+      operatorBonuses: this.lobbyBonuses(),
     });
   }
 
@@ -774,11 +784,17 @@ export class Room {
       tickRate: TICK_RATE,
       speed: this.settings.speed,
       rules: this.settings.rules,
-      goldBonus: this.settings.goldBonus === 0 ? null : this.settings.goldBonus,
+      operatorBonuses: this.settings.operatorBonuses,
       players: this.players(),
       you: seat.id,
       token: seat.token,
     } satisfies ServerMessage);
+  }
+
+  /** The operator's bonuses as set in the lobby, by the lobby number of their seat. */
+  private lobbyBonuses(): OperatorBonuses | null {
+    const seat = this.operatorSeat;
+    return seat ? { player: seat.id, bonuses: this.operatorBits } : null;
   }
 
   private players(): PlayerInfo[] {

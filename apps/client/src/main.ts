@@ -756,8 +756,8 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
       onStart: () => {
         online?.start();
       },
-      onConfigure: (options, name, operatorGold) => {
-        online?.configure(options, name, operatorGold);
+      onConfigure: (options, name, operatorBonuses) => {
+        online?.configure(options, name, operatorBonuses);
       },
       onHold: () => {
         online?.hold();
@@ -990,8 +990,8 @@ function startOnline(
       teams: start.teams,
       disabled: start.disabled,
       rules: start.rules,
-      // The operator's test bonus (R-MODE-09): every client doubles the same player's gold.
-      ...(start.goldBonus === null ? {} : { goldBonus: start.goldBonus }),
+      // The operator's test bonuses (R-MODE-09): every client plays them for the same player.
+      ...(start.operatorBonuses === null ? {} : { operator: start.operatorBonuses }),
       // Ticks per beat of the server, which the screen paces the turns by.
       speed: start.speed,
       playerName: "",

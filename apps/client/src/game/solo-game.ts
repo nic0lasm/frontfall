@@ -87,11 +87,11 @@ export class SoloGame {
     const teams = options.record ? (options.record.teams ?? 0) : (options.teams ?? 0);
     const disabled = options.record ? (options.record.disabled ?? 0) : (options.disabled ?? 0);
     const rules = (options.record ? options.record.rules : options.rules) ?? {};
-    const goldBonus = (options.record ? options.record.goldBonus : options.goldBonus) ?? 0;
+    const operator = options.record ? options.record.operator : options.operator;
     const difficulty = options.record?.bots.difficulty ?? options.difficulty;
     const create = (): Game =>
       createSimulation(
-        { terrain, seed, players, balance, teams, disabled, rules, goldBonus },
+        { terrain, seed, players, balance, teams, disabled, rules, ...(operator && { operator }) },
         botIds,
         nationIds,
         difficulty,
@@ -249,7 +249,7 @@ export class SoloGame {
       ...(this.game.teams > 0 ? { teams: this.game.teams } : {}),
       ...(this.game.disabled > 0 ? { disabled: this.game.disabled } : {}),
       ...(ruleBits(this.game.rules) !== 0 ? { rules: { ...this.game.rules } } : {}),
-      ...(this.game.goldBonus !== 0 ? { goldBonus: this.game.goldBonus } : {}),
+      ...(this.game.operator.bonuses !== 0 ? { operator: { ...this.game.operator } } : {}),
       you: this.you,
       ticks: this.game.tick,
       turns: this.history,
@@ -283,7 +283,7 @@ export class SoloGame {
       ...(this.game.teams > 0 ? { teams: this.game.teams } : {}),
       ...(this.game.disabled > 0 ? { disabled: this.game.disabled } : {}),
       ...(ruleBits(this.game.rules) !== 0 ? { rules: { ...this.game.rules } } : {}),
-      ...(this.game.goldBonus !== 0 ? { goldBonus: this.game.goldBonus } : {}),
+      ...(this.game.operator.bonuses !== 0 ? { operator: { ...this.game.operator } } : {}),
       you: this.you,
       ticks: this.game.tick,
       turns: this.history,

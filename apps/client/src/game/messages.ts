@@ -2,6 +2,7 @@ import type {
   DesyncReport,
   GameRecord,
   GameRules as SpecialRules,
+  OperatorBonuses,
   Order,
   Turn,
 } from "@frontfall/engine";
@@ -43,8 +44,8 @@ export interface GameRules {
   readonly disabled: number;
   /** Special rules of the game (R-MODE-08). */
   readonly special: SpecialRules;
-  /** The player whose gold the operator's test bonus doubles (R-MODE-09), 0 for none. */
-  readonly goldBonus: number;
+  /** The operator's test bonuses (R-MODE-09); `bonuses` is 0 in nearly every game. */
+  readonly operator: OperatorBonuses;
 }
 
 /** From the page to the simulation worker. */

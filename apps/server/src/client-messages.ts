@@ -60,7 +60,7 @@ const ERROR_TEXT: Record<ErrorCode, string> = {
   token_invalid: "this game is over or the seat was given up",
   token_in_use: "the seat is still connected",
   invalid_settings: "no such map, or too many bots or seats for it",
-  not_operator: "only the operator, signed in, has the gold bonus, in a private game",
+  not_operator: "only the operator, signed in, has the operator's bonuses, in a private game",
   restarting: "the server is about to restart; try again in a few minutes",
   invalid_game_name: "the game name is not allowed",
   not_enough_players: "wait for more players before starting",
@@ -315,16 +315,16 @@ export function messageHandler(ctx: MessageContext): {
         // A quick game keeps filling in with the new map's bots.
         const soloBots =
           current.room.settings.soloBots > 0 ? (ctx.maps.get(message.options.map)?.bots ?? 0) : 0;
-        const turnedOn = message.operatorGold === true;
+        const bonuses = message.operatorBonuses;
         const error = current.room.configure(
           current.seat,
           { ...message.options, capacity: seats, soloBots, ...(name !== undefined && { name }) },
           Date.now(),
           message.seq,
-          message.operatorGold,
+          bonuses,
         );
         if (error) refuse(error);
-        else if (turnedOn) ctx.logger.info("operator_gold", { game: current.room.id });
+        else if (bonuses) ctx.logger.info("operator_bonuses", { game: current.room.id, bonuses });
         return;
       }
       case "start": {

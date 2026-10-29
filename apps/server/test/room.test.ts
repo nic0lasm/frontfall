@@ -26,7 +26,7 @@ const PUBLIC: RoomSettings = {
   maxOrdersPerTurn: 3,
   seatsPerAddress: 3,
   maxLogBytes: 1_000_000,
-  goldBonus: 0,
+  operatorBonuses: null,
 };
 /** Started by its host; `autoStart` off so that a full lobby still waits. */
 const PRIVATE: RoomSettings = {
@@ -270,7 +270,7 @@ describe("private lobby", () => {
     expect(host.peer.last("lobby").rules).toEqual({ collapsingFronts: true, capitals: true });
   });
 
-  describe("operator's gold bonus (R-MODE-09)", () => {
+  describe("operator's bonuses (R-MODE-09)", () => {
     const options = {
       map: "world",
       bots: 0,
@@ -293,31 +293,37 @@ describe("private lobby", () => {
 
     it("is offered only to the operator, and only in a private game", () => {
       const { guest, operator } = withOperator(PRIVATE);
-      expect(guest.peer.last("lobby")).toMatchObject({ operator: false, goldBonus: null });
-      expect(operator.peer.last("lobby")).toMatchObject({ operator: true, goldBonus: null });
+      expect(guest.peer.last("lobby")).toMatchObject({ operator: false, operatorBonuses: null });
+      expect(operator.peer.last("lobby")).toMatchObject({ operator: true, operatorBonuses: null });
       const listed = withOperator(HOSTED);
       expect(listed.operator.peer.last("lobby").operator).toBe(false);
     });
 
     it("goes to the operator who turns it on as host, never to the others", () => {
       const { room, guest, operator } = withOperator(PRIVATE);
-      expect(room.configure(guest.seat, options, 0, undefined, true)).toBe("not_operator");
+      expect(room.configure(guest.seat, options, 0, undefined, 1)).toBe("not_operator");
       room.leave(guest.seat, 0);
-      expect(room.configure(operator.seat, options, 0, undefined, true)).toBeUndefined();
+      expect(room.configure(operator.seat, options, 0, undefined, 0b0011)).toBeUndefined();
       const other = seated(room, "Other");
-      expect(other.peer.last("lobby").goldBonus).toBe(operator.seat.id);
+      expect(other.peer.last("lobby").operatorBonuses).toEqual({
+        player: operator.seat.id,
+        bonuses: 0b0011,
+      });
       room.requestStart(operator.seat, 0);
       // Renumbered at the start: the operator came first among those left.
-      expect(other.peer.last("started")).toMatchObject({ goldBonus: 1, you: 2 });
-      expect(operator.peer.last("started").goldBonus).toBe(1);
+      expect(other.peer.last("started")).toMatchObject({
+        operatorBonuses: { player: 1, bonuses: 0b0011 },
+        you: 2,
+      });
+      expect(operator.peer.last("started").operatorBonuses?.player).toBe(1);
     });
 
     it("refuses a guest host and a public game", () => {
       const { room, guest } = withOperator(PRIVATE);
-      expect(room.configure(guest.seat, options, 0, undefined, false)).toBe("not_operator");
+      expect(room.configure(guest.seat, options, 0, undefined, 0)).toBe("not_operator");
       const listed = withOperator({ ...HOSTED, capacity: 4 });
       listed.room.leave(listed.guest.seat, 0);
-      expect(listed.room.configure(listed.operator.seat, options, 0, undefined, true)).toBe(
+      expect(listed.room.configure(listed.operator.seat, options, 0, undefined, 1)).toBe(
         "not_operator",
       );
     });
@@ -327,23 +333,23 @@ describe("private lobby", () => {
       const plain = new Room("game0001", PRIVATE, 1);
       const alone = seated(plain, "Alone");
       plain.requestStart(alone.seat, 0);
-      expect(alone.peer.last("started").goldBonus).toBeNull();
+      expect(alone.peer.last("started").operatorBonuses).toBeNull();
       room.leave(room.seatOf(1) as Seat, 0);
-      expect(room.configure(operator.seat, options, 0, undefined, true)).toBeUndefined();
+      expect(room.configure(operator.seat, options, 0, undefined, 1)).toBeUndefined();
       const other = seated(room, "Other");
       room.leave(operator.seat, 0);
-      expect(other.peer.last("lobby").goldBonus).toBeNull();
+      expect(other.peer.last("lobby").operatorBonuses).toBeNull();
       room.requestStart(other.seat, 0);
-      expect(other.peer.last("started").goldBonus).toBeNull();
+      expect(other.peer.last("started").operatorBonuses).toBeNull();
     });
 
     it("can be turned off again", () => {
       const { room, guest, operator } = withOperator(PRIVATE);
       room.leave(guest.seat, 0);
-      room.configure(operator.seat, options, 0, undefined, true);
-      room.configure(operator.seat, options, 0, undefined, false);
+      room.configure(operator.seat, options, 0, undefined, 1);
+      room.configure(operator.seat, options, 0, undefined, 0);
       room.requestStart(operator.seat, 0);
-      expect(operator.peer.last("started").goldBonus).toBeNull();
+      expect(operator.peer.last("started").operatorBonuses).toBeNull();
     });
   });
 

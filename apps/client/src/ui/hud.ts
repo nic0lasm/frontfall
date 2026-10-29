@@ -1,4 +1,4 @@
-import { DEFAULT_BALANCE } from "@frontfall/engine";
+import { DEFAULT_BALANCE, NO_OPERATOR } from "@frontfall/engine";
 import { attackPreview, goldPerSecond, soldiersOf } from "../game/attack-preview.ts";
 import type { GameRules } from "../game/messages.ts";
 import type { ClickMode, GameUpdate, PlayerView } from "../game/solo-game.ts";
@@ -170,7 +170,7 @@ export class Hud {
     teams: [],
     disabled: 0,
     special: { collapsingFronts: false, capitals: false },
-    goldBonus: 0,
+    operator: NO_OPERATOR,
   };
 
   private readonly touch: () => boolean;

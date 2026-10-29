@@ -40,8 +40,8 @@ const seatsPerAddress =
 
 /**
  * Accounts of the operator, by id, separated by commas or spaces: each may
- * double their own gold in their private games, to test (R-MODE-09). Unset,
- * no one can. See docs/server.md#operator-gold-bonus.
+ * give themselves the bonuses of R-MODE-09 in their private games, to test.
+ * Unset, no one can. See docs/server.md#operator-bonuses.
  */
 const operatorAccounts = new Set(
   (process.env.FRONTFALL_OPERATOR_ACCOUNTS ?? "").split(/[\s,]+/).filter((id) => id !== ""),

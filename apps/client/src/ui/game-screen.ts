@@ -1,4 +1,10 @@
-import type { DesyncReport, GameRecord, Turn } from "@frontfall/engine";
+import {
+  NO_OPERATOR,
+  type DesyncReport,
+  type GameRecord,
+  type OperatorBonuses,
+  type Turn,
+} from "@frontfall/engine";
 import { accessibility, motionReduced, onMotionChange } from "./accessibility.ts";
 import { TICK_RATE } from "@frontfall/protocol";
 import { LocalSession, SOLO_SNAPSHOT_REFUSED, type ServerLink } from "../game/local-session.ts";
@@ -114,8 +120,8 @@ export class GameScreen {
   private ownableTiles = 1;
   /** Special rules of the game (R-MODE-08), for the end screen. */
   private special: Readonly<Record<string, boolean>> = {};
-  /** The player of the operator's gold bonus (R-MODE-09), 0 for none. */
-  private goldBonus = 0;
+  /** The operator's bonuses (R-MODE-09); `bonuses` 0 for none. */
+  private operator: OperatorBonuses = NO_OPERATOR;
   private peakTiles = 0;
   private winShare = 100;
   private stats = new StatsRecorder(10);
@@ -179,8 +185,8 @@ export class GameScreen {
       this.actions.onFailure(key);
     });
     this.tracker =
-      // A game with the operator's gold bonus is a test (R-MODE-09): it counts for nothing.
-      facts && !options.record && !options.goldBonus
+      // A game with the operator's bonuses is a test (R-MODE-09): it counts for nothing.
+      facts && !options.record && !options.operator
         ? usage().track({ ...facts, view: this.scene.kind }, Date.now())
         : undefined;
     this.published = map.manifest !== undefined;
@@ -321,9 +327,9 @@ export class GameScreen {
           this.stats = new StatsRecorder(info.rules.ticksPerSecond);
           this.ownableTiles = info.rules.ownableTiles;
           this.special = { ...info.rules.special };
-          this.goldBonus = info.rules.goldBonus;
+          this.operator = info.rules.operator;
           if (!options.record) {
-            if (info.rules.goldBonus === 0) {
+            if (info.rules.operator.bonuses === 0) {
               this.achievements.start(info.rules, link ? undefined : options.difficulty);
             }
             // Without it the game goes on in silence.
@@ -911,7 +917,7 @@ export class GameScreen {
           canRecord: this.published,
           teams: this.teams,
           special: this.special,
-          goldBonus: this.goldBonus,
+          operator: this.operator,
           details: `${this.options.map}, ${usage().device().device}`,
           kind: this.link ? "online" : this.options.record ? "replay" : "solo",
         },
