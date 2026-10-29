@@ -14,6 +14,8 @@ export interface ServerStatus {
   lobbies: number;
   /** Time before an announced restart, if any. */
   restartInMs: number | null;
+  /** When this run of the server began, as an ISO time; it changes with every restart. */
+  startedAt: string;
 }
 
 /** A page for people, in both languages of the game. Plain HTML: the site's policy forbids inline styles. */

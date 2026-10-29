@@ -33,6 +33,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### For self-hosters and contributors
 
+- **`/api/status` tells when the server started.** Its new `startedAt` field changes with every restart, so a script polling the server can tell a restart from games ending. `pnpm announce` uses it to post when a running public game ends, without a winner ([self-hosting.md](docs/self-hosting.md#announce-public-games-on-discord)).
 - **Announce public games on Discord.** `pnpm announce`, run next to a server with `FRONTFALL_URL` and `DISCORD_WEBHOOK_URL`, posts each public game once, when it opens, with its map, its seats and a link to join. It mentions nobody, escapes the names players type, and never prints the webhook address ([self-hosting.md](docs/self-hosting.md#announce-public-games-on-discord)).
 
 ## [0.9.1] - 2026-10-29

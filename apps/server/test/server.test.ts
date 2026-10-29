@@ -1430,6 +1430,11 @@ describe("WebSocket", () => {
     >;
     expect(status).toMatchObject({ version: "abc123", state: "ok", running: 0, lobbies: 0 });
     expect(status.restartInMs).toBeGreaterThan(290_000);
+    expect(Date.parse(String(status.startedAt))).toBeLessThanOrEqual(Date.now());
+    // The same for the whole run, so that a reader sees a restart by it changing.
+    expect(await (await fetch(`http://${host}/api/status`)).json()).toMatchObject({
+      startedAt: status.startedAt,
+    });
     const page = await (await fetch(`http://${host}/status`)).text();
     expect(page).toContain("Players online / Joueurs en ligne");
     expect(page).toContain("dans 5 min");
