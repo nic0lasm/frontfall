@@ -595,6 +595,12 @@
   border-style: dashed;
 }
 
+/* Under the pointer from the moment it goes down, until the game reads the click. */
+.click-mark.pressed::before {
+  transform: scale(0.55);
+  animation: none;
+}
+
 /* An online order on its way to the server and back. */
 .click-mark.pending::before {
   opacity: 0.6;

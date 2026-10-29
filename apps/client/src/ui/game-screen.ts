@@ -505,6 +505,11 @@ export class GameScreen {
       onTileClick: (tile, finger) => {
         this.click(tile, finger);
       },
+      onPress: (tile) => {
+        // Answered at once, before the game reads the click (ui/click-marks.ts).
+        if (tile === undefined) this.marks.unpress(performance.now());
+        else if (this.orders.clickable) this.marks.pressed(tile, performance.now());
+      },
       onTileHold: (tile) => {
         if (!this.replayBar) this.diplomacy.pick(this.scene.ownerAt(tile));
       },
@@ -591,13 +596,20 @@ export class GameScreen {
 
   private click(tile: number, finger = false): void {
     // A finger's first tap in a build mode shows where it would go; the second places it.
-    if (this.previews.tap(tile, finger)) return;
+    if (this.previews.tap(tile, finger)) {
+      this.marks.unpress(performance.now());
+      return;
+    }
     this.commit(tile, finger);
   }
 
   private commit(tile: number, finger: boolean): void {
     const reach = aimReach(this.scene.camera.scale, finger);
-    if (!this.orders.click(tile, this.mode, reach)) return;
+    if (!this.orders.click(tile, this.mode, reach)) {
+      this.marks.unpress(performance.now());
+      return;
+    }
+    this.marks.clicked(tile, performance.now());
     // A build mode stays on until a structure goes up (afterClick): a click
     // made while the worker answers the one before is still a build click.
     this.clicksInFlight.push(this.mode);

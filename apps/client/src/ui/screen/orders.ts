@@ -25,10 +25,16 @@ export class Orders {
     private readonly state: OrderState,
   ) {}
 
+  /** Whether a click on the map would go out now. */
+  get clickable(): boolean {
+    const update = this.state.latest();
+    return update !== undefined && !this.state.held() && update.winner === undefined;
+  }
+
   /** A click on the map, which the game reads by its mode; whether it went out. */
   click(tile: number, mode: ClickMode, reach: number): boolean {
     const update = this.state.latest();
-    if (!update || this.state.held() || update.winner !== undefined) return false;
+    if (!update || !this.clickable) return false;
     this.ordered(update);
     this.session.click(tile, this.state.ratio(), mode, reach);
     return true;

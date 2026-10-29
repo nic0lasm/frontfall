@@ -71,20 +71,27 @@ export async function buildAround(
   for (const point of spiral(start, 8, 4)) {
     if ((await mode.getAttribute("aria-pressed")) !== "true") await page.keyboard.press(key);
     await expect(mode).toHaveAttribute("aria-pressed", "true");
-    // A ring lasts well under a second: an observer keeps the first one this click draws.
+    // A ring lasts well under a second: an observer keeps the first answer this
+    // click draws. The ring is there from the press, and answers once the game reads it.
     await page.evaluate(`(() => {
       window.clickAnswer = "";
       const observer = new MutationObserver((changes) => {
         for (const change of changes) {
-          for (const node of change.addedNodes) {
+          for (const node of [change.target, ...change.addedNodes]) {
             if (!node.classList || !node.classList.contains("click-mark")) continue;
+            if (node.classList.contains("pressed")) continue;
             window.clickAnswer = node.classList.contains("refused") ? "refused" : "order";
             observer.disconnect();
             return;
           }
         }
       });
-      observer.observe(document.body, { childList: true, subtree: true });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class"],
+      });
     })()`);
     await page.mouse.click(point.x, point.y);
     const at = `${String(Math.round(point.x))}, ${String(Math.round(point.y))}`;
