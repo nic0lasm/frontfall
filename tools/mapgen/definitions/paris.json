@@ -22,11 +22,11 @@
   "minLakeTiles": 80,
   "players": {
     "min": 2,
-    "recommended": 10,
-    "max": 24
+    "recommended": 12,
+    "max": 32
   },
   "nations": {
-    "count": 24,
+    "count": 37,
     "minDistance": 0
   },
   "city": {
@@ -38,8 +38,8 @@
     "woodsShare": 0.5,
     "minWoodsTiles": 150,
     "smoothTiles": 4,
-    "hills": 70,
-    "mountains": 108,
+    "hills": 48,
+    "mountains": 95,
     "nations": [
       {
         "name": "Montmartre",
@@ -160,6 +160,71 @@
         "name": "Vincennes",
         "capital": "Hôtel de ville de Vincennes",
         "at": [2.439, 48.8475]
+      },
+      {
+        "name": "Clichy",
+        "capital": "Hôtel de ville de Clichy",
+        "at": [2.306, 48.904]
+      },
+      {
+        "name": "Romainville",
+        "capital": "Hôtel de ville de Romainville",
+        "at": [2.435, 48.8848]
+      },
+      {
+        "name": "Malakoff",
+        "capital": "Hôtel de ville de Malakoff",
+        "at": [2.298, 48.817]
+      },
+      {
+        "name": "Saint-Cloud",
+        "capital": "Hôtel de ville de Saint-Cloud",
+        "at": [2.219, 48.844]
+      },
+      {
+        "name": "Charenton-le-Pont",
+        "capital": "Hôtel de ville de Charenton-le-Pont",
+        "at": [2.413, 48.822]
+      },
+      {
+        "name": "Saint-Ouen",
+        "capital": "Hôtel de ville de Saint-Ouen",
+        "at": [2.333, 48.905]
+      },
+      {
+        "name": "Puteaux",
+        "capital": "Hôtel de ville de Puteaux",
+        "at": [2.2389, 48.8846]
+      },
+      {
+        "name": "Noisy-le-Sec",
+        "capital": "Hôtel de ville de Noisy-le-Sec",
+        "at": [2.46, 48.891]
+      },
+      {
+        "name": "Montrouge",
+        "capital": "Hôtel de ville de Montrouge",
+        "at": [2.319, 48.816]
+      },
+      {
+        "name": "Bagnolet",
+        "capital": "Hôtel de ville de Bagnolet",
+        "at": [2.418, 48.8693]
+      },
+      {
+        "name": "Levallois-Perret",
+        "capital": "Hôtel de ville de Levallois-Perret",
+        "at": [2.287, 48.895]
+      },
+      {
+        "name": "Gentilly",
+        "capital": "Hôtel de ville de Gentilly",
+        "at": [2.344, 48.813]
+      },
+      {
+        "name": "Saint-Mandé",
+        "capital": "Hôtel de ville de Saint-Mandé",
+        "at": [2.4186, 48.8424]
       }
     ]
   }

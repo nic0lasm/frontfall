@@ -120,8 +120,8 @@
       "topology": "flat",
       "players": {
         "min": 2,
-        "recommended": 10,
-        "max": 24
+        "recommended": 12,
+        "max": 32
       },
       "group": "world",
       "manifest": "paris.json",

@@ -17,7 +17,7 @@ game. The file layout is specified in
 | Island   | 256 × 192   | Flat, drawn                           | 6       | 2 / 4 / 8                         |
 | Strait   | 320 × 192   | Flat, drawn                           | 6       | 2 / 4 / 8                         |
 | Ring     | 512 × 256   | Cylinder, drawn                       | 6       | 2 / 6 / 8                         |
-| Paris    | 768 × 440   | Flat, 2.215° E to 2.475° E, city      | 24      | 2 / 10 / 24                       |
+| Paris    | 768 × 440   | Flat, 2.215° E to 2.475° E, city      | 37      | 2 / 12 / 32                       |
 | Lyon     | 576 × 532   | Flat, 4.765° E to 4.935° E, city      | 16      | 2 / 8 / 16                        |
 
 The catalogue `maps/index.json` lists each map with a `group` the menu shows
@@ -215,7 +215,12 @@ The generator ([`city.ts`](../tools/src/mapgen/city.ts)) then:
    that are band 10, so they cost an attacker what hills do.
 5. **Places nations** at the points listed in `city.nations`, in the order
    written, as on a drawn map: the arrondissements and quarters of the city
-   and the towns around it, each at its town hall.
+   and the towns around it, each at its town hall. Paris seats the inner
+   suburbs too: with the arrondissements alone, the outskirts were free to
+   take, and a player starting there won 10 games out of 12 against normal
+   nations (`pnpm balance -- --map paris --bots normal:4 --nations normal
+--average`). With 37 nations and hills from 48 m, it wins 8 of 24, about
+   what it wins on World; on Lyon, 5 of 24.
 
 The manifest credits both rasters, and the about page and
 [CREDITS.md](../CREDITS.md) carry the attributions their licences ask for.

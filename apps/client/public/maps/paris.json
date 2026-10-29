@@ -19,13 +19,13 @@
   "terrain": {
     "file": "paris.bin",
     "bytes": 337936,
-    "sha256": "fa7c107a19914df1b0522faf02483bf2e4c377a6e0c984f1f256ddbf54e38c1b"
+    "sha256": "04379cbb8cf460fc7ec0326eed9c4fae947bcd9a7f214d867806d9aa7c31ca73"
   },
   "thumbnail": "paris.png",
   "players": {
     "min": 2,
-    "recommended": 10,
-    "max": 24
+    "recommended": 12,
+    "max": 32
   },
   "nations": [
     {
@@ -147,6 +147,71 @@
       "name": "Vincennes",
       "capital": "Hôtel de ville de Vincennes",
       "tile": 195733
+    },
+    {
+      "name": "Clichy",
+      "capital": "Hôtel de ville de Clichy",
+      "tile": 6412
+    },
+    {
+      "name": "Romainville",
+      "capital": "Hôtel de ville de Romainville",
+      "tile": 71305
+    },
+    {
+      "name": "Malakoff",
+      "capital": "Hôtel de ville de Malakoff",
+      "tile": 297461
+    },
+    {
+      "name": "Saint-Cloud",
+      "capital": "Hôtel de ville de Saint-Cloud",
+      "tile": 207371
+    },
+    {
+      "name": "Charenton-le-Pont",
+      "capital": "Hôtel de ville de Charenton-le-Pont",
+      "tile": 280904
+    },
+    {
+      "name": "Saint-Ouen",
+      "capital": "Hôtel de ville de Saint-Ouen",
+      "tile": 3420
+    },
+    {
+      "name": "Puteaux",
+      "capital": "Hôtel de ville de Puteaux",
+      "tile": 71494
+    },
+    {
+      "name": "Noisy-le-Sec",
+      "capital": "Hôtel de ville de Noisy-le-Sec",
+      "tile": 50643
+    },
+    {
+      "name": "Montrouge",
+      "capital": "Hôtel de ville de Montrouge",
+      "tile": 301363
+    },
+    {
+      "name": "Bagnolet",
+      "capital": "Hôtel de ville de Bagnolet",
+      "tile": 122711
+    },
+    {
+      "name": "Levallois-Perret",
+      "capital": "Hôtel de ville de Levallois-Perret",
+      "tile": 36308
+    },
+    {
+      "name": "Gentilly",
+      "capital": "Hôtel de ville de Gentilly",
+      "tile": 311421
+    },
+    {
+      "name": "Saint-Mandé",
+      "capital": "Hôtel de ville de Saint-Mandé",
+      "tile": 213337
     }
   ],
   "credits": [
