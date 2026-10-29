@@ -310,6 +310,8 @@ const fragmentShader = /* glsl */ `
     // looking blurred; it fades out before it could shimmer.
     float detail = 0.0;
     if (pixel < 0.5) detail = (noise(at * 1.7) * 0.6 + noise(at * 4.1) * 0.4 - 0.5) * (1.0 - smoothstep(0.15, 0.5, pixel));
+    // Closer still, a finer grain, so a tile filling the screen is not a smear.
+    if (pixel < 0.12) detail += (noise(at * 11.0) - 0.5) * 0.6 * (1.0 - smoothstep(0.04, 0.12, pixel));
   #endif
   #ifdef SPHERE
     // Pixels clear of the rim stop here, once every derivative is taken: after
@@ -371,11 +373,14 @@ const fragmentShader = /* glsl */ `
       // The player's own land has a wider, whiter rim, to find it on a crowded map.
       bool mine = owner == highlight;
       bool wide = mine || allied || pointed;
-      float width = wide ? max(0.4, 2.5 * pixel) : max(0.22, 1.5 * pixel);
+      // Edges are a fraction of a tile, but no more than a few pixels when zoomed right in.
+      float width = wide ? max(2.5 * pixel, min(0.4, 8.0 * pixel)) : max(1.5 * pixel, min(0.22, 5.0 * pixel));
       // Three edges, told apart without colour: a thin dark line of the owner's
       // colour at the edge of its land, the same line plus surf on a coast, and
       // between two players a front, 1.7 times wider, with a light ridge on top.
-      vec3 lineColor = wide ? mix(ownerColor, vec3(1.0), 0.75) : ownerColor * 0.38;
+      // Pale colours get a darker edge, so they keep an outline on sand and snow.
+      float ownerLight = dot(ownerColor, vec3(0.2126, 0.7152, 0.0722));
+      vec3 lineColor = wide ? mix(ownerColor, vec3(1.0), 0.75) : ownerColor * mix(0.38, 0.2, smoothstep(0.35, 0.75, ownerLight));
       vec3 ridgeColor = wide ? lineColor : mix(ownerColor, vec3(1.0), 0.45);
       float contactWidth = 1.7 * width;
       float border = 1.0 - smoothstep(width - pixel, width, edge);
@@ -386,7 +391,7 @@ const fragmentShader = /* glsl */ `
       // Dark colours are close to the ground in brightness: a light rim, one
       // pixel wide, inside their dark edge keeps them apart from it in very
       // low vision or in sunlight. Pale colours stand out on their own.
-      if (!wide && dot(ownerColor, vec3(0.2126, 0.7152, 0.0722)) < 0.3) {
+      if (!wide && ownerLight < 0.3) {
         float rimWidth = width + max(0.15, pixel);
         float rim = (1.0 - smoothstep(rimWidth - pixel, rimWidth, edge)) * (1.0 - border);
         owned = mix(owned, mix(ownerColor, vec3(1.0), 0.6), rim * dash);
