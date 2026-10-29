@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-29
+
+Smooth and quick: a lighter picture for phones and dense screens, orders that answer at once, new sounds and a score, a guided start and games you can take back, two city maps, and a server that holds thousands of players.
+
 ### Added
 
 - **A Graphics setting, and a lighter picture for phones that struggle.** The menu's Accessibility section has a new Graphics choice: Automatic (the default), Light and Sharpest. Automatic picks by your device: a weak one gets the light picture, the flat map drawn at your screen's own pixels, a phone gets the full map at 1.5 times its screen's pixels instead of twice, and a game that still cannot keep up at the lowest sharpness switches to the light picture by itself and remembers it. Sharpest keeps the picture as sharp as the screen allows whatever the device. The choice applies to the next game.
@@ -48,14 +52,13 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **Orders answer sooner.** A ring now shows under the pointer the moment you press on the map, instead of after you let go and the game has read the click; it turns into the usual answer once the order is read. Online, a turn that the network or a busy page delays no longer holds back every turn after it for three seconds: it plays a little late on its own, so your orders come back sooner, by about 60 ms in our measurements and much more after a hiccup.
 - **Fewer hitches on every tick.** Taking in each turn of the game costs the page about a fifth of what it did: the panels, the names over the land and the leaderboard no longer redraw what has not changed, so frames keep coming while the bots attack. Names over the land are also placed faster.
 
+### Fixed
+
+- **No more "This land is already yours" on an enemy.** When your attack took a tile a moment before you clicked it, the click was refused although the map still showed the enemy there. It now goes at the enemy's land right beside it.
 - **The attack slider is wide enough for a finger on a phone.** On a narrow screen it was squeezed to a few pixels beside the buttons while attacks were open or the buildings tray was out; it now keeps at least 44 pixels, and on the narrowest phones its sword icon steps aside to make room.
 - **The first steps keep off the buildings tray.** On a phone, the first steps' card no longer sits behind the open tray: it moves under your figures, and in a short window it waits until the tray closes.
 - **A tutorial you reload comes back.** Reloading the page a few seconds into a solo game or the tutorial now takes you back into it, where it was kept after only three seconds of play instead of fifteen.
 - **The music slider starts at 35 %.** It showed 40 % because its steps were too coarse; it now moves in steps of 5.
-
-### Fixed
-
-- **No more "This land is already yours" on an enemy.** When your attack took a tile a moment before you clicked it, the click was refused although the map still showed the enemy there. It now goes at the enemy's land right beside it.
 
 ### Security
 
@@ -68,10 +71,15 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### For self-hosters and contributors
 
 - **Errors of players, grouped.** The errors players' pages report are grouped on the server by kind, message and place in the code, and counted by day, release, browser family, device and screen, for 30 days. `/admin/errors?days=N`, from inside the container, lists them, the most reported first ([server.md](docs/server.md#errors-of-players)); `client_error` log lines name their group. Error reports carry, optionally, the file, line and column of the game's own code they came from, the browser family, the device and the screen; a game a page could not take back from its snapshot is reported as the new kind `snapshot` ([privacy.md](docs/privacy.md#reports)). The game protocol does not change.
+- **Protocol 24.** The lobby carries `operator` and `goldBonus`, `configure` takes `operatorGold` and `started` carries `goldBonus` ([R-MODE-09](docs/rules.md), [protocol](docs/protocol.md)); a game saved by an older server comes back without the bonus. A "Play now" never joins a game whose host changed its options, and `desync` is no longer sent when no majority of the reports agrees. Pages from before this release reload on their next connection.
+- **What one server holds.** `FRONTFALL_MAX_PLAYERS` (3000), `FRONTFALL_MAX_CONNECTIONS` (5000), `FRONTFALL_MAX_LOG_MIB` (192), `FRONTFALL_GAMES_PER_ADDRESS` (10), `FRONTFALL_TRUST_PROXY` and `FRONTFALL_OPERATOR_ACCOUNTS` are new ([server.md](docs/server.md#configuration)). Measured with `pnpm load` on 4 cores at 2.1 GHz, one server holds 4800 players with the turns within 9 ms of their time, and falls behind from about 5600; 3040 players who all reload are back within 4.6 s, and a tenth who stop reading do not grow its memory ([capacity.md](docs/capacity.md)). New metrics `frontfall_refused_connections_total` and `frontfall_slow_clients_total`; `pnpm load` takes `--client-procs`, `--ramp`, `--rejoin-storm`, `--slow-clients` and `--heap-mib`.
+- **Speed.** A turn of the engine costs about a third less, the map's shader, uploads and frame pacing are lighter, and a page takes in an update in about a fifth of its former time, all measured in [performance.md](docs/performance.md). `?perf` on the game's address measures a phone. The speed work changes no rule; the rule changes of this release are listed above.
 
-### For self-hosters and contributors
+- **Balance keys for the new fights.** `B-ATTACK-PACE` (20 %), `B-ATTACK-PACE-ODDS` (3x) and `B-GOLD-BASE` (500 gold a second) are new, `B-CITY-LAND` is now 0 (no limit), and the normal nations' `B-NATION-INTERVAL` (1 s), `B-NATION-RESERVE` (40 %), `B-NATION-HOLD` (30 %) and `B-NATION-GRACE` (100 s) changed ([balance.md](docs/balance.md), R-ATTACK-03, R-BUILD-07, R-ECO-03). On World, 30 minutes, collapsing fronts, attacks on players take land at 23 tiles a second at the median instead of 159, and the average player wins 7 games of 24 against normal nations (5 before) and 0 of 12 against hard ones.
+- **Golden replays rebuilt.** The six golden replays (`europe-capitals`, `europe-normal`, `europe-teams`, `world-collapse`, `world-hard`, `world-nations`) were rebuilt for the new rules, so the hash of each game changed. The game protocol stays at 24, as above. The balance bench (`bench/balance`) now also reports how long fights between players last and how much land falls in 10 s.
+- **Tick cost.** On the engine gate's reference game a tick takes 4.45 ms, against 3.49 ms before the pace and 3.16 ms without it, because longer attacks mean fronts planned on more ticks; the tick p95 is 7.55 ms against the 30 ms budget.
 
-- **Everything is still synthesised in the browser**, so there are no sound files and nothing to credit in `CREDITS.md`. The audio lives in `apps/client/src/audio/` and loads as its own chunk after the first click: `voices.ts` holds the instruments, `palettes.ts` the scale, instruments and room, `synth.ts` the effects and their variants, `music.ts` the generative score, `mix.ts` the buses, room and limiter, and `place.ts` the placement by view. The first-visit budget is unchanged (118.3 kB); the whole build grows by about 5 kB. The sound settings now store a `music` level beside `volume` and `muted`. No game rule, replay or message depends on sound.
+- **Everything is still synthesised in the browser**, so there are no sound files and nothing to credit in `CREDITS.md`. The audio lives in `apps/client/src/audio/` and loads as its own chunk after the first click: `voices.ts` holds the instruments, `palettes.ts` the scale, instruments and room, `synth.ts` the effects and their variants, `music.ts` the generative score, `mix.ts` the buses, room and limiter, and `place.ts` the placement by view. The first-visit budget is unchanged (118.4 kB); the whole build grows by about 5 kB. The sound settings now store a `music` level beside `volume` and `muted`. No game rule, replay or message depends on sound.
 
 ### Removed
 
