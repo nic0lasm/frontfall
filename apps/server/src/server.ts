@@ -105,6 +105,8 @@ export function createGameServer(options: ServerOptions): GameServer {
   let closing: Promise<void> | undefined;
   /** When an announced restart is due, as `Date.now()` time. */
   let maintenanceAt: number | undefined;
+  /** When this run of the server began: a reader polling /api/status sees a restart by it changing. */
+  const startedAt = new Date().toISOString();
   const logger = options.logger ?? silentLogger;
   const pseudonym = addressPseudonym();
   const metrics = new Metrics();
@@ -710,6 +712,7 @@ export function createGameServer(options: ServerOptions): GameServer {
       running: running(),
       lobbies,
       restartInMs: maintenanceAt !== undefined && maintenanceAt > now ? maintenanceAt - now : null,
+      startedAt,
     };
   }
 

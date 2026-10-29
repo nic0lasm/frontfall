@@ -1,12 +1,18 @@
 import { PublicGame } from "@frontfall/protocol";
 import { z } from "zod";
 
-// Announces on a Discord webhook the public games that /api/games lists as open.
-// Ends are not announced: the server never learns who won (it only relays
-// turns), and a game that leaves the list may have been stopped by a restart.
+// Announces on a Discord webhook the public games that /api/games lists as
+// open, and those that ended. A running game that leaves the list ended, unless
+// the server restarted meanwhile, which /api/status tells by its startedAt.
+// No winner is named: the server never learns who won, it only relays turns.
 
 /** What `/api/games` answers; see docs/protocol.md, "HTTP endpoints". */
 export const GameList = z.object({ games: z.array(PublicGame) });
+/** The part of `/api/status` read here; see docs/server.md. */
+export const Status = z.object({ state: z.string(), startedAt: z.string() });
+
+/** Games `/api/games` lists at most (MAX_LISTED_GAMES in apps/server/src/directory.ts, a test ties the two). */
+export const MAX_LISTED = 100;
 
 /** How long a game's id is remembered after it was last listed, so it is never announced twice. */
 const REMEMBER_MS = 24 * 60 * 60 * 1000;
@@ -29,18 +35,27 @@ export function escapeMarkdown(text: string): string {
 export class Announcer {
   /** Ids of the games listed, and when each was last listed; undefined until a list was read. */
   private seen: Map<string, number> | undefined;
-  /** Announcements not posted yet, by game id. */
+  /** Announcements not posted yet. An opening is keyed by its game's id, an end by `end:` and the id. */
   private pending = new Map<string, Post>();
+  /** The running games of the last lists, each with the post that will announce its end. */
+  private running = new Map<string, Post>();
+  /** The `startedAt` of the server run those games belong to. */
+  private run: string | undefined;
 
   /** @param joinUrl The page that joins a game, given its id. */
   constructor(private readonly joinUrl: (id: string) => string) {}
 
   /**
    * Takes one list of public games and returns what to post: the games newly
-   * open, after those the webhook refused before and that are still open.
+   * open or ended, after those the webhook refused before.
+   *
+   * @param run The server's `startedAt` when it answered the list, and was
+   * not stopping, both before and after it; undefined when it was not, and a
+   * game missing from this list may be one the server stopped.
    */
-  next(games: PublicGame[], now: number): [string, Post][] {
+  next(games: PublicGame[], now: number, run?: string): [string, Post][] {
     const first = this.seen === undefined;
+    this.ended(games, run);
     const seen = (this.seen ??= new Map());
     const open = new Set<string>();
     for (const game of games) {
@@ -62,9 +77,35 @@ export class Announcer {
     }
     for (const [id, time] of seen) if (now - time > REMEMBER_MS) seen.delete(id);
     // A game that started or closed meanwhile is no longer worth a post.
-    for (const id of this.pending.keys()) if (!open.has(id)) this.pending.delete(id);
+    for (const id of this.pending.keys())
+      if (!id.startsWith("end:") && !open.has(id)) this.pending.delete(id);
     for (const id of [...this.pending.keys()].slice(0, -MAX_PENDING)) this.pending.delete(id);
     return [...this.pending];
+  }
+
+  /** Queues an end for each running game gone from the list, when its absence can be trusted. */
+  private ended(games: PublicGame[], run: string | undefined): void {
+    const listed = new Set(games.map((game) => game.id));
+    // A full list may leave running games out, as they come after the open ones.
+    const trusted = run !== undefined && run === this.run && games.length < MAX_LISTED;
+    for (const [id, post] of this.running) {
+      if (!trusted || listed.has(id)) continue;
+      this.pending.set(`end:${id}`, post);
+      this.running.delete(id);
+    }
+    // ponytail: a game that ends during a restart is never announced as ended;
+    // the next run knows only the games it kept (FRONTFALL_DATA).
+    if (run !== undefined && run !== this.run) {
+      this.running.clear();
+      this.run = run;
+    }
+    for (const game of games) {
+      if (game.state !== "running") continue;
+      this.running.set(game.id, {
+        content: `The public game **${escapeMarkdown(game.name)}** on ${escapeMarkdown(game.map)} has ended.`,
+        allowed_mentions: { parse: [] },
+      });
+    }
   }
 
   /** The webhook took this post. */
@@ -83,7 +124,8 @@ export interface AnnounceOptions {
 
 /**
  * Reads the server once and posts what is new. Returns why the round fell
- * short, if it did; posts the webhook refused are tried again next round.
+ * short, if it did, ends left out included; posts the webhook refused are
+ * tried again next round.
  */
 export async function announceOnce(
   announcer: Announcer,
@@ -91,13 +133,32 @@ export async function announceOnce(
   now = Date.now(),
 ): Promise<string | undefined> {
   const get = options.fetch ?? fetch;
-  let posts: [string, Post][];
-  try {
-    const response = await get(new URL("api/games", options.server), {
+  const read = async (path: string): Promise<unknown> => {
+    const response = await get(new URL(path, options.server), {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`it answered ${String(response.status)}`);
-    posts = announcer.next(GameList.parse(await response.json()).games, now);
+    return response.json();
+  };
+  // The run the list belongs to: the same before and after it, and not stopping.
+  const run = async (): Promise<string | undefined> => {
+    const status = Status.safeParse(await read("api/status").catch(() => undefined));
+    if (!status.success) throw new Error("no startedAt in /api/status");
+    return status.data.state === "ok" ? status.data.startedAt : undefined;
+  };
+  let posts: [string, Post][];
+  // Why ends are not posted, when /api/status cannot tell a restart: an older server, say.
+  let blind: string | undefined;
+  const runOrBlind = () =>
+    run().catch((caught: unknown) => {
+      blind = `ends are not posted: ${caught instanceof Error ? caught.message : String(caught)}`;
+      return undefined;
+    });
+  try {
+    const before = await runOrBlind();
+    const games = GameList.parse(await read("api/games")).games;
+    const after = await runOrBlind();
+    posts = announcer.next(games, now, before === after ? before : undefined);
   } catch (caught) {
     return `could not read the server: ${caught instanceof Error ? caught.message : String(caught)}`;
   }
@@ -115,5 +176,5 @@ export async function announceOnce(
       return `the webhook answered ${response ? String(response.status) : "nothing"}`;
     announcer.posted(id);
   }
-  return undefined;
+  return blind;
 }
