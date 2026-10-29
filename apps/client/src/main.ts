@@ -185,8 +185,8 @@ function showMenu(): void {
 /**
  * `?speed=` and `?minutes=` let end-to-end tests play a whole game in
  * seconds, `?gold=` (B-GOLD-RATE) pay for a structure without a long
- * wait, and `?cityland=` (B-CITY-LAND) make room for a palace on a small
- * map; nothing in the interface sets them.
+ * wait, and `?cityland=` (B-CITY-LAND) put back the land limit on cities,
+ * small enough for a palace on a small map; nothing in the interface sets them.
  */
 const testing = (() => {
   const params = new URLSearchParams(location.search);

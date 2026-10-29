@@ -61,7 +61,7 @@ describe("Game", () => {
     expect(() => new Game(withBalance({ buildSpacing: 0 }))).toThrow(/buildSpacing/);
     expect(() => new Game(withBalance({ cityCost: -1 }))).toThrow(/cityCost/);
     expect(() => new Game(withBalance({ costGrowthPercent: 90 }))).toThrow(/costGrowthPercent/);
-    expect(() => new Game(withBalance({ cityLand: 0 }))).toThrow(/cityLand/);
+    expect(() => new Game(withBalance({ cityLand: -1 }))).toThrow(/cityLand/);
     expect(() => new Game(withBalance({ boatSpeed: 3 }))).not.toThrow();
   });
 

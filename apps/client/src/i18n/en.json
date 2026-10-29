@@ -260,6 +260,8 @@
   "click.nothing": "None of your structures here.",
   "hud.cities.one": "{built} of {count} city",
   "hud.cities.other": "{built} of {count} cities",
+  "hud.citiesBuilt.one": "{count} city",
+  "hud.citiesBuilt.other": "{count} cities",
   "diplo.requests": "Alliance requests",
   "diplo.request": "{name} asks for an alliance · {seconds} s",
   "diplo.accept": "Accept",

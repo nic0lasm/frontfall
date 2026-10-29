@@ -125,10 +125,10 @@ test.describe("on a touch screen", () => {
     await expect(page.locator(".bp-card")).toContainText("Tap again to confirm");
     // Nothing was built by the first tap.
     await expect(page.locator("#build-city")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#build-city .build-count")).not.toContainText("1 of");
+    await expect(page.locator("#build-city .build-count")).not.toContainText("1 city");
 
     await page.touchscreen.tap(start.x, start.y);
-    await expect(page.locator("#build-city .build-count")).toContainText("1 of", {
+    await expect(page.locator("#build-city .build-count")).toContainText("1 city", {
       timeout: 5_000,
     });
     await expect(page.locator("#build-city")).toHaveAttribute("aria-pressed", "false");
@@ -147,7 +147,7 @@ test.describe("on a touch screen", () => {
     await page.touchscreen.tap(start.x, start.y);
     await expect(page.locator(".bp-anchor")).toHaveAttribute("data-ok", "true");
     await page.locator(".bp-confirm").click();
-    await expect(page.locator("#build-city .build-count")).toContainText("1 of", {
+    await expect(page.locator("#build-city .build-count")).toContainText("1 city", {
       timeout: 5_000,
     });
     await expect(page.locator("#build-city")).toHaveAttribute("aria-pressed", "false");

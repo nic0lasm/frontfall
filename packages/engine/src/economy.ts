@@ -81,7 +81,9 @@ export function installEconomy(game: Game): void {
       const earning = goldEarning(game, player);
       // R-MODE-09: the operator's test bonus doubles one player's income.
       const bonus = player.id === game.goldBonus ? OPERATOR_GOLD_FACTOR : 1;
-      const earned = earning * game.balance.goldPerThousandTroops * bonus + player.goldRemainder;
+      // B-GOLD-BASE: gold per second for every player, in the same units.
+      const income = earning * game.balance.goldPerThousandTroops + game.balance.goldBase * 1000;
+      const earned = income * bonus + player.goldRemainder;
       player.gold += Math.floor(earned / goldDivisor);
       player.goldRemainder = earned % goldDivisor;
     }

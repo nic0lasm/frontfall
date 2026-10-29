@@ -11,7 +11,13 @@ import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
 
-const balance: Balance = { ...DEFAULT_BALANCE, spawnPhaseTicks: 10, spawnDistance: 12 };
+// No structures are installed: bots must not earn enough for a city before they could build one (B-GOLD-BASE).
+const balance: Balance = {
+  ...DEFAULT_BALANCE,
+  spawnPhaseTicks: 10,
+  spawnDistance: 12,
+  goldBase: 0,
+};
 
 /** A full game of bots only on a plains cylinder, with a lake in the middle. */
 function botGame(seed: number, count: number, difficulty: BotDifficulty, width = 96, height = 48) {

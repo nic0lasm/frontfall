@@ -29,6 +29,8 @@ export interface Balance {
   desertionBasisPoints: number;
   /** B-GOLD-RATE, in thousandths of gold per idle troop per second (5 = 0.5 per 100) */
   goldPerThousandTroops: number;
+  /** B-GOLD-BASE, gold per second every living player earns whatever their size */
+  goldBase: number;
   /** B-WORK-MAX, the largest share of troops at home, in %, a player may put to work */
   workMaxPercent: number;
   /** B-WORK-GOLD, how many times a soldier's gold a worker earns */
@@ -39,6 +41,10 @@ export interface Balance {
   reliefCostTenths: readonly [number, number, number];
   /** B-ATTACK-SPEED: an attack takes 1 + isqrt(troops) / attackSpeedDivisor tiles per tick */
   attackSpeedDivisor: number;
+  /** B-ATTACK-PACE, percent of its front's length an attack on a player at full strength takes per tick; 0 leaves only B-ATTACK-SPEED */
+  attackPacePercent: number;
+  /** B-ATTACK-PACE-ODDS, in tenths: troops, as a multiple of the garrison facing them, an attack needs for full pace */
+  attackPaceOddsTenths: number;
   /** B-ATTACK-SPREAD, tiles of distance to the aim that each side shared with the attacker's land is worth */
   attackSpread: number;
   /** B-DEFENSE-DENSITY, in tenths: share of the defender's troops per tile added to the cost of a tile */
@@ -196,12 +202,15 @@ export const DEFAULT_BALANCE: Balance = {
   growthBasisPoints: 800,
   growthFloorPercent: 20,
   goldPerThousandTroops: 5,
+  goldBase: 500,
   desertionBasisPoints: 500,
   workMaxPercent: 80,
   workGoldFactor: 4,
   neutralCost: 8,
   reliefCostTenths: [10, 15, 25],
   attackSpeedDivisor: 4,
+  attackPacePercent: 20,
+  attackPaceOddsTenths: 30,
   attackSpread: 4,
   defenseDensityTenths: 10,
   retreatPenaltyPercent: 25,
@@ -219,7 +228,7 @@ export const DEFAULT_BALANCE: Balance = {
   portCost: 100_000,
   costGrowthPercent: 150,
   buildSpacing: 10,
-  cityLand: 10_000,
+  cityLand: 0,
   fortRadius: 25,
   fortStrengthPercent: 200,
   fortLossPercent: 50,

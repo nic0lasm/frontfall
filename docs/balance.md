@@ -46,6 +46,7 @@ Spawn values are set for a map of 2^19 tiles (1024 × 512) (`R-SPAWN-06`). On a 
 | `B-GROWTH-FLOOR`      |    20 | % of `B-GROWTH-RATE`       | `R-ECO-02`   | Rate of an empty army; growth peaks at 38 %    |
 | `B-DESERTION`         |     5 | % of the excess/second     | `R-ECO-02`   | Troops above the cap that leave                |
 | `B-GOLD-RATE`         |   0.5 | gold per 100 idle troops/s | `R-ECO-03`   |                                                |
+| `B-GOLD-BASE`         |   500 | gold/s                     | `R-ECO-03`   | For every living player, whatever their size   |
 | `B-WORK-MAX`          |    80 | % of troops at home        | `R-ECO-07`   | The rest always defends                        |
 | `B-WORK-GOLD`         |     4 | × a soldier's gold         | `R-ECO-07`   | 80 % at work gives 3.4 times the gold          |
 
@@ -58,6 +59,8 @@ Spawn values are set for a map of 2^19 tiles (1024 × 512) (`R-SPAWN-06`). On a 
 | `B-RELIEF-COST`      | 1 / 1.5 / 2.5 | multiplier                  | `R-MAP-06`    | Plains / hills / mountains                  |
 | `B-DEFENSE-DENSITY`  |           1.0 | defender troops/tile weight | `R-ATTACK-03` | Cost of a tile grows with defender density  |
 | `B-ATTACK-SPEED`     |             4 | divisor                     | `R-ATTACK-03` | Tiles taken per tick: 1 + isqrt(troops) / 4 |
+| `B-ATTACK-PACE`      |            20 | % of the front per tick     | `R-ATTACK-03` | Against a player, at full strength          |
+| `B-ATTACK-PACE-ODDS` |           3.0 | × the garrison facing it    | `R-ATTACK-03` | Troops for full pace; less goes slower      |
 | `B-ATTACK-SPREAD`    |             4 | tiles                       | `R-ATTACK-03` | Head start per side shared with own land    |
 | `B-ENCIRCLE-MAX`     |          4000 | tiles                       | `R-ATTACK-08` | Larger pockets must be conquered            |
 | `B-RETREAT-PENALTY`  |            25 | % of returning troops       | `R-ATTACK-06` |                                             |
@@ -135,14 +138,14 @@ Like the other lengths, the range grows with the side of the map. At 500 tiles o
 | `B-COST-GROWTH`      |     1.5 | multiplier | `R-BUILD-*`  | Cost of the n-th structure of a kind: base × 1.5^(n−1)  |
 | `B-PALACE-CITIES`    |       2 | cities     | `R-BUILD-08` | Fixed: what a palace counts as, for cost, land and pop. |
 | `B-BUILD-SPACING`    |      10 | tiles      | `R-BUILD-07` | Between any two structures                              |
-| `B-CITY-LAND`        |   10000 | tiles      | `R-BUILD-07` | Land each city beyond the first needs                   |
+| `B-CITY-LAND`        |       0 | tiles      | `R-BUILD-07` | Land each city beyond the first needs; 0 for no limit   |
 | `B-FORT-RADIUS`      |      25 | tiles      | `R-BUILD-03` |                                                         |
 | `B-FORT-STRENGTH`    |     200 | % of price | `R-BUILD-03` | Paid by attackers inside the radius                     |
 | `B-FORT-LOSSES`      |      50 | % of loss  | `R-BUILD-03` | Lost by the defender inside the radius                  |
 
 Structure values were set on World with eight normal bots, five seeds. Before structures, a bot reached `B-WIN-SHARE` after 8.8 to 13.0 minutes (median 10.1). With cities worth 10 % and one per 20,000 tiles of World, the snowball brought that down to 7.5 to 9.8 minutes; at 5 % and one per 40,000 tiles it is 7.9 to 10.6 (median 10.1), and a scripted casual player that also builds cities wins against seven normal bots as often as before (2 seeds out of 5).
 
-Distances and land are given for a map of 2^19 tiles, like the spawn values: on a larger map `B-FORT-RADIUS` grows with the spawn radius and `B-CITY-LAND` with the spawn area, so on World a fort covers 50 tiles around it and each city beyond the first needs 40,000 tiles.
+Distances and land are given for a map of 2^19 tiles, like the spawn values: on a larger map `B-FORT-RADIUS` grows with the spawn radius and `B-CITY-LAND`, when a game sets it, with the spawn area, so on World a fort covers 50 tiles around it and a limit of 10,000 tiles per city becomes 40,000.
 
 ## Missiles
 
@@ -178,17 +181,17 @@ Each value is given for easy / normal / hard (`R-BOT-04`); the others are the sa
 | `B-BOT-CITY-SEARCH`       |              40 | tiles                           | `R-BOT-06` | Radius around its start in which a bot looks for room for a city                                                                               |
 | `B-BOT-PORT-SEARCH`       |              60 | tiles                           | `R-BOT-06` | Radius around its start in which a bot looks for a coast for its port                                                                          |
 | `B-BOT-ALLIANCE-MAX`      |               1 | allies                          | `R-BOT-10` | So that a bot always has someone left to fight                                                                                                 |
-| `B-NATION-INTERVAL`       |       5 / 2 / 1 | s between decisions             | `R-BOT-09` | In place of `B-BOT-INTERVAL`: nations are the opponents of a solo game and keep pace with a player                                             |
+| `B-NATION-INTERVAL`       |       5 / 1 / 1 | s between decisions             | `R-BOT-09` | In place of `B-BOT-INTERVAL`: nations are the opponents of a solo game and keep pace with a player                                             |
 | `B-NATION-ATTACK-RATIO`   |    15 / 40 / 60 | % of troops at home             | `R-BOT-09` | In place of `B-BOT-ATTACK-RATIO`                                                                                                               |
-| `B-NATION-RESERVE`        |    25 / 10 / 40 | % of population cap             | `R-BOT-09` | In place of `B-BOT-RESERVE`; never sent                                                                                                        |
+| `B-NATION-RESERVE`        |    25 / 40 / 40 | % of population cap             | `R-BOT-09` | In place of `B-BOT-RESERVE`; never sent                                                                                                        |
 | `B-NATION-ODDS`           |   80 / 90 / 100 | % of the nation's troop density | `R-BOT-09` | Attacks a player at most this dense, half while land is free; by sea as well                                                                   |
 | `B-NATION-FULL`           |              90 | % of population cap             | `R-BOT-09` | From here a nation takes the odds of `B-BOT-BOLDNESS` instead: troops past the cap would be wasted                                             |
-| `B-NATION-GRACE`          |  180 / 120 / 90 | s of play                       | `R-BOT-09` | Free land only until then, so nobody starts next to a nation that comes for them at once; an attacker is still answered                        |
+| `B-NATION-GRACE`          |  180 / 100 / 90 | s of play                       | `R-BOT-09` | Free land only until then, so nobody starts next to a nation that comes for them at once; an attacker is still answered                        |
 | `B-NATION-PILE`           |               2 | nations                         | `R-BOT-13` | Most nations that open a front on the same player early on; the leader is not protected                                                        |
 | `B-NATION-PILE-TIME`      |             600 | s of play                       | `R-BOT-13` | After this, nations gang up on anyone                                                                                                          |
 | `B-NATION-THREAT`         |              10 | % of the nation's troops        | `R-BOT-08` | Smaller attacks do not make a nation hold, so a trickle of them cannot freeze it                                                               |
 | `B-NATION-WORK`           |              40 | % of troops at home             | `R-BOT-15` | Put to work while its army is full and nobody holds it                                                                                         |
-| `B-NATION-HOLD`           |    60 / 40 / 30 | % of population cap             | `R-BOT-08` | Under attack, a nation sends nothing below this, and only answers the attacker above it                                                        |
+| `B-NATION-HOLD`           |    60 / 30 / 30 | % of population cap             | `R-BOT-08` | Under attack, a nation sends nothing below this, and only answers the attacker above it                                                        |
 | `B-NATION-WARSHIPS`       |               2 | warships                        | `R-BOT-11` | No more than ports, bought while an enemy transport sails for the nation's coast                                                               |
 | `B-NATION-SILO-CITIES`    |               2 | cities                          | `R-BOT-12` | Before a nation builds a silo                                                                                                                  |
 | `B-NATION-HUNT`           |     0 / 20 / 20 | % of all ownable land           | `R-BOT-14` | From here the leading player is the first target of every nation along its border, odds allowing; never on easy                                |
@@ -229,6 +232,17 @@ Against the leader that runs away with the map, what works is the cap: past 20 %
 Easy nations keep 25 % of their cap at home instead of 60 %: with 60 % they were too dense for anyone to take, and the average player won 1 game in 12 there. Easy nations launched up to 36 missiles a minute between them once rich; `B-NATION-MISSILE-PAUSE` and a dearer light missile (600,000 instead of 300,000, nearer the reference game's 750,000) bring that down to 70 a game at the median. Games of bots alone are unchanged: against eight normal bots on World, or eleven on Europe, the average player wins 2 games of 12 either way, and a bot still wins in 6 to 10 minutes. Hard nations keep 40 % of their cap at home instead of 10 %: with 10 %, on Europe, the average player ate the largest and thinnest nation and won 10 games of 12 in under 7 minutes, before the hunt (`B-NATION-HUNT`) starts. With 40 % it wins 1 game of 12 there (11 decided), and none on World, where hard nations eliminate it after 6.5 minutes at the median; 25 % left Europe at 6 wins. On Europe against normal nations it wins 5 games of 12; a reserve of 25 % for normal nations made them easier to beat (9 on Europe, 11 on World), so normal keeps 10 %. Values were measured with `pnpm balance -- --map world --bots normal:0 --nations normal --average --minutes 30 --seeds 1-12 --rule collapsingFronts`.
 
 With ships for everyone, a scripted player that also sails (free land first, then its weakest neighbour, then a ship to a free or weaker coast, 30 % of its troops every 5 s) wins most solo games: against 7 normal bots on World, 7 seeds out of 8, in 5.5 to 7.2 minutes; against the menu's default of 11 normal bots on Europe, 5 out of 6, in 4.3 to 5.4 minutes. Against 7 hard bots on World it wins 2 seeds out of 4. A real casual player is slower than this script, so these are upper bounds; playtests decide whether normal bots need to be bolder.
+
+Fights between players then lasted no time at all: on World against normal nations, an attack that took a player's land lasted 0.7 s at the median, and the average player lost 96 % of its land within 10 s at its worst moment, when a few nations fell on it together at the end of their grace. `B-ATTACK-PACE` ties the speed of an attack on a player to the length of its front and to its odds against the soldiers facing it, as the reference game does with the shared border and the balance of forces; the price of a tile and the defender's losses (`R-ATTACK-03`) are unchanged, so both sides still pay for every tile. With a pace of 20 % at odds of 3, attacks take land at 23 tiles a second at the median instead of 159, and the nations' first attacks no longer sweep the average player away: its largest loss in 10 s comes after 2 to 24 minutes instead of at once, and in 9 games of 24 stays under a quarter of its land. A player already worn down to a few thousand tiles still falls within 10 s to a much larger neighbour, two rows of tiles a second. A slower pace (10 % at odds of 5) left most games undecided after 30 minutes; a pace without a ceiling for larger odds brought back the 10-second collapse. Counting troops away in attacks against the cap made the game easier (13 wins of 24) and was dropped.
+
+The land limit on cities (`B-CITY-LAND`, 40,000 tiles per city on World) and a gold income that followed troops alone left a small player with one city and about 200 gold a second. Cities are now limited by their growing price only, and every player earns `B-GOLD-BASE`. A ceiling of 1,000,000 on the price of a structure, as in the reference game, let the average player stack cities and win 14 to 19 games of 24, and was dropped.
+
+Slower fights stop one nation from rolling over the others, and the average player won 11 games of 24 against normal nations. Normal nations now decide every second (`B-NATION-INTERVAL`), hold back less under attack (`B-NATION-HOLD`), keep 40 % of their cap at home (`B-NATION-RESERVE`) and end their grace after 100 s (`B-NATION-GRACE`): at 90 s the average player won 1 game of 24, at 105 s 11. On World, 30 minutes, collapsing fronts, the average player wins:
+
+| Nations | Before                   | After                                                  |
+| ------- | ------------------------ | ------------------------------------------------------ |
+| Normal  | 5 of 24 (nations win 19) | 7 of 24 (nations win 10, 7 undecided), eliminated in 2 |
+| Hard    | 0 of 12, eliminated in 5 | 0 of 12, eliminated in 6                               |
 
 ## Capitals
 

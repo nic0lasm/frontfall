@@ -127,8 +127,9 @@ export function buildTime(game: Game, kind: StructureKind): number {
     : game.balance.buildTicks;
 }
 
-/** R-BUILD-07: most cities a player's land supports, one for every B-CITY-LAND tiles, the first one free. */
+/** R-BUILD-07: most cities a player's land supports, one for every B-CITY-LAND tiles, the first one free; no limit at 0. */
 export function cityLimit(game: Game, player: number): number {
+  if (game.balance.cityLand === 0) return Number.MAX_SAFE_INTEGER;
   return 1 + divFloor(game.territory.tileCount(player), cityLand(game));
 }
 

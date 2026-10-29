@@ -8,6 +8,8 @@ import { WorldGrid } from "../src/world-grid.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
+  // Gold counts below leave out the income every player earns (B-GOLD-BASE).
+  goldBase: 0,
   spawnPhaseTicks: 0,
   popPerTile: 100,
   popPerCityPercent: 10,
@@ -140,6 +142,13 @@ describe("economy", () => {
     expect(ada.gold).toBe(1);
     run(8);
     expect(ada.gold).toBe(5);
+  });
+
+  it("pays every player B-GOLD-BASE a second on top, whatever their troops (R-ECO-03)", () => {
+    const { ada, run } = newGame({ goldBase: 500, popPerTile: 0, desertionBasisPoints: 0 });
+    ada.troops = 0;
+    run(10);
+    expect(ada.gold).toBe(500);
   });
 
   it("eliminates a player without land, who loses everything (R-ECO-05)", () => {

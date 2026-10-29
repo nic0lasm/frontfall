@@ -479,14 +479,21 @@ describe("nation starts (R-BOT-07)", () => {
       installEconomy(game);
       installBots(game, [5, 6, 7, 8], "hard");
       installNations(game, [1, 2, 3, 4], "hard");
-      for (let i = 0; i < 600; i++) game.step({ tick: game.tick, orders: [] });
-      return game;
+      // Most land each nation held: one may since have been surrounded and taken (R-ATTACK-08).
+      const peak = new Map<number, number>();
+      for (let i = 0; i < 600; i++) {
+        game.step({ tick: game.tick, orders: [] });
+        for (const id of [1, 2, 3, 4]) {
+          peak.set(id, Math.max(peak.get(id) ?? 0, game.territory.tileCount(id)));
+        }
+      }
+      return { game, peak };
     };
-    const first = play();
-    const second = play();
+    const { game: first, peak } = play();
+    const { game: second } = play();
     expect(first.hash()).toBe(second.hash());
     for (const id of [1, 2, 3, 4]) {
-      expect(first.territory.tileCount(id)).toBeGreaterThan(0);
+      expect(peak.get(id)).toBeGreaterThan(100);
     }
     expect(first.territory.tileCount(NEUTRAL)).toBeLessThan(96 * 48);
   });

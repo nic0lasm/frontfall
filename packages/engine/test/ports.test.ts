@@ -10,6 +10,8 @@ import { WorldGrid } from "../src/world-grid.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
+  // Gold counts below leave out the income every player earns (B-GOLD-BASE).
+  goldBase: 0,
   spawnPhaseTicks: 0,
   buildTicks: 5,
   cityCost: 1000,

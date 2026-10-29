@@ -69,8 +69,9 @@ export function installAttacks(game: Game): void {
    * Plans every attack's front for this tick before any of them moves: up to
    * its speed in tiles of its target that touch the player's territory, the
    * closest to its aim first. One pass over each attacking player's border
-   * serves all of their attacks, and only the best few tiles are kept, so a
-   * long front costs one scan and no sort.
+   * serves all of their attacks and measures their fronts, which set their
+   * speed (R-ATTACK-03); only the best few tiles are then kept, so a long
+   * front costs one scan and no sort.
    */
   function planFronts(): void {
     attacksOf.clear();
@@ -80,6 +81,7 @@ export function installAttacks(game: Game): void {
       (frontPriorities[a] ??= []).length = 0;
       frontLengths[a] = 0;
       const alive = game.player(attack.player)?.alive === true;
+      // The most an attack of this size can take, before its front is measured.
       speeds[a] =
         alive && attack.troops > 0
           ? 1 + divFloor(isqrt(attack.troops), balance.attackSpeedDivisor)
@@ -121,7 +123,38 @@ export function installAttacks(game: Game): void {
         }
       }
     }
+    // The shortlist kept the best tiles an attack of its size could take; its front's pace keeps the first few.
+    for (let a = 0; a < attacks.length; a++) {
+      if (speeds[a] === 0) continue;
+      speeds[a] = pace(a);
+      const tiles = fronts[a] as number[];
+      if (tiles.length > (speeds[a] as number)) {
+        tiles.length = speeds[a] as number;
+        (frontPriorities[a] as number[]).length = speeds[a] as number;
+      }
+    }
     if (collapsing) for (let a = 0; a < attacks.length; a++) overwhelming[a] = overwhelms(a);
+  }
+
+  /**
+   * R-ATTACK-03: tiles an attack on a player takes this tick. At full
+   * strength, troops of B-ATTACK-PACE-ODDS times the garrison facing them,
+   * a share B-ATTACK-PACE of the front's length; a weaker attack in
+   * proportion, at least one tile; never more than its size allows
+   * (B-ATTACK-SPEED). Unowned land only knows the last limit.
+   */
+  function pace(a: number): number {
+    const attack = attacks[a] as Attack;
+    const most = speeds[a] as number;
+    if (attack.target === NEUTRAL || balance.attackPacePercent === 0) return most;
+    const defender = game.player(attack.target);
+    const front = frontLengths[a] as number;
+    if (!defender?.alive || front === 0) return most;
+    const garrison = Math.max(1, defensePerTile(game, defender) * front);
+    const full = Math.max(1, mulDiv(garrison, balance.attackPaceOddsTenths, 10));
+    const strength = Math.min(attack.troops, full);
+    const tiles = mulDiv(front * balance.attackPacePercent, strength, full * 100);
+    return Math.min(most, Math.max(1, tiles));
   }
 
   /**

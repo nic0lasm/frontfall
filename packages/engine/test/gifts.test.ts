@@ -28,6 +28,8 @@ function newGame(disabled = 0) {
     ],
     balance: {
       ...DEFAULT_BALANCE,
+      // Gold counts below leave out the income every player earns (B-GOLD-BASE).
+      goldBase: 0,
       spawnPhaseTicks: 0,
       buildTicks: 1,
       goldPerThousandTroops: 0,

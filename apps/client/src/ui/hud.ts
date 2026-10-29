@@ -690,7 +690,11 @@ export class Hud {
     this.airDefenseCost.textContent = formatCount(airDefenseCost);
     this.missileCost.textContent = formatCount(missileCost);
     this.heavyMissileCost.textContent = formatCount(heavyMissileCost);
-    this.cityCount.textContent = plural("hud.cities", cityLimit, { built: cities });
+    // R-BUILD-07: without a land limit, only the count of cities built.
+    this.cityCount.textContent =
+      cityLimit >= Number.MAX_SAFE_INTEGER
+        ? plural("hud.citiesBuilt", cities)
+        : plural("hud.cities", cityLimit, { built: cities });
     const playing = update.phase === "play" && human.alive;
     const can: Partial<Record<ClickMode, boolean>> = {
       city: playing && human.gold >= cityCost && cities < cityLimit,

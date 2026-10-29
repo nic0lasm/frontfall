@@ -335,3 +335,61 @@ describe("retreat", () => {
     expect(attacks.list()).toHaveLength(1);
   });
 });
+
+describe("pace of an attack on a player (R-ATTACK-03)", () => {
+  /**
+   * Ada holds the west column of a 10 x 40 strip, Bea the next eight and the
+   * east column is free, so Bea is never surrounded: a straight front of 40 tiles.
+   */
+  function front(overrides: Partial<Balance> = {}) {
+    const grid = new WorldGrid(10, 40, { wrapsX: false });
+    const game = new Game({
+      terrain: new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains)),
+      seed: 3,
+      players: [
+        { id: 1, name: "Ada" },
+        { id: 2, name: "Bea" },
+      ],
+      balance: {
+        ...balance,
+        attackSpeedDivisor: 1,
+        attackPacePercent: 20,
+        attackPaceOddsTenths: 30,
+        ...overrides,
+      },
+    });
+    installAttacks(game);
+    for (let tile = 0; tile < grid.size; tile++) {
+      const x = grid.x(tile);
+      if (x < 9) game.territory.setOwner(tile, x === 0 ? 1 : 2);
+    }
+    const ada = game.player(1) as Player;
+    const bea = game.player(2) as Player;
+    // 320 tiles at 10 soldiers each: a garrison of 400 on the front, full pace from 1,200 troops.
+    bea.troops = 3200;
+    const strike = (troops: number) => {
+      ada.troops = troops;
+      game.step({
+        tick: game.tick,
+        orders: [{ player: 1, order: { type: "attack", target: grid.index(5, 20), troops } }],
+      });
+      return game.territory.tileCount(1) - 40;
+    };
+    return { strike };
+  }
+
+  it("takes B-ATTACK-PACE of the front per tick at full strength, however large the attack", () => {
+    expect(front().strike(1200)).toBe(8);
+    expect(front().strike(5000)).toBe(8);
+  });
+
+  it("slows in proportion below B-ATTACK-PACE-ODDS, never under one tile", () => {
+    expect(front().strike(300)).toBe(2);
+    expect(front().strike(40)).toBe(1);
+  });
+
+  it("leaves only B-ATTACK-SPEED at a pace of 0", () => {
+    // 1 + isqrt(5000) = 71 tiles allowed: the whole front of 40 falls at once.
+    expect(front({ attackPacePercent: 0 }).strike(5000)).toBe(40);
+  });
+});

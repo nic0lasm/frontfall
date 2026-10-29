@@ -145,7 +145,9 @@ test("builds a city once the gold allows it (R-BUILD-01)", async ({ page }) => {
   await expect(city).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".banner")).toContainText("build a city");
   await page.mouse.click(start.x, start.y);
-  await expect(page.locator("#build-city .build-count")).toContainText("1 of", { timeout: 5_000 });
+  await expect(page.locator("#build-city .build-count")).toContainText("1 city", {
+    timeout: 5_000,
+  });
   await expect(city).toHaveAttribute("aria-pressed", "false");
   await expect
     .poll(() => changedSince(page, start, before), { timeout: 30_000 })
