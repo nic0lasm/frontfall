@@ -20,15 +20,16 @@
   font-size: 12px;
 }
 
-/* R-ECO-08: gold taken from an eliminated player, over the counter; it takes no room in the bar. */
-.stat {
-  position: relative;
-}
-
+/* R-ECO-08: gold taken from an eliminated player, by the counter; it takes no room in the panel. */
+/* The figures sit in a corner at the top: the gain shows beside their panel. */
 .gold-gain {
   position: absolute;
-  left: 0;
-  bottom: 100%;
+  top: calc(50% - 14px);
+  left: calc(100% + 8px);
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ff-night-800) 92%, transparent);
+  box-shadow: var(--ff-lift);
   color: var(--ff-warning);
   font-size: 16px;
   font-weight: 700;
@@ -36,11 +37,21 @@
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
 }
 
 .gold-gain.rising {
   animation: gold-rise 2.4s ease-out forwards;
+}
+
+/* In the bar at the foot of a wide screen, it rises over the counter. */
+.game[data-wide] .stats .stat {
+  position: relative;
+}
+
+.game[data-wide] .gold-gain {
+  top: auto;
+  bottom: calc(100% + 14px);
+  left: -9px;
 }
 
 @keyframes gold-rise {
@@ -57,7 +68,7 @@
   }
   100% {
     opacity: 0;
-    transform: translateY(-14px);
+    transform: translateY(-10px);
   }
 }
 
