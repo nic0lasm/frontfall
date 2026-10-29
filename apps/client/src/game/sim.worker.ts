@@ -1,6 +1,7 @@
 import type { Order, Turn } from "@frontfall/engine";
 import { transferables, type WorkerReply, type WorkerRequest } from "./messages.ts";
 import { fetchMapData } from "./maps.ts";
+import { BeatClock } from "./beat-clock.ts";
 import { REPLAY_MAP_CHANGED, REPLAY_SPEEDS, sameReplayMap } from "./replay-rules.ts";
 import { SoloGame } from "./solo-game.ts";
 
@@ -23,7 +24,7 @@ const MAX_SPEED = Math.max(...REPLAY_SPEEDS);
 
 let game: SoloGame | undefined;
 let started = false;
-let timer: ReturnType<typeof setInterval> | undefined;
+let clock: BeatClock | undefined;
 let paused = false;
 /** Ticks run per beat of the clock. */
 let speed = 1;
@@ -43,7 +44,7 @@ function tick(): void {
     const update = game.replay(speed);
     scope.postMessage({ type: "update", update }, transferables(update));
     // The last tick of the record: nothing more to play.
-    if (update.replay?.hash !== undefined) clearInterval(timer);
+    if (update.replay?.hash !== undefined) clock?.stop();
     return;
   }
   const orders = pending;
@@ -129,11 +130,17 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
     return;
   }
   speed = Math.max(1, Math.floor(request.options.speed ?? 1));
-  timer = setInterval(() => {
+  clock = new BeatClock(() => {
     // A replay runs its ticks in one go, so that its update covers them all.
     if (game?.options.record) tick();
     else for (let i = 0; i < speed; i++) tick();
   }, 1000 / ticksPerSecond);
+  clock.start();
+}
+
+/** Solo: the player's order plays at once rather than at the next beat (beat-clock.ts). */
+function hurry(): void {
+  if (!paused && !game?.options.record) clock?.pull();
 }
 
 scope.onmessage = (event) => {
@@ -149,6 +156,7 @@ scope.onmessage = (event) => {
       break;
     case "order":
       pending.push(request.order);
+      hurry();
       break;
     case "click": {
       if (!game) break;
@@ -169,6 +177,7 @@ scope.onmessage = (event) => {
       const outcome = "order" in result ? result.order.type : result.refused;
       const note = "order" in result ? result.note : undefined;
       scope.postMessage({ type: "click", tile: request.tile, outcome, ...(note ? { note } : {}) });
+      if ("order" in result) hurry();
       break;
     }
     case "peek":
@@ -197,8 +206,8 @@ scope.onmessage = (event) => {
       paused = request.paused;
       break;
     case "stop":
-      clearInterval(timer);
-      timer = undefined;
+      clock?.stop();
+      clock = undefined;
       game = undefined;
       break;
   }

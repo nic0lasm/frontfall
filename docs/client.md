@@ -126,7 +126,9 @@ latest (a lone late turn plays late on its own rather than hold the others
 back), so bunched
 arrivals still come out one per tick; a backlog of more than 4 turns plays
 at once. A solo game goes down the same path: each tick, its orders become
-the turn a server would have sent. A click becomes an order
+the turn a server would have sent. Its clock (`game/beat-clock.ts`) plays
+the next beat as soon as the player gives an order, and the beat after keeps
+its time, never more than one beat ahead of the schedule. A click becomes an order
 the page sends to the server; it takes effect when its turn comes back.
 After every 50th tick the worker hashes the game state and the page reports
 it, so the server can tell a client out of step (`desync`). The worker keeps

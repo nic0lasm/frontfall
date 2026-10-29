@@ -8,6 +8,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 - **A smoother map on high-density screens.** Moving, zooming and playing no longer stutter on a laptop whose graphics chip cannot draw every pixel of a Retina screen sixty times a second: the map is drawn a little less sharp while frames fall behind, and back at full sharpness as soon as they keep up. Phones draw the map at most at twice their screen's resolution. The map's shading also does less work for the same picture: borders up close, the sea's swell and the grain of the ground are cheaper to draw.
 
+- **Your orders play at once in a solo game.** An order no longer waits up to a tenth of a second for the game's next beat: that beat plays as soon as the order is given, and the one after keeps its time, so the game runs at the same pace.
 - **Orders answer sooner.** A ring now shows under the pointer the moment you press on the map, instead of after you let go and the game has read the click; it turns into the usual answer once the order is read. Online, a turn that the network or a busy page delays no longer holds back every turn after it for three seconds: it plays a little late on its own, so your orders come back sooner, by about 60 ms in our measurements and much more after a hiccup.
 
 ## [0.8.0] - 2026-10-29
