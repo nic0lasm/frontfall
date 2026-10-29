@@ -7,6 +7,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### Changed
 
 - **A smoother map on high-density screens.** Moving, zooming and playing no longer stutter on a laptop whose graphics chip cannot draw every pixel of a Retina screen sixty times a second: the map is drawn a little less sharp while frames fall behind, and back at full sharpness as soon as they keep up. Phones draw the map at most at twice their screen's resolution. The map's shading also does less work for the same picture: borders up close, the sea's swell and the grain of the ground are cheaper to draw.
+- **Games run lighter.** Each turn of a game takes about a third less time to work out, on the server and in solo games alike, and capital mode games with many nations up to three times less: a capital that moves no longer searches the whole map, and fronts, encirclements, ships and forts do less work for the same result. Nothing about the rules changes.
 
 ## [0.8.0] - 2026-10-29
 
