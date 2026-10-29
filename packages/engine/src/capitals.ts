@@ -171,16 +171,20 @@ export function installCapitals(game: Game): void {
     logEvent(game, { tick: game.tick, type: "razed", a: player.id, b: player.id });
   }
 
-  /** The player's tile closest to `tile`, the lowest tile number among equals; undefined without land. */
+  /**
+   * The player's tile closest to `tile`, the lowest tile number among equals;
+   * undefined without land. `tile` is never the player's, so the answer is
+   * one of their border tiles: any other tile has all four neighbours in
+   * their land, and the one a step towards `tile` is strictly closer.
+   */
   function closestOwned(player: Player, tile: number): number | undefined {
-    if (territory.tileCount(player.id) === 0) return undefined;
-    const owners = territory.owners;
+    const borders = territory.borderList(player.id);
     let best: number | undefined;
     let closest = 0;
-    for (let t = 0; t < owners.length; t++) {
-      if (owners[t] !== player.id) continue;
+    for (let i = 0; i < borders.length; i++) {
+      const t = borders[i] as number;
       const distance = topology.squaredDistance(t, tile);
-      if (best === undefined || distance < closest) {
+      if (best === undefined || distance < closest || (distance === closest && t < best)) {
         best = t;
         closest = distance;
       }

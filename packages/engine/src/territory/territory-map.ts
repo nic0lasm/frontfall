@@ -80,6 +80,16 @@ export class TerritoryMap {
     return (this.borderLists[player] as Int32Array)[i] as number;
   }
 
+  /**
+   * A player's border tiles, in the order of borderTile(), as a view of the
+   * live list: read it before the next setOwner(), which can reorder or
+   * reallocate it. Never write to it.
+   */
+  borderList(player: number): Int32Array {
+    const size = this.borderCount(player);
+    return (this.borderLists[player] as Int32Array).subarray(0, size);
+  }
+
   setOwner(tile: number, player: number): void {
     this.checkTile(tile);
     this.checkPlayer(player);

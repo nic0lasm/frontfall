@@ -86,26 +86,77 @@ export function installAttacks(game: Game): void {
       if (own) own.push(a);
       else attacksOf.set(attack.player, [a]);
     }
+    const owners = territory.owners;
     // Map iteration follows insertion, which follows the attack list: the same on every client.
     for (const [player, own] of attacksOf) {
       scan++;
-      const borders = territory.borderCount(player);
-      for (let i = 0; i < borders; i++) {
-        const count = topology.neighborsInto(territory.borderTile(player, i), around);
+      const borders = territory.borderList(player);
+      // A player has at most one attack per target: the common single attack needs no lookup.
+      const only = own.length === 1 ? (own[0] as number) : -1;
+      const onlyTarget = only < 0 ? -1 : (attacks[only] as Attack).target;
+      // Without a front length to count (R-ATTACK-10), a border tile too far from the aim is passed over whole.
+      const skips =
+        only >= 0 && (!collapsing || onlyTarget === NEUTRAL) && balance.attackSpread >= 0;
+      for (let i = 0; i < borders.length; i++) {
+        if (skips && outranked(only, borders[i] as number)) continue;
+        const count = topology.neighborsInto(borders[i] as number, around);
         for (let j = 0; j < count; j++) {
           const tile = around[j] as number;
           if (seen[tile] === scan) continue;
-          const owner = territory.ownerOf(tile);
-          if (owner === player || !game.usable(tile)) continue;
-          const a = own.find((index) => (attacks[index] as Attack).target === owner);
-          if (a === undefined) continue;
+          const owner = owners[tile] as number;
+          if (owner === player) continue;
+          let a = -1;
+          if (only >= 0) {
+            if (owner === onlyTarget) a = only;
+          } else {
+            for (let k = 0; k < own.length; k++) {
+              if ((attacks[own[k] as number] as Attack).target === owner) {
+                a = own[k] as number;
+                break;
+              }
+            }
+          }
+          if (a < 0 || !game.usable(tile)) continue;
           seen[tile] = scan;
           frontLengths[a] = (frontLengths[a] as number) + 1;
-          shortlist(a, tile, priority(player, tile, (attacks[a] as Attack).aim));
+          consider(a, player, tile);
         }
       }
     }
     if (collapsing) for (let a = 0; a < attacks.length; a++) overwhelming[a] = overwhelms(a);
+  }
+
+  /**
+   * Whether no neighbour of a border tile can make an attack's full
+   * shortlist: each is at most one tile nearer to the aim, and has at most
+   * four sides on the player's land.
+   */
+  function outranked(a: number, border: number): boolean {
+    const tiles = fronts[a] as number[];
+    if (tiles.length !== speeds[a]) return false;
+    const last = (frontPriorities[a] as number[])[tiles.length - 1] as number;
+    const bound = last + 4 * balance.attackSpread + 1;
+    return (
+      bound >= 0 &&
+      topology.squaredDistance(border, (attacks[a] as Attack).aim) >= (bound + 1) * (bound + 1)
+    );
+  }
+
+  /**
+   * Shortlists a tile of an attack's front by priority(), skipping the work
+   * when even its best possible priority, with all four sides on the
+   * player's land, could not make the full shortlist.
+   */
+  function consider(a: number, player: number, tile: number): void {
+    const tiles = fronts[a] as number[];
+    const distance = topology.squaredDistance(tile, (attacks[a] as Attack).aim);
+    if (tiles.length === speeds[a] && balance.attackSpread >= 0) {
+      // A tile only gets in with a rank below the last one's, or equal to it with a lower number.
+      const last = (frontPriorities[a] as number[])[tiles.length - 1] as number;
+      const bound = last + 4 * balance.attackSpread;
+      if (bound >= 0 && distance >= (bound + 1) * (bound + 1)) return;
+    }
+    shortlist(a, tile, priority(player, tile, distance));
   }
 
   /**
@@ -128,12 +179,12 @@ export function installAttacks(game: Game): void {
    * Tiles in the hollows of the front catch up with its tip, so an attack
    * spreads as a wedge towards its aim instead of a thin line.
    */
-  function priority(player: number, tile: number, aim: number): number {
+  function priority(player: number, tile: number, squaredDistance: number): number {
+    const owners = territory.owners;
     let sides = 0;
     const count = topology.neighborsInto(tile, ownAround);
-    for (let k = 0; k < count; k++)
-      if (territory.ownerOf(ownAround[k] as number) === player) sides++;
-    return isqrt(topology.squaredDistance(tile, aim)) - balance.attackSpread * sides;
+    for (let k = 0; k < count; k++) if (owners[ownAround[k] as number] === player) sides++;
+    return isqrt(squaredDistance) - balance.attackSpread * sides;
   }
 
   /** Inserts a tile into an attack's front, kept sorted by priority then tile and cut at its speed. */
