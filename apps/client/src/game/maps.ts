@@ -222,14 +222,31 @@ export async function warmMap(info: MapInfo, fetcher: typeof fetch = fetch): Pro
   }
 }
 
-export function generateMap(id: string): MapData {
+/** The land of a generated map, one grid-wide pass per map and session: it is the costly part. */
+const generatedLands = new Map<string, Uint8Array>();
+
+/**
+ * Which tiles of a generated map are land (1) or water (0). The menu draws its
+ * thumbnails from this alone, without the relief the game adds.
+ */
+export function generatedLand(id: string): { map: GeneratedMap; land: Uint8Array } {
   const map = GENERATED.find((candidate) => candidate.id === id);
   if (!map) throw new RangeError(`unknown map ${id}`);
+  let land = generatedLands.get(id);
+  if (!land) {
+    const grid = new WorldGrid(map.width, map.height, { wrapsX: map.wrapsX });
+    land = keepLargestLandmass(
+      grid,
+      generateLand(grid, map.seed, { seeds: map.seeds, landShare: map.landShare }),
+    );
+    generatedLands.set(id, land);
+  }
+  return { map, land };
+}
+
+export function generateMap(id: string): MapData {
+  const { map, land } = generatedLand(id);
   const grid = new WorldGrid(map.width, map.height, { wrapsX: map.wrapsX });
-  const land = keepLargestLandmass(
-    grid,
-    generateLand(grid, map.seed, { seeds: map.seeds, landShare: map.landShare }),
-  );
   const kinds = land.map((value) => (value === 1 ? TileKind.Plains : TileKind.Water));
   const relief = coastDistance(grid, land).map((distance) => Math.min(distance - 1, 12));
   return {

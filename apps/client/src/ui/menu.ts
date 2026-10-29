@@ -1,7 +1,7 @@
 import { accessibilityPanel } from "./accessibility.ts";
 import { CATALOGUE } from "../achievements/catalog.ts";
 import { REPLAY_EXTENSION } from "../game/replay-file.ts";
-import { MAP_GROUPS, generateMap, suggestedBots, type MapInfo } from "../game/maps.ts";
+import { MAP_GROUPS, generatedLand, suggestedBots, type MapInfo } from "../game/maps.ts";
 import { MAX_BOTS, type Difficulty } from "../game/solo-game.ts";
 import {
   LANGUAGES,
@@ -641,24 +641,42 @@ function thumbnail(info: MapInfo): HTMLElement {
   if (info.thumbnail) {
     return h("img", { class: "map-thumb", src: info.thumbnail, alt: "", loading: "lazy" });
   }
-  const map = generateMap(info.id);
-  const scale = Math.max(1, Math.ceil(map.width / 160));
-  const width = Math.floor(map.width / scale);
-  const height = Math.floor(map.height / scale);
+  const scale = Math.max(1, Math.ceil(info.width / 160));
+  const width = Math.floor(info.width / scale);
+  const height = Math.floor(info.height / scale);
   const canvas = h("canvas", { class: "map-thumb", width, height, "aria-hidden": "true" });
   const context = canvas.getContext("2d");
   if (!context) return canvas;
-  const image = context.createImageData(width, height);
-  const land = hexToRgb(MAP_COLORS.landHigh);
-  const ocean = hexToRgb(MAP_COLORS.ocean);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const kind = map.kinds[y * scale * map.width + x * scale];
-      image.data.set([...(kind === 0 ? ocean : land), 255], (y * width + x) * 4);
+  // Growing the land takes a while: the menu shows first and each picture follows in its own task.
+  paintAfterMenu(() => {
+    const { land } = generatedLand(info.id);
+    const image = context.createImageData(width, height);
+    const landColor = hexToRgb(MAP_COLORS.landHigh);
+    const ocean = hexToRgb(MAP_COLORS.ocean);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const isLand = land[y * scale * info.width + x * scale] === 1;
+        image.data.set([...(isLand ? landColor : ocean), 255], (y * width + x) * 4);
+      }
     }
-  }
-  context.putImageData(image, 0, 0);
+    context.putImageData(image, 0, 0);
+  });
   return canvas;
+}
+
+const thumbnailQueue: (() => void)[] = [];
+
+/** Runs `paint` once the page has painted, after the ones queued before it, each in its own task. */
+function paintAfterMenu(paint: () => void): void {
+  thumbnailQueue.push(paint);
+  if (thumbnailQueue.length > 1) return;
+  const next = (): void => {
+    thumbnailQueue.shift()?.();
+    if (thumbnailQueue.length > 0) setTimeout(next, 0);
+  };
+  requestAnimationFrame(() => {
+    setTimeout(next, 0);
+  });
 }
 
 /** A button that opens the file picker for a replay saved from the end of a game. */
