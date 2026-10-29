@@ -12,6 +12,7 @@ import { LeaderList } from "./leader-list.ts";
 import { PopulationBar } from "./population-bar.ts";
 import { BUILD_MODES, costOf, numberOf, offers } from "./build-modes.ts";
 import { safeStorage } from "./setup.ts";
+import { pressToSet } from "./range-click.ts";
 import { workText } from "./work-text.ts";
 
 // Also found here, where it was first defined.
@@ -187,6 +188,8 @@ export class Hud {
     this.leaders = new LeaderList((player) => {
       actions.onPlayer(player);
     });
+    pressToSet(this.ratioInput);
+    pressToSet(this.workInput);
     this.ratioInput.addEventListener("input", () => {
       this.setRatio(Number(this.ratioInput.value));
     });

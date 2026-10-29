@@ -164,6 +164,14 @@
 .ratio input {
   min-width: 0;
   margin: 0;
+  /* A press on the track sets the value (range-click.ts): the browser must not scroll or zoom instead. */
+  touch-action: none;
+}
+
+@media (pointer: fine) {
+  .ratio input[type="range"] {
+    min-height: 28px;
+  }
 }
 
 .ratio .range-value {
