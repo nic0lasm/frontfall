@@ -498,6 +498,8 @@ tiles of its blast changing hands as it strikes.
 
 ## Server load
 
+What one server holds, measured with this bench, is in [capacity.md](capacity.md).
+
 The game server relays orders and closes one turn every 100 ms for every
 game ([protocol](protocol.md)). [`bench/server`](../bench/server) checks that
 it keeps that pace with many full games:
