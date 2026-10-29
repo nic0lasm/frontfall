@@ -210,19 +210,23 @@ class SeaSearch {
 
   /** Searches up to `budget` more water tiles; gives back what is left of the budget. */
   advance(budget: number): number {
-    const { topology } = this.game.terrain;
+    // A search walks most of the sea of a large map: the loop reads the typed arrays directly.
+    const { topology, kinds } = this.game.terrain;
+    const { marks, around, range, generation } = this;
     let { head, tail } = this;
     let left = budget;
     while (head < tail && left > 0) {
       left--;
       const water = this.queue[head++] as number;
-      const distance = this.distance(water) + 1;
-      if (distance >= this.range) continue;
-      const next = topology.neighborsInto(water, this.around);
+      const distance = ((marks[water] as number) & 0xffff) + 1;
+      if (distance >= range) continue;
+      const next = topology.neighborsInto(water, around);
       for (let i = 0; i < next; i++) {
-        const tile = this.around[i] as number;
-        if (!this.isWater(tile) || this.seen(tile)) continue;
-        this.mark(tile, distance);
+        const tile = around[i] as number;
+        if (kinds[tile] !== TileKind.Water || (marks[tile] as number) >>> 16 === generation) {
+          continue;
+        }
+        marks[tile] = ((generation << 16) | distance) >>> 0;
         tail = this.enqueue(tail, tile);
       }
     }

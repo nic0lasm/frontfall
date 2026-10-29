@@ -13,6 +13,9 @@ export type TileKind = (typeof TileKind)[keyof typeof TileKind];
 /** Kinds are numbered from 0 without gaps, so a range check validates them. */
 const HIGHEST_KIND: number = TileKind.Impassable;
 
+/** Kinds of land a player can own, as a bit set (bit 1 << kind): see `isOwnable`. */
+const OWNABLE_KINDS = (1 << TileKind.Plains) | (1 << TileKind.Hills) | (1 << TileKind.Mountains);
+
 /** Kind of every tile of a map, indexed like its topology. */
 export class Terrain {
   readonly topology: Topology;
@@ -101,12 +104,15 @@ export class Terrain {
 
   /** 1 on every water tile of the largest body of water, 0 elsewhere. */
   private findOcean(): Uint8Array {
-    const bodies = this.findBodies((tile) => this.kinds[tile] === TileKind.Water);
-    const sizes: number[] = [];
-    for (const body of bodies) if (body >= 0) sizes[body] = (sizes[body] ?? 0) + 1;
+    const { masses: bodies, count } = this.findBodies(1 << TileKind.Water);
+    const sizes = new Int32Array(count);
+    for (let tile = 0; tile < bodies.length; tile++) {
+      const body = bodies[tile] as number;
+      if (body >= 0) sizes[body] = (sizes[body] as number) + 1;
+    }
     let largest = -1;
     // The first body in tile order wins a tie, the same on every client.
-    for (let body = 0; body < sizes.length; body++) {
+    for (let body = 0; body < count; body++) {
       if (largest < 0 || (sizes[body] as number) > (sizes[largest] as number)) largest = body;
     }
     const ocean = new Uint8Array(bodies.length);
@@ -115,18 +121,23 @@ export class Terrain {
   }
 
   private findLandmasses(): Int32Array {
-    return this.findBodies((tile) => this.isOwnable(tile));
+    return this.findBodies(OWNABLE_KINDS).masses;
   }
 
-  /** Numbers the regions of tiles that `inside` accepts, connected through each other, from 0 in tile order; -1 elsewhere. */
-  private findBodies(inside: (tile: number) => boolean): Int32Array {
-    const { topology } = this;
+  /**
+   * Numbers the regions of tiles whose kind is in the bit set `accepted`
+   * (bit 1 << kind), connected through each other, from 0 in tile order;
+   * -1 elsewhere. Gives the numbers and how many regions there are. A bit
+   * set rather than a callback: on World this walks millions of tiles.
+   */
+  private findBodies(accepted: number): { masses: Int32Array; count: number } {
+    const { topology, kinds } = this;
     const masses = new Int32Array(topology.size).fill(-1);
     const queue = new Int32Array(topology.size);
     const around = new Int32Array(4);
     let next = 0;
     for (let start = 0; start < topology.size; start++) {
-      if (masses[start] !== -1 || !inside(start)) continue;
+      if (masses[start] !== -1 || ((accepted >>> (kinds[start] as number)) & 1) === 0) continue;
       masses[start] = next;
       queue[0] = start;
       let head = 0;
@@ -135,13 +146,13 @@ export class Terrain {
         const count = topology.neighborsInto(queue[head++] as number, around);
         for (let i = 0; i < count; i++) {
           const tile = around[i] as number;
-          if (masses[tile] !== -1 || !inside(tile)) continue;
+          if (masses[tile] !== -1 || ((accepted >>> (kinds[tile] as number)) & 1) === 0) continue;
           masses[tile] = next;
           queue[tail++] = tile;
         }
       }
       next++;
     }
-    return masses;
+    return { masses, count: next };
   }
 }
