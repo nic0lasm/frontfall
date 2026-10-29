@@ -191,21 +191,88 @@ function cityLand(game: Game): number {
 /** R-BUILD-03: whether a ready fort of the tile's owner stands within its radius of the tile. */
 export function fortified(game: Game, tile: number, owner: number): boolean {
   if (owner === NEUTRAL) return false;
+  const cache = readyForts(game);
+  const forts = cache.byPlayer[owner];
+  if (forts === undefined) return false;
   const topology = game.terrain.topology;
-  const radius = fortRadius(game);
-  for (const structure of game.structures) {
+  const territory = game.territory;
+  const radius = cache.radius;
+  for (const structure of forts) {
     if (
-      structure.kind === StructureKind.Fort &&
       structure.player === owner &&
       // Taken earlier in this tick, before the structures changed hands.
-      game.territory.ownerOf(structure.tile) === owner &&
-      isReady(game, structure) &&
+      territory.ownerOf(structure.tile) === owner &&
       topology.distance(structure.tile, tile) <= radius
     ) {
       return true;
     }
   }
   return false;
+}
+
+/**
+ * The ready forts of a game by player id, and the fort radius. Attacks ask
+ * `fortified` twice for every tile they take, so the forts are picked out of
+ * all the structures once rather than at every call.
+ */
+interface FortCache {
+  readonly game: Game;
+  readonly tick: number;
+  readonly length: number;
+  readonly last: Structure | undefined;
+  readonly nextId: number;
+  readonly handovers: number;
+  readonly radius: number;
+  readonly byPlayer: (Structure[] | undefined)[];
+}
+
+// One game at a time: a game only finds its own forts here, and others rebuild them.
+let fortCache: FortCache | undefined;
+
+/** Structures that changed hands so far, in every game: a fort that changes hands moves to another list. */
+let handovers = 0;
+
+/**
+ * Ready forts by player. A fort's kind, tile and `readyAt` never change, so
+ * the lists hold as long as the tick, the set of structures and their players
+ * do. The set changes only by a push, which adds at the end (and, for a
+ * build, takes the next id), or by removals, which shorten the array: the
+ * length, the last structure and the next id tell. Players change only when
+ * structures change hands, which counts them.
+ */
+function readyForts(game: Game): FortCache {
+  const structures = game.structures;
+  const length = structures.length;
+  const last = structures[length - 1];
+  const cache = fortCache;
+  if (
+    cache?.game === game &&
+    cache.tick === game.tick &&
+    cache.length === length &&
+    cache.last === last &&
+    cache.nextId === game.nextStructureId &&
+    cache.handovers === handovers
+  ) {
+    return cache;
+  }
+  const byPlayer: (Structure[] | undefined)[] = [];
+  for (const structure of structures) {
+    if (structure.kind !== StructureKind.Fort || !isReady(game, structure)) continue;
+    const forts = byPlayer[structure.player];
+    if (forts === undefined) byPlayer[structure.player] = [structure];
+    else forts.push(structure);
+  }
+  fortCache = {
+    game,
+    tick: game.tick,
+    length,
+    last,
+    nextId: game.nextStructureId,
+    handovers,
+    radius: cache?.game === game ? cache.radius : fortRadius(game),
+    byPlayer,
+  };
+  return fortCache;
 }
 
 /**
@@ -246,7 +313,10 @@ export function installStructures(game: Game): void {
       const owner = game.territory.ownerOf(structure.tile);
       // Should land ever go back to nobody, what stood on it goes too.
       if (owner === NEUTRAL) continue;
-      structure.player = owner;
+      if (structure.player !== owner) {
+        structure.player = owner;
+        handovers++;
+      }
       structures[kept++] = structure;
     }
     structures.length = kept;

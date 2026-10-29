@@ -342,124 +342,168 @@ export class Game {
    * turns must report the same hash for the same tick (R-FAIR-01).
    */
   hash(): number {
+    // Every value goes through `mix` and `mixWord` below, in the order and
+    // with the bytes it always had: the hash of a state must never change.
+    // The running hash stays in a local rather than a variable captured by
+    // closures, which the loop over every tile of the map reads and writes
+    // far faster, and no array is built per entity.
     let hash = 0x811c9dc5;
-    const mixWord = (word: number): void => {
-      for (let shift = 0; shift < 32; shift += 8) {
-        hash = Math.imul(hash ^ ((word >>> shift) & 0xff), 0x01000193);
-      }
-    };
-    // Feeds the value as two 32-bit halves, so counts above 2^32 are not truncated.
-    const mix = (value: number): void => {
-      mixWord(value >>> 0);
-      mixWord(Math.floor(value / 2 ** 32) >>> 0);
-    };
-    mix(this.currentTick);
-    mixWord(this.balanceDigest);
-    for (const word of this.random.state()) mix(word);
+    hash = mix(hash, this.currentTick);
+    hash = mixWord(hash, this.balanceDigest);
+    for (const word of this.random.state()) hash = mix(hash, word);
     const owners = this.territory.owners;
     for (let tile = 0; tile < owners.length; tile++) {
       hash = Math.imul(hash ^ (owners[tile] as number), 0x01000193);
     }
     for (const p of this.sortedPlayers) {
-      for (const value of [
-        p.id,
-        p.troops,
-        p.gold,
-        p.goldRemainder,
-        p.workShare,
-        p.alive ? 1 : 0,
-        p.start ?? -1,
-        p.traitorUntil,
-        // The map's nations come from its manifest, which the terrain's hash does not cover.
-        p.home ?? -1,
-      ]) {
-        mix(value);
-      }
+      hash = mix(hash, p.id);
+      hash = mix(hash, p.troops);
+      hash = mix(hash, p.gold);
+      hash = mix(hash, p.goldRemainder);
+      hash = mix(hash, p.workShare);
+      hash = mix(hash, p.alive ? 1 : 0);
+      hash = mix(hash, p.start ?? -1);
+      hash = mix(hash, p.traitorUntil);
+      // The map's nations come from its manifest, which the terrain's hash does not cover.
+      hash = mix(hash, p.home ?? -1);
     }
-    mix(this.nextAttackId);
+    hash = mix(hash, this.nextAttackId);
     for (const a of this.attacks) {
-      for (const value of [a.id, a.player, a.target, a.aim, a.troops]) mix(value);
+      hash = mix(hash, a.id);
+      hash = mix(hash, a.player);
+      hash = mix(hash, a.target);
+      hash = mix(hash, a.aim);
+      hash = mix(hash, a.troops);
       // Games without collapsing fronts hash as they did before the rule existed.
-      if (this.rules.collapsingFronts) mix(a.pressure);
+      if (this.rules.collapsingFronts) hash = mix(hash, a.pressure);
     }
-    mix(this.nextBoatId);
+    hash = mix(hash, this.nextBoatId);
     for (const b of this.boats) {
-      for (const value of [b.id, b.player, b.target, b.troops, b.step, b.path.length]) mix(value);
-      for (const tile of b.path) mix(tile);
+      hash = mix(hash, b.id);
+      hash = mix(hash, b.player);
+      hash = mix(hash, b.target);
+      hash = mix(hash, b.troops);
+      hash = mix(hash, b.step);
+      hash = mix(hash, b.path.length);
+      for (const tile of b.path) hash = mix(hash, tile);
     }
-    mix(this.nextStructureId);
-    for (const s of this.structures)
-      for (const value of [s.id, s.player, s.kind, s.tile, s.readyAt, s.reloadAt]) mix(value);
-    mix(this.alliances.length);
-    for (const a of this.alliances)
-      for (const value of [a.a, a.b, a.until, a.renewA ? 1 : 0, a.renewB ? 1 : 0]) mix(value);
-    mix(this.allianceRequests.length);
-    for (const r of this.allianceRequests)
-      for (const value of [r.from, r.to, r.expiresAt]) mix(value);
-    mix(this.requestCooldowns.length);
-    for (const c of this.requestCooldowns) for (const value of [c.from, c.to, c.until]) mix(value);
-    mix(this.nextTradeShipId);
-    mix(this.tradeShips.length);
+    hash = mix(hash, this.nextStructureId);
+    for (const s of this.structures) {
+      hash = mix(hash, s.id);
+      hash = mix(hash, s.player);
+      hash = mix(hash, s.kind);
+      hash = mix(hash, s.tile);
+      hash = mix(hash, s.readyAt);
+      hash = mix(hash, s.reloadAt);
+    }
+    hash = mix(hash, this.alliances.length);
+    for (const a of this.alliances) {
+      hash = mix(hash, a.a);
+      hash = mix(hash, a.b);
+      hash = mix(hash, a.until);
+      hash = mix(hash, a.renewA ? 1 : 0);
+      hash = mix(hash, a.renewB ? 1 : 0);
+    }
+    hash = mix(hash, this.allianceRequests.length);
+    for (const r of this.allianceRequests) {
+      hash = mix(hash, r.from);
+      hash = mix(hash, r.to);
+      hash = mix(hash, r.expiresAt);
+    }
+    hash = mix(hash, this.requestCooldowns.length);
+    for (const c of this.requestCooldowns) {
+      hash = mix(hash, c.from);
+      hash = mix(hash, c.to);
+      hash = mix(hash, c.until);
+    }
+    hash = mix(hash, this.nextTradeShipId);
+    hash = mix(hash, this.tradeShips.length);
     for (const t of this.tradeShips) {
-      for (const value of [t.id, t.player, t.port, t.from, t.to, t.step, t.path.length]) mix(value);
+      hash = mix(hash, t.id);
+      hash = mix(hash, t.player);
+      hash = mix(hash, t.port);
+      hash = mix(hash, t.from);
+      hash = mix(hash, t.to);
+      hash = mix(hash, t.step);
+      hash = mix(hash, t.path.length);
       // The ends of its route, which the route cache outside the state chose.
-      mix(t.path[0] ?? -1);
-      mix(t.path[t.path.length - 1] ?? -1);
+      hash = mix(hash, t.path[0] ?? -1);
+      hash = mix(hash, t.path[t.path.length - 1] ?? -1);
     }
-    mix(this.nextWarshipId);
+    hash = mix(hash, this.nextWarshipId);
     for (const w of this.warships) {
-      for (const value of [
-        w.id,
-        w.player,
-        w.tile,
-        w.health,
-        w.patrol,
-        w.step,
-        w.path.length,
-        w.reloadAt,
-      ])
-        mix(value);
+      hash = mix(hash, w.id);
+      hash = mix(hash, w.player);
+      hash = mix(hash, w.tile);
+      hash = mix(hash, w.health);
+      hash = mix(hash, w.patrol);
+      hash = mix(hash, w.step);
+      hash = mix(hash, w.path.length);
+      hash = mix(hash, w.reloadAt);
     }
-    mix(this.nextMissileId);
-    mix(this.missiles.length);
+    hash = mix(hash, this.nextMissileId);
+    hash = mix(hash, this.missiles.length);
     for (const m of this.missiles) {
-      for (const value of [m.id, m.player, m.size, m.from, m.to, m.launchedAt, m.arrivesAt]) {
-        mix(value);
-      }
-      mix(m.tried.length);
-      for (const id of m.tried) mix(id);
+      hash = mix(hash, m.id);
+      hash = mix(hash, m.player);
+      hash = mix(hash, m.size);
+      hash = mix(hash, m.from);
+      hash = mix(hash, m.to);
+      hash = mix(hash, m.launchedAt);
+      hash = mix(hash, m.arrivesAt);
+      hash = mix(hash, m.tried.length);
+      for (const id of m.tried) hash = mix(hash, id);
     }
-    mix(this.fallout.length);
-    for (const f of this.fallout) for (const value of [f.tile, f.radius, f.until]) mix(value);
-    mix(this.fights.length);
-    for (const f of this.fights) for (const value of [f.a, f.b, f.until]) mix(value);
-    mix(this.embargoes.length);
-    for (const e of this.embargoes) for (const value of [e.from, e.to, e.since]) mix(value);
-    mix(this.winner ?? 0);
+    hash = mix(hash, this.fallout.length);
+    for (const f of this.fallout) {
+      hash = mix(hash, f.tile);
+      hash = mix(hash, f.radius);
+      hash = mix(hash, f.until);
+    }
+    hash = mix(hash, this.fights.length);
+    for (const f of this.fights) {
+      hash = mix(hash, f.a);
+      hash = mix(hash, f.b);
+      hash = mix(hash, f.until);
+    }
+    hash = mix(hash, this.embargoes.length);
+    for (const e of this.embargoes) {
+      hash = mix(hash, e.from);
+      hash = mix(hash, e.to);
+      hash = mix(hash, e.since);
+    }
+    hash = mix(hash, this.winner ?? 0);
     // Free-for-all games hash as they did before teams existed.
     if (this.teams > 0) {
-      mix(this.teams);
-      for (const p of this.sortedPlayers) mix(p.team);
-      mix(this.winningTeam ?? 0);
+      hash = mix(hash, this.teams);
+      for (const p of this.sortedPlayers) hash = mix(hash, p.team);
+      hash = mix(hash, this.winningTeam ?? 0);
     }
     // So do games that leave nothing out, and games without quick messages.
-    if (this.disabled !== 0) mix(this.disabled);
+    if (this.disabled !== 0) hash = mix(hash, this.disabled);
     // And games with no special rule.
     if (ruleBits(this.rules) !== 0) {
       // Tagged, so that no value of `disabled` before it reads the same.
-      mix(RULES_TAG);
-      mix(ruleBits(this.rules));
+      hash = mix(hash, RULES_TAG);
+      hash = mix(hash, ruleBits(this.rules));
     }
     for (const c of this.quickCooldowns) {
-      if (this.currentTick < c.until) for (const value of [c.player, c.until]) mix(value);
+      if (this.currentTick < c.until) {
+        hash = mix(hash, c.player);
+        hash = mix(hash, c.until);
+      }
     }
-    mix(this.decidedAt ?? -1);
+    hash = mix(hash, this.decidedAt ?? -1);
     // Games without capitals hash as they did before the mode existed.
     if (this.rules.capitals) {
-      for (const p of this.sortedPlayers) mix(p.capital ?? -1);
-      mix(this.capitalFalls.length);
-      for (const f of this.capitalFalls)
-        for (const value of [f.tick, f.player, f.by, f.tile]) mix(value);
+      for (const p of this.sortedPlayers) hash = mix(hash, p.capital ?? -1);
+      hash = mix(hash, this.capitalFalls.length);
+      for (const f of this.capitalFalls) {
+        hash = mix(hash, f.tick);
+        hash = mix(hash, f.player);
+        hash = mix(hash, f.by);
+        hash = mix(hash, f.tile);
+      }
     }
     return hash >>> 0;
   }
@@ -564,6 +608,19 @@ export class Game {
     this.currentTick++;
     return applied;
   }
+}
+
+/** One FNV-1a round per byte of a 32-bit word, lowest byte first. */
+function mixWord(hash: number, word: number): number {
+  hash = Math.imul(hash ^ (word & 0xff), 0x01000193);
+  hash = Math.imul(hash ^ ((word >>> 8) & 0xff), 0x01000193);
+  hash = Math.imul(hash ^ ((word >>> 16) & 0xff), 0x01000193);
+  return Math.imul(hash ^ (word >>> 24), 0x01000193);
+}
+
+/** Feeds a value as two 32-bit halves, low then high, so counts above 2^32 are not truncated. */
+function mix(hash: number, value: number): number {
+  return mixWord(mixWord(hash, value >>> 0), Math.floor(value / 2 ** 32) >>> 0);
 }
 
 /**

@@ -107,9 +107,12 @@ export function allianceOf(game: Game, a: number, b: number): Alliance | undefin
   if (a === b) return undefined;
   const low = Math.min(a, b);
   const high = Math.max(a, b);
-  return game.alliances.find(
-    (alliance) => alliance.a === low && alliance.b === high && game.tick < alliance.until,
-  );
+  // A plain loop: border scans ask this about every tile next to a player's land.
+  const tick = game.tick;
+  for (const alliance of game.alliances) {
+    if (alliance.a === low && alliance.b === high && tick < alliance.until) return alliance;
+  }
+  return undefined;
 }
 
 /** Ids of a player's allies, in ascending order. */

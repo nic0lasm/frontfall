@@ -53,6 +53,9 @@ export interface BorderScan {
   enemyDensity: number;
 }
 
+/** Neighbours of one border tile in `scanBorder`, kept between calls: a scan never runs inside another. */
+const scanNeighbors = new Int32Array(4);
+
 /**
  * What lies across a sample of the player's border: free land, and the
  * neighbour with the fewest troops per tile. A large empire looks at more of
@@ -60,7 +63,7 @@ export interface BorderScan {
  */
 export function scanBorder(game: Game, bot: Player, accept: OwnerFilter = anyone): BorderScan {
   const { territory, terrain, random } = game;
-  const around = new Int32Array(4);
+  const around = scanNeighbors;
   const borders = territory.borderCount(bot.id);
   const scan: BorderScan = { neutral: -1, enemy: -1, enemyDensity: 0 };
   const samples = Math.min(borders, Math.max(BORDER_SAMPLES, isqrt(borders)));
