@@ -92,6 +92,42 @@
       "thumbnail": "island.png"
     },
     {
+      "id": "lyon",
+      "name": {
+        "en": "Lyon",
+        "fr": "Lyon"
+      },
+      "width": 576,
+      "height": 532,
+      "topology": "flat",
+      "players": {
+        "min": 2,
+        "recommended": 8,
+        "max": 16
+      },
+      "group": "world",
+      "manifest": "lyon.json",
+      "thumbnail": "lyon.png"
+    },
+    {
+      "id": "paris",
+      "name": {
+        "en": "Paris",
+        "fr": "Paris"
+      },
+      "width": 768,
+      "height": 440,
+      "topology": "flat",
+      "players": {
+        "min": 2,
+        "recommended": 10,
+        "max": 24
+      },
+      "group": "world",
+      "manifest": "paris.json",
+      "thumbnail": "paris.png"
+    },
+    {
       "id": "ring",
       "name": {
         "en": "Ring",

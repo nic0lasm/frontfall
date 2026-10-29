@@ -45,5 +45,43 @@
       "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_bathymetry_G_4000.geojson",
       "sha256": "ad876e6b6b686494a0e89f0096880a6755aee77af3d738794bbbc92216afcf3d"
     }
+  },
+  "rasters": {
+    "worldcover-n45e003": {
+      "url": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N45E003_Map.tif",
+      "sha256": "fa02d47027d5d437200689a55c40467465e2e4cdc8d7027cc0cee3e479256aa2",
+      "credit": {
+        "title": "ESA WorldCover 10 m 2021 v200",
+        "url": "https://esa-worldcover.org/",
+        "license": "CC BY 4.0"
+      }
+    },
+    "worldcover-n48e000": {
+      "url": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N48E000_Map.tif",
+      "sha256": "9f5b06e56a3efe48166663fde287c3e73b0ca9533901f75d908e1a3f8fc144c3",
+      "credit": {
+        "title": "ESA WorldCover 10 m 2021 v200",
+        "url": "https://esa-worldcover.org/",
+        "license": "CC BY 4.0"
+      }
+    },
+    "dem-n45e004": {
+      "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E004_00_DEM/Copernicus_DSM_COG_10_N45_00_E004_00_DEM.tif",
+      "sha256": "ccebea0a93d3ba6bfa3da64e1c309d7b80ba306ee8d1808ce9cbba7bd8b4c27f",
+      "credit": {
+        "title": "Copernicus DEM GLO-30",
+        "url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+        "license": "Copernicus DEM GLO-30 licence, free of charge"
+      }
+    },
+    "dem-n48e002": {
+      "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N48_00_E002_00_DEM/Copernicus_DSM_COG_10_N48_00_E002_00_DEM.tif",
+      "sha256": "1a79b2992645954ac7d7a5ab5e0b0ee5c53a124a74e13b5dcdf01f41b96fe25a",
+      "credit": {
+        "title": "Copernicus DEM GLO-30",
+        "url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+        "license": "Copernicus DEM GLO-30 licence, free of charge"
+      }
+    }
   }
 }

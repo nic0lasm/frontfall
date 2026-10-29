@@ -1,0 +1,166 @@
+{
+  "id": "paris",
+  "name": {
+    "en": "Paris",
+    "fr": "Paris"
+  },
+  "version": 1,
+  "width": 768,
+  "height": 440,
+  "topology": "flat",
+  "bounds": {
+    "west": 2.215,
+    "east": 2.475,
+    "south": 48.805,
+    "north": 48.906
+  },
+  "ice": {
+    "north": 90,
+    "south": -90
+  },
+  "minIslandTiles": 30,
+  "minLakeTiles": 80,
+  "players": {
+    "min": 2,
+    "recommended": 10,
+    "max": 24
+  },
+  "nations": {
+    "count": 24,
+    "minDistance": 0
+  },
+  "city": {
+    "landCover": "worldcover-n48e000",
+    "elevation": "dem-n48e002",
+    "waterShare": 0.3,
+    "bridgeTiles": 2,
+    "widenTiles": 1,
+    "woodsShare": 0.5,
+    "minWoodsTiles": 150,
+    "smoothTiles": 4,
+    "hills": 70,
+    "mountains": 108,
+    "nations": [
+      {
+        "name": "Montmartre",
+        "capital": "Mairie du 18e",
+        "at": [2.3445, 48.8924]
+      },
+      {
+        "name": "Place d'Italie",
+        "capital": "Mairie du 13e",
+        "at": [2.3561, 48.8314]
+      },
+      {
+        "name": "Passy",
+        "capital": "Mairie du 16e",
+        "at": [2.2771, 48.8635]
+      },
+      {
+        "name": "Belleville",
+        "capital": "Mairie du 20e",
+        "at": [2.3988, 48.865]
+      },
+      {
+        "name": "Vaugirard",
+        "capital": "Mairie du 15e",
+        "at": [2.3002, 48.8414]
+      },
+      {
+        "name": "Bercy",
+        "capital": "Mairie du 12e",
+        "at": [2.3881, 48.8406]
+      },
+      {
+        "name": "Batignolles",
+        "capital": "Mairie du 17e",
+        "at": [2.3215, 48.884]
+      },
+      {
+        "name": "Buttes-Chaumont",
+        "capital": "Mairie du 19e",
+        "at": [2.3825, 48.8823]
+      },
+      {
+        "name": "Paris Centre",
+        "capital": "Mairie de Paris Centre",
+        "at": [2.36, 48.8645]
+      },
+      {
+        "name": "Montparnasse",
+        "capital": "Mairie du 14e",
+        "at": [2.3265, 48.833]
+      },
+      {
+        "name": "Bastille",
+        "capital": "Mairie du 11e",
+        "at": [2.3797, 48.8574]
+      },
+      {
+        "name": "Champs-Élysées",
+        "capital": "Mairie du 8e",
+        "at": [2.3135, 48.8783]
+      },
+      {
+        "name": "Quartier latin",
+        "capital": "Mairie du 5e",
+        "at": [2.3446, 48.8462]
+      },
+      {
+        "name": "Canal Saint-Martin",
+        "capital": "Mairie du 10e",
+        "at": [2.3577, 48.8718]
+      },
+      {
+        "name": "Invalides",
+        "capital": "Mairie du 7e",
+        "at": [2.3195, 48.8566]
+      },
+      {
+        "name": "Opéra",
+        "capital": "Mairie du 9e",
+        "at": [2.3405, 48.8722]
+      },
+      {
+        "name": "Saint-Germain-des-Prés",
+        "capital": "Mairie du 6e",
+        "at": [2.3326, 48.851]
+      },
+      {
+        "name": "Boulogne-Billancourt",
+        "capital": "Hôtel de ville de Boulogne-Billancourt",
+        "at": [2.241, 48.8352]
+      },
+      {
+        "name": "Montreuil",
+        "capital": "Hôtel de ville de Montreuil",
+        "at": [2.4419, 48.8619]
+      },
+      {
+        "name": "Neuilly-sur-Seine",
+        "capital": "Hôtel de ville de Neuilly-sur-Seine",
+        "at": [2.2697, 48.8846]
+      },
+      {
+        "name": "Ivry-sur-Seine",
+        "capital": "Hôtel de ville d'Ivry-sur-Seine",
+        "at": [2.3856, 48.8125]
+      },
+      {
+        "name": "Pantin",
+        "capital": "Hôtel de ville de Pantin",
+        "at": [2.4094, 48.8943]
+      },
+      {
+        "name": "Issy-les-Moulineaux",
+        "capital": "Hôtel de ville d'Issy-les-Moulineaux",
+        "at": [2.27, 48.8236]
+      },
+      {
+        "name": "Vincennes",
+        "capital": "Hôtel de ville de Vincennes",
+        "at": [2.439, 48.8475]
+      }
+    ]
+  }
+}

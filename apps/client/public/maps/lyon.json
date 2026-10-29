@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "id": "lyon",
+  "name": {
+    "en": "Lyon",
+    "fr": "Lyon"
+  },
+  "version": 1,
+  "width": 576,
+  "height": 532,
+  "topology": "flat",
+  "projection": {
+    "type": "equirectangular",
+    "west": 4.765,
+    "east": 4.935,
+    "south": 45.69,
+    "north": 45.805
+  },
+  "terrain": {
+    "file": "lyon.bin",
+    "bytes": 306448,
+    "sha256": "b3e7efd905e94d336d515ea465131e8280a36e75a2ee6025bc98f5d623f5025c"
+  },
+  "thumbnail": "lyon.png",
+  "players": {
+    "min": 2,
+    "recommended": 8,
+    "max": 16
+  },
+  "nations": [
+    {
+      "name": "Croix-Rousse",
+      "capital": "Mairie du 4e",
+      "tile": 74514
+    },
+    {
+      "name": "Monplaisir",
+      "capital": "Mairie du 8e",
+      "tile": 186977
+    },
+    {
+      "name": "Vaise",
+      "capital": "Mairie du 9e",
+      "tile": 80774
+    },
+    {
+      "name": "Villeurbanne",
+      "capital": "Hôtel de ville de Villeurbanne",
+      "tile": 102915
+    },
+    {
+      "name": "Fourvière",
+      "capital": "Mairie du 5e",
+      "tile": 126262
+    },
+    {
+      "name": "Guillotière",
+      "capital": "Mairie du 7e",
+      "tile": 158085
+    },
+    {
+      "name": "Brotteaux",
+      "capital": "Mairie du 6e",
+      "tile": 95904
+    },
+    {
+      "name": "Presqu'île",
+      "capital": "Mairie du 2e",
+      "tile": 136723
+    },
+    {
+      "name": "Part-Dieu",
+      "capital": "Mairie du 3e",
+      "tile": 120658
+    },
+    {
+      "name": "Pentes de la Croix-Rousse",
+      "capital": "Mairie du 1er",
+      "tile": 96985
+    },
+    {
+      "name": "Caluire-et-Cuire",
+      "capital": "Hôtel de ville de Caluire-et-Cuire",
+      "tile": 25043
+    },
+    {
+      "name": "Bron",
+      "capital": "Hôtel de ville de Bron",
+      "tile": 176181
+    },
+    {
+      "name": "Oullins",
+      "capital": "Hôtel de ville d'Oullins",
+      "tile": 242064
+    },
+    {
+      "name": "Vénissieux",
+      "capital": "Hôtel de ville de Vénissieux",
+      "tile": 287833
+    },
+    {
+      "name": "Sainte-Foy-lès-Lyon",
+      "capital": "Hôtel de ville de Sainte-Foy-lès-Lyon",
+      "tile": 189026
+    },
+    {
+      "name": "Vaulx-en-Velin",
+      "capital": "Hôtel de ville de Vaulx-en-Velin",
+      "tile": 71952
+    }
+  ],
+  "credits": [
+    {
+      "title": "ESA WorldCover 10 m 2021 v200",
+      "url": "https://esa-worldcover.org/",
+      "license": "CC BY 4.0"
+    },
+    {
+      "title": "Copernicus DEM GLO-30",
+      "url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "license": "Copernicus DEM GLO-30 licence, free of charge"
+    }
+  ]
+}

@@ -95,6 +95,12 @@ export function buildTerrain(
     tiles[i] = TILE_LAND | (frozen ? MAGNITUDE_IMPASSABLE : (relief[i] as number));
   }
 
+  markShore(topology, land, tiles);
+  return tiles;
+}
+
+/** Sets the shore bit on every land tile with a water neighbour, across the seam on a cylinder. */
+export function markShore(topology: Topology, land: Uint8Array, tiles: Uint8Array): void {
   const neighbours = new Int32Array(4);
   for (let i = 0; i < tiles.length; i++) {
     if (land[i] === 0) continue;
@@ -106,7 +112,6 @@ export function buildTerrain(
       }
     }
   }
-  return tiles;
 }
 
 /**

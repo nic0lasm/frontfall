@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **Two city maps: Paris and Lyon.** Fight street by street across the real lie of each city, built from satellite land cover and elevation. In Paris, the Seine winds from Bercy to Boulogne with the Île de la Cité in its middle, the Bois de Boulogne and the Bois de Vincennes are woods that slow an attack like hills, and Montmartre, Belleville and the heights of the east stand up as hills and mountains. In Lyon, the Saône and the Rhône close in on the Presqu'île and meet at the Confluence, Fourvière and the Croix-Rousse rise above them and the Parc de la Tête d'Or is a wood with its lake. Ships sail the rivers, so a port on the Seine or the Rhône can trade and land troops across the water. Nations are named after the arrondissements and quarters they start in, Montmartre, Belleville, the Quartier latin, the Croix-Rousse, the Presqu'île, and the towns around: 24 in Paris, 16 in Lyon. Both maps are listed with the world maps and load only when you pick them.
+
 ### Changed
 
 - **A smoother map on high-density screens.** Moving, zooming and playing no longer stutter on a laptop whose graphics chip cannot draw every pixel of a Retina screen sixty times a second: the map is drawn a little less sharp while frames fall behind, and back at full sharpness as soon as they keep up. Phones draw the map at most at twice their screen's resolution. The map's shading also does less work for the same picture: borders up close, the sea's swell and the grain of the ground are cheaper to draw.

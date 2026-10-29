@@ -4,12 +4,14 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 
+const Credit = z.object({ title: z.string(), url: z.url(), license: z.string() });
+const Pin = z.object({ url: z.url(), sha256: z.string().regex(/^[0-9a-f]{64}$/) });
+
 export const SourceList = z.object({
-  dataset: z.object({ title: z.string(), url: z.url(), license: z.string() }),
-  files: z.record(
-    z.string(),
-    z.object({ url: z.url(), sha256: z.string().regex(/^[0-9a-f]{64}$/) }),
-  ),
+  dataset: Credit,
+  files: z.record(z.string(), Pin),
+  /** GeoTIFF rasters of the city maps, each with the credit it needs. */
+  rasters: z.record(z.string(), Pin.extend({ credit: Credit })).default({}),
 });
 export type SourceList = z.infer<typeof SourceList>;
 
@@ -25,8 +27,9 @@ export async function fetchSource(
   source: { url: string; sha256: string },
   cacheDir: string,
   log: (line: string) => void,
+  extension = "geojson",
 ): Promise<Buffer> {
-  const cached = join(cacheDir, `${source.sha256}.geojson`);
+  const cached = join(cacheDir, `${source.sha256}.${extension}`);
   if (existsSync(cached)) {
     const bytes = await readFile(cached);
     if (sha256(bytes) === source.sha256) return bytes;

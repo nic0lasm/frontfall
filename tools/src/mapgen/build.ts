@@ -10,6 +10,7 @@ import {
 } from "@frontfall/engine";
 import { MapManifest, MapName, MapPlayers, type MapCatalog } from "@frontfall/protocol";
 import { z } from "zod";
+import { CityDefinition, buildCityTerrain, type Raster } from "./city.ts";
 import { nearestOwnable, pickNations, type Country, type Nation } from "./nations.ts";
 import { encodeIndexedPng } from "./png.ts";
 import type { SourceList } from "./sources.ts";
@@ -72,6 +73,8 @@ export const MapDefinition = z.object({
       nations: z.array(z.object({ name: z.string(), capital: z.string(), at: LonLat })),
     })
     .optional(),
+  /** A city built from land cover and elevation rasters (CityDefinition). */
+  city: CityDefinition.optional(),
 });
 export type MapDefinition = z.infer<typeof MapDefinition>;
 
@@ -79,6 +82,13 @@ export interface MapSources extends TerrainSources {
   places: Place[];
   /** Country outlines, with POP_EST and ADM0_A3 properties. */
   countries: Shape[];
+}
+
+/** The rasters a city map is read from, cut to its bounds, and the credits they need. */
+export interface CitySources {
+  landCover: Raster;
+  elevation: Raster;
+  credits: SourceList["dataset"][];
 }
 
 export interface BuiltMap {
@@ -103,6 +113,7 @@ export function buildMap(
   definition: MapDefinition,
   sources: MapSources,
   dataset: SourceList["dataset"],
+  citySources?: CitySources,
 ): BuiltMap {
   const grid: GridSpec = {
     width: definition.width,
@@ -111,16 +122,28 @@ export function buildMap(
   };
   const topology = topologyOf(grid, definition.topology === "cylinder");
   const drawn = definition.drawn;
-  const terrainSources = drawn ? drawnSources(drawn) : sources;
-  const tiles = buildTerrain(grid, topology, terrainSources, definition);
+  const city = definition.city;
+  if (city && !citySources) throw new Error(`${definition.id}: city map built without its rasters`);
+  const tiles =
+    city && citySources
+      ? buildCityTerrain(
+          grid,
+          topology,
+          city,
+          citySources.landCover,
+          citySources.elevation,
+          definition,
+        )
+      : buildTerrain(grid, topology, drawn ? drawnSources(drawn) : sources, definition);
   const terrain = encodeMapFile({
     width: grid.width,
     height: grid.height,
     wrapsX: topology.wrapsX,
     tiles,
   });
-  const nations = drawn
-    ? placeNations(grid, topology, tiles, drawn.nations)
+  const listed = drawn?.nations ?? city?.nations;
+  const nations = listed
+    ? placeNations(grid, topology, tiles, listed)
     : pickNations(
         grid,
         topology,
@@ -129,7 +152,7 @@ export function buildMap(
         eligibleCountries(countryScores(grid, tiles, sources.countries), definition.nations),
         definition.nations,
       );
-  if (!drawn && nations.length < definition.nations.count) {
+  if (!listed && nations.length < definition.nations.count) {
     throw new Error(
       `${definition.id}: ${String(nations.length)} of ${String(definition.nations.count)} nations placed; lower nations.count or nations.minDistance`,
     );
@@ -148,7 +171,7 @@ export function buildMap(
     thumbnail: `${definition.id}.png`,
     players: definition.players,
     nations,
-    credits: [drawn ? DRAWN_CREDIT : dataset],
+    credits: drawn ? [DRAWN_CREDIT] : (citySources?.credits ?? [dataset]),
   });
   return { manifest, terrain, thumbnail: thumbnail(grid, tiles) };
 }
@@ -170,7 +193,7 @@ function drawnSources(drawn: Drawn): TerrainSources {
   };
 }
 
-/** Nations of a drawn map, in the order written, each on the nearest ownable tile. */
+/** Nations of a drawn or city map, in the order written, each on the nearest ownable tile. */
 function placeNations(
   grid: GridSpec,
   topology: Topology,

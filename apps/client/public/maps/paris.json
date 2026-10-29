@@ -1,0 +1,164 @@
+{
+  "format": 1,
+  "id": "paris",
+  "name": {
+    "en": "Paris",
+    "fr": "Paris"
+  },
+  "version": 1,
+  "width": 768,
+  "height": 440,
+  "topology": "flat",
+  "projection": {
+    "type": "equirectangular",
+    "west": 2.215,
+    "east": 2.475,
+    "south": 48.805,
+    "north": 48.906
+  },
+  "terrain": {
+    "file": "paris.bin",
+    "bytes": 337936,
+    "sha256": "fa7c107a19914df1b0522faf02483bf2e4c377a6e0c984f1f256ddbf54e38c1b"
+  },
+  "thumbnail": "paris.png",
+  "players": {
+    "min": 2,
+    "recommended": 10,
+    "max": 24
+  },
+  "nations": [
+    {
+      "name": "Montmartre",
+      "capital": "Mairie du 18e",
+      "tile": 45694
+    },
+    {
+      "name": "Place d'Italie",
+      "capital": "Mairie du 13e",
+      "tile": 249248
+    },
+    {
+      "name": "Passy",
+      "capital": "Mairie du 16e",
+      "tile": 142263
+    },
+    {
+      "name": "Belleville",
+      "capital": "Mairie du 20e",
+      "tile": 137246
+    },
+    {
+      "name": "Vaugirard",
+      "capital": "Mairie du 15e",
+      "tile": 216059
+    },
+    {
+      "name": "Bercy",
+      "capital": "Mairie du 12e",
+      "tile": 218623
+    },
+    {
+      "name": "Batignolles",
+      "capital": "Mairie du 17e",
+      "tile": 73274
+    },
+    {
+      "name": "Buttes-Chaumont",
+      "capital": "Mairie du 19e",
+      "tile": 79598
+    },
+    {
+      "name": "Paris Centre",
+      "capital": "Mairie de Paris Centre",
+      "tile": 138668
+    },
+    {
+      "name": "Montparnasse",
+      "capital": "Mairie du 14e",
+      "tile": 244553
+    },
+    {
+      "name": "Bastille",
+      "capital": "Mairie du 11e",
+      "tile": 162534
+    },
+    {
+      "name": "Champs-Élysées",
+      "capital": "Mairie du 8e",
+      "tile": 92450
+    },
+    {
+      "name": "Quartier latin",
+      "capital": "Mairie du 5e",
+      "tile": 200062
+    },
+    {
+      "name": "Canal Saint-Martin",
+      "capital": "Mairie du 10e",
+      "tile": 114085
+    },
+    {
+      "name": "Invalides",
+      "capital": "Mairie du 7e",
+      "tile": 165428
+    },
+    {
+      "name": "Opéra",
+      "capital": "Mairie du 9e",
+      "tile": 113266
+    },
+    {
+      "name": "Saint-Germain-des-Prés",
+      "capital": "Mairie du 6e",
+      "tile": 183899
+    },
+    {
+      "name": "Boulogne-Billancourt",
+      "capital": "Hôtel de ville de Boulogne-Billancourt",
+      "tile": 236620
+    },
+    {
+      "name": "Montreuil",
+      "capital": "Hôtel de ville de Montreuil",
+      "tile": 148126
+    },
+    {
+      "name": "Neuilly-sur-Seine",
+      "capital": "Hôtel de ville de Neuilly-sur-Seine",
+      "tile": 71585
+    },
+    {
+      "name": "Ivry-sur-Seine",
+      "capital": "Hôtel de ville d'Ivry-sur-Seine",
+      "tile": 313079
+    },
+    {
+      "name": "Pantin",
+      "capital": "Hôtel de ville de Pantin",
+      "tile": 38974
+    },
+    {
+      "name": "Issy-les-Moulineaux",
+      "capital": "Hôtel de ville d'Issy-les-Moulineaux",
+      "tile": 275106
+    },
+    {
+      "name": "Vincennes",
+      "capital": "Hôtel de ville de Vincennes",
+      "tile": 195733
+    }
+  ],
+  "credits": [
+    {
+      "title": "ESA WorldCover 10 m 2021 v200",
+      "url": "https://esa-worldcover.org/",
+      "license": "CC BY 4.0"
+    },
+    {
+      "title": "Copernicus DEM GLO-30",
+      "url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "license": "Copernicus DEM GLO-30 licence, free of charge"
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "id": "lyon",
+  "name": {
+    "en": "Lyon",
+    "fr": "Lyon"
+  },
+  "version": 1,
+  "width": 576,
+  "height": 532,
+  "topology": "flat",
+  "bounds": {
+    "west": 4.765,
+    "east": 4.935,
+    "south": 45.69,
+    "north": 45.805
+  },
+  "ice": {
+    "north": 90,
+    "south": -90
+  },
+  "minIslandTiles": 30,
+  "minLakeTiles": 30,
+  "players": {
+    "min": 2,
+    "recommended": 8,
+    "max": 16
+  },
+  "nations": {
+    "count": 16,
+    "minDistance": 0
+  },
+  "city": {
+    "landCover": "worldcover-n45e003",
+    "elevation": "dem-n45e004",
+    "waterShare": 0.35,
+    "bridgeTiles": 2,
+    "woodsShare": 0.5,
+    "minWoodsTiles": 150,
+    "smoothTiles": 4,
+    "hills": 215,
+    "mountains": 275,
+    "nations": [
+      {
+        "name": "Croix-Rousse",
+        "capital": "Mairie du 4e",
+        "at": [4.827, 45.7769]
+      },
+      {
+        "name": "Monplaisir",
+        "capital": "Mairie du 8e",
+        "at": [4.8693, 45.7349]
+      },
+      {
+        "name": "Vaise",
+        "capital": "Mairie du 9e",
+        "at": [4.8048, 45.7746]
+      },
+      {
+        "name": "Villeurbanne",
+        "capital": "Hôtel de ville de Villeurbanne",
+        "at": [4.8795, 45.7665]
+      },
+      {
+        "name": "Fourvière",
+        "capital": "Mairie du 5e",
+        "at": [4.8, 45.7575]
+      },
+      {
+        "name": "Guillotière",
+        "capital": "Mairie du 7e",
+        "at": [4.8423, 45.7457]
+      },
+      {
+        "name": "Brotteaux",
+        "capital": "Mairie du 6e",
+        "at": [4.85, 45.769]
+      },
+      {
+        "name": "Presqu'île",
+        "capital": "Mairie du 2e",
+        "at": [4.8274, 45.7537]
+      },
+      {
+        "name": "Part-Dieu",
+        "capital": "Mairie du 3e",
+        "at": [4.8461, 45.7598]
+      },
+      {
+        "name": "Pentes de la Croix-Rousse",
+        "capital": "Mairie du 1er",
+        "at": [4.8291, 45.7686]
+      },
+      {
+        "name": "Caluire-et-Cuire",
+        "capital": "Hôtel de ville de Caluire-et-Cuire",
+        "at": [4.8463, 45.7955]
+      },
+      {
+        "name": "Bron",
+        "capital": "Hôtel de ville de Bron",
+        "at": [4.913, 45.739]
+      },
+      {
+        "name": "Oullins",
+        "capital": "Hôtel de ville d'Oullins",
+        "at": [4.8075, 45.714]
+      },
+      {
+        "name": "Vénissieux",
+        "capital": "Hôtel de ville de Vénissieux",
+        "at": [4.886, 45.697]
+      },
+      {
+        "name": "Sainte-Foy-lès-Lyon",
+        "capital": "Hôtel de ville de Sainte-Foy-lès-Lyon",
+        "at": [4.794, 45.734]
+      },
+      {
+        "name": "Vaulx-en-Velin",
+        "capital": "Hôtel de ville de Vaulx-en-Velin",
+        "at": [4.921, 45.778]
+      }
+    ]
+  }
+}

@@ -1,4 +1,5 @@
 import {
+  HILLS_FROM,
   MAGNITUDE_IMPASSABLE,
   MOUNTAINS_FROM,
   TILE_LAND,
@@ -159,6 +160,58 @@ describe("relief", () => {
 
   it("keeps the Paris basin as plains", () => {
     expect(at("europe", 2.35, 48.85)).toBeLessThan(10);
+  });
+});
+
+describe("city maps", () => {
+  const cities = maps.filter((m) => m.definition.city);
+  const at = (id: string, lon: number, lat: number): number => {
+    const map = cities.find((m) => m.definition.id === id);
+    if (!map) throw new Error(`no city map ${id}`);
+    return map.tiles[tileAt(map.grid, lon, lat) as number] as number;
+  };
+
+  it("exist and credit their land cover and elevation", () => {
+    expect(cities.map((m) => m.definition.id)).toEqual(["lyon", "paris"]);
+    for (const map of cities) {
+      expect(map.manifest.credits.map((c) => c.title)).toEqual([
+        "ESA WorldCover 10 m 2021 v200",
+        "Copernicus DEM GLO-30",
+      ]);
+    }
+  });
+
+  it("keep their nations in the order they are written", () => {
+    for (const map of cities) {
+      expect(map.manifest.nations.map((n) => n.name)).toEqual(
+        map.definition.city?.nations.map((n) => n.name),
+      );
+    }
+  });
+
+  it.each([
+    ["paris", "Montmartre", 2.3431, 48.8867],
+    ["paris", "Belleville", 2.394, 48.872],
+    ["lyon", "Fourvière", 4.8226, 45.7623],
+    ["lyon", "the Croix-Rousse", 4.832, 45.776],
+  ])("raises %s's %s among the hills or higher", (id, _, lon, lat) => {
+    expect(magnitude(at(id, lon, lat))).toBeGreaterThanOrEqual(HILLS_FROM);
+  });
+
+  it.each([
+    ["paris", "the Bois de Boulogne", 2.253, 48.862],
+    ["paris", "the Bois de Vincennes", 2.437, 48.833],
+    ["lyon", "the Parc de la Tête d'Or", 4.854, 45.779],
+  ])("turns %s's %s into woods", (id, _, lon, lat) => {
+    const tile = at(id, lon, lat);
+    expect(isLand(tile)).toBe(true);
+    expect(magnitude(tile)).toBeGreaterThanOrEqual(HILLS_FROM);
+    expect(magnitude(tile)).toBeLessThan(MOUNTAINS_FROM);
+  });
+
+  it("keeps the Île de la Cité and the Presqu'île as plains", () => {
+    expect(at("paris", 2.3499, 48.853)).toBe(TILE_LAND);
+    expect(at("lyon", 4.832, 45.7578)).toBe(TILE_LAND);
   });
 });
 
@@ -329,6 +382,18 @@ describe("seas", () => {
     return distance[goal] as number;
   };
 
+  it("lets ships sail up the Seine across Paris", () => {
+    const steps = sail("paris", [2.3665, 48.8437], [2.2798, 48.8513]); // Austerlitz to Grenelle
+    expect(steps).toBeGreaterThan(0);
+    expect(steps).toBeLessThan(500);
+  });
+
+  it("joins the Saône and the Rhône below the Presqu'île of Lyon", () => {
+    const steps = sail("lyon", [4.8274, 45.7589], [4.8389, 45.756]); // Pont Bonaparte to La Guillotière
+    expect(steps).toBeGreaterThan(0);
+    expect(steps).toBeLessThan(400);
+  });
+
   it.each(["world", "americas"])("opens the Panama Canal on %s", (id) => {
     const steps = sail(id, [-79.93, 9.6], [-79.5, 8.6]);
     expect(steps).toBeGreaterThan(0);
@@ -348,7 +413,15 @@ describe("catalog", () => {
     const catalog = MapCatalog.parse(json(join(mapsDir, "index.json")));
     expect(catalog.maps.map((m) => m.id)).toEqual(definitions.map((d) => d.id));
     const group = (name: string) => catalog.maps.filter((m) => m.group === name).map((m) => m.id);
-    expect(group("world")).toEqual(["africa", "americas", "asia", "europe", "world"]);
+    expect(group("world")).toEqual([
+      "africa",
+      "americas",
+      "asia",
+      "europe",
+      "lyon",
+      "paris",
+      "world",
+    ]);
     expect(group("quick")).toEqual(["island", "ring", "strait"]);
   });
 
