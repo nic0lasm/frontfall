@@ -39,6 +39,9 @@ const { values } = parseArgs({
     "map-tiles": { type: "string", default: String(4096 * 2048) },
     "client-procs": { type: "string", default: "1" },
     "heap-mib": { type: "string" },
+    "server-limits": { type: "boolean", default: false },
+    "max-players": { type: "string" },
+    "max-connections": { type: "string" },
     "rejoin-storm": { type: "string" },
     "rejoin-from-zero": { type: "boolean", default: false },
     "slow-clients": { type: "string" },
@@ -70,6 +73,15 @@ const stormSeconds =
     ? undefined
     : positive("rejoin-storm", values["rejoin-storm"]);
 const fromZero = values["rejoin-from-zero"];
+const maxPlayers =
+  values["max-players"] === undefined ? undefined : positive("max-players", values["max-players"]);
+const maxConnections =
+  values["max-connections"] === undefined
+    ? undefined
+    : positive("max-connections", values["max-connections"]);
+// The bench lifts the server's admission limits unless asked to test them.
+const serverLimits =
+  values["server-limits"] || maxPlayers !== undefined || maxConnections !== undefined;
 const slowPercent =
   values["slow-clients"] === undefined ? 0 : positive("slow-clients", values["slow-clients"]);
 const sampleMs = positive("sample-seconds", values["sample-seconds"]) * 1000;
@@ -101,7 +113,13 @@ class SpawnedServer {
     if (heapMiB !== undefined) execArgv.push(`--max-old-space-size=${String(heapMiB)}`);
     const child = fork(fileURLToPath(new URL("serve.ts", import.meta.url)), {
       execArgv,
-      env: { ...process.env, LOAD_PLAYERS: String(players) },
+      env: {
+        ...process.env,
+        LOAD_PLAYERS: String(players),
+        LOAD_SERVER_LIMITS: serverLimits ? "1" : "0",
+        LOAD_MAX_PLAYERS: maxPlayers === undefined ? "" : String(maxPlayers),
+        LOAD_MAX_CONNECTIONS: maxConnections === undefined ? "" : String(maxConnections),
+      },
     });
     const port = await new Promise<number>((resolve, reject) => {
       child.once("message", (message: { port: number }) => {

@@ -568,6 +568,13 @@ pnpm load -- --spawn-server --games 50 --minutes 30 --slow-clients 10
   max) and fails if a client did not rejoin, or if a turn was lost, reordered
   or came back with other orders than before (the "Changed" column, which
   compares every turn across the clients of a game).
+- **Admission limits.** The spawned server runs without its limits on
+  players, connections and games (`maxPlayers`, `maxConnections`,
+  `maxRooms`), so that a run finds where the server itself breaks.
+  `--server-limits` keeps the server's defaults, and `--max-players <n>` or
+  `--max-connections <n>` set others, to test admission: clients turned away
+  (`too_many_games`, or a close with 4006) are counted, and a private game
+  starts with the guests that got in.
 - **`--slow-clients <p>`**: `p` % of the clients, spread over the games, stop
   reading their socket once their game starts, like a frozen tab, so that what
   the server sends them piles up. They are left out of the turn statistics,

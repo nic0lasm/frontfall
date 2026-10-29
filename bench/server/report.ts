@@ -101,6 +101,7 @@ export function formatRamp(steps: readonly RampStep[]): string {
       flagged = true;
     } else if (reason) notes.push(`saturated (${reason})`);
     if (report.clientLoopDelay.p99 > CLIENT_BOUND_LOOP_MS) notes.push("clients late");
+    if (report.refusedClients > 0) notes.push(`${String(report.refusedClients)} refused`);
     const serverCells = server
       ? `${server.cpuPercent.toFixed(1)} % | ${mib(server.rssBytes)} MiB | ${mib(server.heapUsedBytes)} MiB | ${ms(server.loopDelay.p99)} ms | ${turnPassText(server.turnPass)}`
       : "– | – | – | – | –";

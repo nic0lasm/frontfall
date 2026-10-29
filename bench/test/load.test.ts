@@ -53,6 +53,7 @@ function sample(games: GameData[], p99: number): LoadSample {
     games,
     clients: games.reduce((sum, { turnsPerClient }) => sum + turnsPerClient.length, 0),
     slowClients: 0,
+    refusedClients: 0,
     connectMs: 10,
     clientLoopDelay: { p99, max: p99 * 2 },
   };

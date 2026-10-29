@@ -1,7 +1,11 @@
+import { CloseCode, type ClientMessage } from "@frontfall/protocol";
 import type { Summary } from "../engine/stats.ts";
 import { GameStats, LoadClient, TURN_MS, type GameData } from "./client.ts";
 import { Histogram, type HistogramData } from "./histogram.ts";
 import { LoopDelay, type LoopDelaySummary } from "./loop-delay.ts";
+
+/** How a client learns that the server is full: an error to its request, or a close at once. */
+const REFUSED = new RegExp(`too_many_games|closed with ${String(CloseCode.full)}`);
 
 /** How the clients play, whatever process runs them. */
 export interface SessionOptions {
@@ -35,6 +39,8 @@ export interface LoadSample {
   games: GameData[];
   clients: number;
   slowClients: number;
+  /** Clients the server turned away: no seat (`too_many_games`) or no connection (4006). */
+  refusedClients: number;
   /** Time to join and start the games added last, in ms. */
   connectMs: number;
   /** Event loop delay of the process running the clients; the worst process when merged. */
@@ -82,6 +88,7 @@ export interface LoadReport {
   clientLoopDelay: LoopDelaySummary;
   clients: number;
   slowClients: number;
+  refusedClients: number;
 }
 
 export interface RejoinReport {
@@ -107,6 +114,7 @@ export class LoadSession {
   private readonly clients: LoadClient[] = [];
   private readonly loopDelay = new LoopDelay();
   private connectMs = 0;
+  private refusedClients = 0;
 
   constructor(private readonly options: SessionOptions) {}
 
@@ -137,6 +145,7 @@ export class LoadSession {
       games: [...this.stats.values()].map((game) => game.take()),
       clients: this.clients.length,
       slowClients: this.clients.filter((client) => client.stalled).length,
+      refusedClients: this.refusedClients,
       connectMs: this.connectMs,
       clientLoopDelay: this.loopDelay.summary(),
     };
@@ -194,22 +203,47 @@ export class LoadSession {
     });
   }
 
-  /** Resolves once every client has `started`. */
+  /**
+   * Connects a client and sends its first request; undefined when the server
+   * turns it away at its admission limits, which the run counts.
+   */
+  private async admit(
+    index: number,
+    request: ClientMessage,
+    answer: (client: LoadClient) => Promise<unknown>,
+  ): Promise<LoadClient | undefined> {
+    let client: LoadClient | undefined;
+    try {
+      client = await this.connect(index);
+      client.send(request);
+      await answer(client);
+      return client;
+    } catch (error) {
+      if (!(error instanceof Error) || !REFUSED.test(error.message)) throw error;
+      client?.stop();
+      this.refusedClients++;
+      return undefined;
+    }
+  }
+
+  /** Resolves once every admitted client has `started`. */
   private async startGames(
     games: readonly number[],
   ): Promise<{ client: LoadClient; index: number }[]> {
     const { players } = this.options;
     if (this.options.mode === "public") {
-      const clients = await Promise.all(
+      const admitted = await Promise.all(
         games.flatMap((game) =>
           Array.from({ length: players }, async (_, seat) => {
             const index = game * players + seat;
-            const client = await this.connect(index);
-            client.send({ type: "play" });
-            return { client, index };
+            const client = await this.admit(index, { type: "play" }, (joined) =>
+              joined.lobbyOrStarted(),
+            );
+            return client ? [{ client, index }] : [];
           }),
         ),
       );
+      const clients = admitted.flat();
       // Public games count down 30 s by default once they have two players.
       await Promise.all(clients.map(({ client }) => client.next("started", 120_000)));
       return clients;
@@ -218,28 +252,43 @@ export class LoadSession {
     const started = await Promise.all(
       games.map(async (game) => {
         const first = game * players;
-        const host = await this.connect(first);
-        host.send({ type: "create" });
-        const { game: id } = await host.next("lobby");
-        const guests = await Promise.all(
+        let id = "";
+        const host = await this.admit(first, { type: "create" }, async (client) => {
+          id = (await client.next("lobby")).game;
+        });
+        if (!host) {
+          this.refusedClients += players - 1;
+          return [];
+        }
+        const admitted = await Promise.all(
           Array.from({ length: players - 1 }, async (_, seat) => {
-            const guest = await this.connect(first + 1 + seat);
-            guest.send({ type: "join", game: id });
-            await guest.lobbyOrStarted();
-            return guest;
+            const index = first + 1 + seat;
+            const guest = await this.admit(index, { type: "join", game: id }, (client) =>
+              client.lobbyOrStarted(),
+            );
+            return guest ? [{ client: guest, index }] : [];
           }),
         );
+        const guests = admitted.flat();
+        if (guests.length === 0) {
+          // A game needs two players to start.
+          host.stop();
+          this.refusedClients++;
+          return [];
+        }
         for (;;) {
           const lobby = await host.lobbyOrStarted();
           if (!lobby) break;
-          if (lobby.players.length < players) continue;
+          if (lobby.players.length < guests.length + 1) continue;
           // A game set to start when full starts by itself.
-          if (!lobby.autoStart || players < lobby.capacity) host.send({ type: "start" });
+          if (!lobby.autoStart || lobby.players.length < lobby.capacity) {
+            host.send({ type: "start" });
+          }
           break;
         }
-        const clients = [host, ...guests];
-        await Promise.all(clients.map((client) => client.next("started")));
-        return clients.map((client, seat) => ({ client, index: first + seat }));
+        const clients = [{ client: host, index: first }, ...guests];
+        await Promise.all(clients.map(({ client }) => client.next("started")));
+        return clients;
       }),
     );
     return started.flat();
@@ -277,6 +326,7 @@ export function mergeSamples(samples: readonly LoadSample[]): LoadSample {
     games: [...games.values()],
     clients: samples.reduce((sum, sample) => sum + sample.clients, 0),
     slowClients: samples.reduce((sum, sample) => sum + sample.slowClients, 0),
+    refusedClients: samples.reduce((sum, sample) => sum + sample.refusedClients, 0),
     connectMs: Math.max(0, ...samples.map((sample) => sample.connectMs)),
     clientLoopDelay: {
       p99: Math.max(0, ...samples.map((sample) => sample.clientLoopDelay.p99)),
@@ -340,6 +390,7 @@ export function summarizeLoad(sample: LoadSample): LoadReport {
     clientLoopDelay: sample.clientLoopDelay,
     clients: sample.clients,
     slowClients: sample.slowClients,
+    refusedClients: sample.refusedClients,
   };
 }
 
@@ -394,6 +445,11 @@ export function formatReport(report: LoadReport): string {
   if (orderLatency) {
     lines.push(
       `Order to turn: p50 ${ms(orderLatency.p50)} ms, p95 ${ms(orderLatency.p95)} ms, max ${ms(orderLatency.max)} ms.`,
+    );
+  }
+  if (report.refusedClients > 0) {
+    lines.push(
+      `The server turned ${String(report.refusedClients)} clients away at its admission limits.`,
     );
   }
   if (report.slowClients > 0) {

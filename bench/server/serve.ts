@@ -30,6 +30,20 @@ export interface ServerStats {
 export type ServerRequest = "stats" | "sample" | "stop";
 
 const players = Number(process.env.LOAD_PLAYERS ?? 16);
+
+/**
+ * Past the admission limits, to find where the server itself breaks, unless
+ * the run tests them: with the server's defaults, or with the ones given.
+ */
+function limits(): { maxPlayers?: number; maxConnections?: number; maxRooms?: number } {
+  const { LOAD_SERVER_LIMITS, LOAD_MAX_PLAYERS, LOAD_MAX_CONNECTIONS } = process.env;
+  if (LOAD_SERVER_LIMITS !== "1")
+    return { maxPlayers: Infinity, maxConnections: 100_000, maxRooms: 100_000 };
+  return {
+    ...(LOAD_MAX_PLAYERS ? { maxPlayers: Number(LOAD_MAX_PLAYERS) } : {}),
+    ...(LOAD_MAX_CONNECTIONS ? { maxConnections: Number(LOAD_MAX_CONNECTIONS) } : {}),
+  };
+}
 const server = createGameServer({
   // The run never requests a page.
   staticRoot: tmpdir(),
@@ -37,6 +51,7 @@ const server = createGameServer({
   // Stopping the bench ends its games at once.
   drainMs: 0,
   publicGame: { capacity: players, countdownMs: 1000 },
+  ...limits(),
 });
 
 const loopDelay = new LoopDelay();
