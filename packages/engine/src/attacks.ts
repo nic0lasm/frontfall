@@ -95,17 +95,13 @@ export function installAttacks(game: Game): void {
       // A player has at most one attack per target: the common single attack needs no lookup.
       const only = own.length === 1 ? (own[0] as number) : -1;
       const onlyTarget = only < 0 ? -1 : (attacks[only] as Attack).target;
-      // Without a front length to count (R-ATTACK-10), a border tile too far from the aim is passed over whole.
-      const skips =
-        only >= 0 && (!collapsing || onlyTarget === NEUTRAL) && balance.attackSpread >= 0;
       for (let i = 0; i < borders.length; i++) {
-        if (skips && outranked(only, borders[i] as number)) continue;
         const count = topology.neighborsInto(borders[i] as number, around);
         for (let j = 0; j < count; j++) {
           const tile = around[j] as number;
-          if (seen[tile] === scan) continue;
+          // Most neighbours of a border tile are the player's own: rule them out first.
           const owner = owners[tile] as number;
-          if (owner === player) continue;
+          if (owner === player || seen[tile] === scan) continue;
           let a = -1;
           if (only >= 0) {
             if (owner === onlyTarget) a = only;
@@ -125,22 +121,6 @@ export function installAttacks(game: Game): void {
       }
     }
     if (collapsing) for (let a = 0; a < attacks.length; a++) overwhelming[a] = overwhelms(a);
-  }
-
-  /**
-   * Whether no neighbour of a border tile can make an attack's full
-   * shortlist: each is at most one tile nearer to the aim, and has at most
-   * four sides on the player's land.
-   */
-  function outranked(a: number, border: number): boolean {
-    const tiles = fronts[a] as number[];
-    if (tiles.length !== speeds[a]) return false;
-    const last = (frontPriorities[a] as number[])[tiles.length - 1] as number;
-    const bound = last + 4 * balance.attackSpread + 1;
-    return (
-      bound >= 0 &&
-      topology.squaredDistance(border, (attacks[a] as Attack).aim) >= (bound + 1) * (bound + 1)
-    );
   }
 
   /**
