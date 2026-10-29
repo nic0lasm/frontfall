@@ -349,6 +349,16 @@ export class MapView implements Renderer {
     this.effects?.collapsed(tile, this.clock());
   }
 
+  /** A capital fell or was razed on `tile` (R-CAP-03, R-CAP-04). */
+  capitalFell(tile: number): void {
+    this.effects?.capitalFell(tile, this.clock());
+  }
+
+  /** The capital of the player at this screen is under threat (R-CAP-05), or `undefined` once safe. */
+  capitalThreat(tile: number | undefined): void {
+    this.effects?.capitalThreat(tile);
+  }
+
   animating(): boolean {
     return this.effects?.alive(this.clock()) ?? false;
   }

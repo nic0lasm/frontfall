@@ -209,6 +209,16 @@ export class EffectsLayer {
     this.tracker.collapsed(tile, now);
   }
 
+  /** A capital fell or was razed on `tile` (R-CAP-03, R-CAP-04): a gold ring and a flash. */
+  capitalFell(tile: number, now: number): void {
+    this.tracker.capitalFell(tile, now);
+  }
+
+  /** The capital of the player at this screen is under threat (R-CAP-05), or `undefined` once safe: it pulses. */
+  capitalThreat(tile: number | undefined): void {
+    this.tracker.setThreat(tile);
+  }
+
   /** Starts one mark, over the oldest if the buffer is full. */
   spawn(particle: Particle): void {
     const i = this.next;
@@ -227,7 +237,7 @@ export class EffectsLayer {
 
   /** Whether any mark is still alive at `now`, which keeps frames coming. */
   alive(now: number): boolean {
-    return now < this.liveUntil;
+    return now < this.liveUntil || this.tracker.pulsing;
   }
 
   /** Follows the clock and the camera, and uploads the marks started since the last frame. */
@@ -237,6 +247,7 @@ export class EffectsLayer {
     (uniforms.cameraX as Three.IUniform<number>).value = cameraX;
     (uniforms.tilesPerPixel as Three.IUniform<number>).value = tilesPerPixel;
     this.tracker.setView(view, tilesPerPixel);
+    this.tracker.tick(now);
     if (!this.dirty) return;
     this.dirty = false;
     for (const attribute of this.attributes) attribute.needsUpdate = true;

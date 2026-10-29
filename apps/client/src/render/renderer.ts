@@ -79,6 +79,10 @@ export interface Renderer {
   setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean;
   /** A front gave way around `tile` (R-ATTACK-10); a renderer without effects leaves it out. */
   collapsed?(tile: number): void;
+  /** A capital fell or was razed on `tile` (R-CAP-03, R-CAP-04); a renderer without effects leaves it out. */
+  capitalFell?(tile: number): void;
+  /** The capital of the player at this screen is under threat (R-CAP-05), or `undefined` once safe. */
+  capitalThreat?(tile: number | undefined): void;
   /** Every structure on the map, replacing the previous ones. */
   setStructures(structures: readonly StructureMark[]): void;
   /** Whether effects are still playing, which keeps frames coming; a renderer without effects leaves it out. */

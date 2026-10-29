@@ -210,6 +210,38 @@ describe("EffectTracker collapsed fronts (R-ATTACK-10)", () => {
   });
 });
 
+describe("EffectTracker, capitals", () => {
+  it("rings a fallen capital in gold with a flash, and one disc when motion is reduced", () => {
+    const { tracker: t, particles } = tracker();
+    t.capitalFell(2550, 1);
+    expect(particles.map((p) => p.shape)).toEqual(["ring", "dot"]);
+    const still = tracker(false);
+    still.tracker.capitalFell(2550, 1);
+    expect(still.particles).toHaveLength(1);
+    expect(still.particles[0]?.size1).toBe(still.particles[0]?.size0);
+  });
+
+  it("pulses slowly around a threatened capital until it is safe, and not when motion is reduced", () => {
+    const { tracker: t, particles } = tracker();
+    t.setThreat(2550);
+    expect(t.pulsing).toBe(true);
+    t.tick(1);
+    t.tick(1.5);
+    expect(particles).toHaveLength(1);
+    t.tick(3);
+    expect(particles).toHaveLength(2);
+    t.setThreat(undefined);
+    expect(t.pulsing).toBe(false);
+    t.tick(6);
+    expect(particles).toHaveLength(2);
+    const still = tracker(false);
+    still.tracker.setThreat(2550);
+    still.tracker.tick(1);
+    expect(still.tracker.pulsing).toBe(false);
+    expect(still.particles).toEqual([]);
+  });
+});
+
 describe("EffectsLayer", () => {
   const create = (): EffectsLayer =>
     new EffectsLayer({

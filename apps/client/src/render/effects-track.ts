@@ -53,6 +53,9 @@ const COLLAPSE_DEPTH = 5;
 const COLLAPSE_LIFE = 1;
 /** Most collapse bursts alive at once. */
 const BURST_CAP = 8;
+/** Radius of the ring of a fallen capital in tiles on a map of 2^19 tiles, and seconds between two pulses of a threatened one. */
+const CAPITAL_DEPTH = 8;
+const CAPITAL_PULSE = 1.8;
 
 /** Spacing of the dots of a trail on screen, in CSS pixels. */
 const TRAIL_PIXELS = 8;
@@ -89,6 +92,8 @@ export class EffectTracker {
   private tilesPerPixel = 1;
   private budget = 0;
   private pulsedAt = -Infinity;
+  private threat: number | undefined;
+  private threatAt = -Infinity;
   /** Players whose land has been seen, to tell a first arrival. */
   private readonly owners = new Set<number>();
   private seed = 0x9e3779b9;
@@ -263,6 +268,52 @@ export class EffectTracker {
         shape: "dot",
       });
     }
+  }
+
+  /**
+   * A capital fell or was razed (R-CAP-03, R-CAP-04): a gold ring that spreads
+   * far from its tile, and a short flash over it. Held still it is one disc
+   * that only fades.
+   */
+  capitalFell(tile: number, now: number): void {
+    const { width } = this.options;
+    const x = (tile % width) + 0.5;
+    const y = Math.floor(tile / width) + 0.5;
+    if (!this.visible(x, y)) return;
+    const radius = CAPITAL_DEPTH * this.blast;
+    if (!this.moving) {
+      this.emit(disc(x, y, now, 1.6, radius * 2, radius * 2, GOLD, 0.4, 14));
+      return;
+    }
+    this.emit({ ...ringOf(x, y, now, radius * 0.3, radius * 2.4), color: GOLD, life: 1.6 });
+    this.emit(disc(x, y, now, 0.5, radius * 0.8, radius * 1.6, FLASH, 0.8, 14));
+  }
+
+  /** Where the pulse of a threatened capital is drawn, or nothing once it is safe. */
+  setThreat(tile: number | undefined): void {
+    this.threat = tile;
+  }
+
+  /** Whether a capital is under threat and pulsing, which keeps frames coming. */
+  get pulsing(): boolean {
+    return this.threat !== undefined && this.moving;
+  }
+
+  /** A slow ring around a threatened capital, every PULSE_CAPITAL seconds (R-CAP-05). */
+  tick(now: number): void {
+    if (this.threat === undefined || !this.moving || now - this.threatAt < CAPITAL_PULSE) return;
+    const { width } = this.options;
+    const x = (this.threat % width) + 0.5;
+    const y = Math.floor(this.threat / width) + 0.5;
+    if (!this.visible(x, y)) return;
+    this.threatAt = now;
+    const radius = CAPITAL_DEPTH * this.blast * 0.5;
+    this.emit({
+      ...ringOf(x, y, now, radius * 0.4, radius * 2),
+      color: EMBER,
+      alpha: 0.55,
+      life: 1.6,
+    });
   }
 
   private appeared(unit: Seen, now: number): void {

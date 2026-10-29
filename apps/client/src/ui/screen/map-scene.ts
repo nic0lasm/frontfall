@@ -304,7 +304,14 @@ export class MapScene {
     for (const event of update.events) {
       if (event.type === "collapsed" && event.tile !== undefined)
         this.view?.collapsed?.(event.tile);
+      // The capital that fell is the one its owner had on the previous update.
+      if (event.type === "capital" || event.type === "razed") {
+        const tile = this.latest?.players.find((p) => p.id === event.b)?.capital;
+        if (tile !== undefined) this.view?.capitalFell?.(tile);
+      }
     }
+    const mine = update.players.find((p) => p.id === update.you)?.capital;
+    this.view?.capitalThreat?.(update.capitals?.threat ? mine : undefined);
     this.lightHovered();
     this.placeStructures(update);
     this.placeFallout(update);
