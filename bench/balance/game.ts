@@ -19,6 +19,7 @@ import {
 } from "@frontfall/engine";
 import { AveragePlayer } from "./average.ts";
 import { CasualPlayer } from "./casual.ts";
+import { CombatLog, type CombatReport } from "./combat.ts";
 
 /** One headless game of the balance runs: who plays, where, for how long. */
 export interface BalanceSetup {
@@ -95,6 +96,8 @@ export interface GameReport {
   readonly leaderSharePercent: number;
   /** Capitals taken, in minutes of play (R-CAP-03); empty without capital mode. */
   readonly capitalFalls: readonly { minute: number; player: number; by: number }[];
+  /** How fights between players went. */
+  readonly combat: CombatReport;
   readonly hash: number;
   readonly ms: number;
 }
@@ -195,6 +198,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
         )
       : undefined;
 
+  const combat = new CombatLog(game);
   const ownable = terrain.ownableCount;
   const perMinute = 60 * balance.ticksPerSecond;
   const lastTick = balance.spawnPhaseTicks + setup.minutes * perMinute;
@@ -253,6 +257,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
       }
     }
     if (game.phase !== "play") continue;
+    combat.afterTick();
     const leader = leaderNow();
     for (const missile of game.missiles) {
       if (missile.id <= seenMissile) continue;
@@ -357,6 +362,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     capitalFalls: game.capitalFalls
       .filter((fall) => fall.by !== 0)
       .map(({ tick, player, by }) => ({ minute: playMinutes(tick), player, by })),
+    combat: combat.report(),
     hash: game.hash(),
     ms: Math.round(performance.now() - began),
   };

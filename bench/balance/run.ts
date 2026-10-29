@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs, promisify } from "node:util";
 import { DEFAULT_BALANCE, type Balance, type BotDifficulty } from "@frontfall/engine";
 import type { BalanceSetup, GameReport } from "./game.ts";
+import { centile } from "./combat.ts";
 import { summarize, type BalanceSummary } from "./summary.ts";
 
 /**
@@ -190,6 +191,31 @@ function print(s: BalanceSummary): void {
         (ofOne.length ? `, after ${round(mid(ofOne))} min (median)` : ""),
     );
   }
+  const combats = reports.map((r) => r.combat);
+  const mid = (pick: (c: (typeof combats)[number]) => number): string =>
+    round(centile(combats.map(pick), 50));
+  const paid = combats.reduce((sum, c) => sum + c.attackerPaid, 0);
+  const lost = combats.reduce((sum, c) => sum + c.defenderLost, 0);
+  const blows = combats.flatMap((c) => c.worstBlows);
+  const stands = combats.flatMap((c) => c.lastStands);
+  const own = combats.flatMap((c) => (c.playerWorstBlow === undefined ? [] : [c.playerWorstBlow]));
+  const ownStands = combats.flatMap((c) =>
+    c.playerLastStand === undefined ? [] : [c.playerLastStand],
+  );
+  console.log(
+    `fights between players, medians over games: ${mid((c) => c.attacks)} attacks taking land, ` +
+      `lasting ${mid((c) => c.durationMedian)} s (90 %: ${mid((c) => c.durationP90)} s), ` +
+      `${mid((c) => c.tilesPerSecondMedian)} tiles/s (90 %: ${mid((c) => c.tilesPerSecondP90)})`,
+  );
+  console.log(
+    `troops: attackers paid ${round(paid / Math.max(1, lost), 2)} for each one the defenders lost; ` +
+      `largest share of a player's land lost in 10 s: ${round(centile(blows, 50))} % median, ${round(centile(blows, 90))} % at 90 %; ` +
+      `half the land to elimination: ${round(centile(stands, 50))} s median` +
+      (own.length
+        ? `; player 1: ${round(centile(own, 50))} % in 10 s at worst (median)` +
+          (ownStands.length ? `, ${round(centile(ownStands, 50))} s from half to out` : "")
+        : ""),
+  );
   if (s.casual) {
     console.log(
       `${values.average ? "average" : "casual"} player: won ${String(s.casual.won)}, alive at the end ${String(s.casual.alive)}` +
