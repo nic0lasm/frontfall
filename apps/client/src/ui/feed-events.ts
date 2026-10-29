@@ -1,5 +1,6 @@
 import type { DiplomacyEvent, GameUpdate, StructureType } from "../game/game-view.ts";
 import { t, type MessageKey } from "../i18n/index.ts";
+import { formatCount } from "./format.ts";
 
 /** How a feed entry looks and how it is read: bad news, good news, a plain fact, or a question for you. */
 export type FeedTone = "bad" | "good" | "info" | "ask";
@@ -38,6 +39,7 @@ const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
   collapsed: "diplo.eventCollapsed",
   capital: "diplo.eventCapital",
   razed: "diplo.eventRazed",
+  eliminated: "diplo.eventEliminated",
 };
 
 const STRUCTURE_TEXT: Readonly<Record<StructureType, MessageKey>> = {
@@ -212,10 +214,21 @@ export class FeedWatcher {
         return target ? "bad" : "good";
       case "razed":
         return "bad";
+      case "eliminated":
+        return "good";
       case "ended":
       case "quick":
         return "info";
     }
+  }
+
+  /** Told from the player's side where it matters: their own front gave way, or they took the gold. */
+  private textKey(event: DiplomacyEvent, you: number, mine: boolean): MessageKey {
+    if (event.type === "collapsed" && event.b === you) return "feed.collapsedYours";
+    if (event.type === "eliminated" && (event.gold ?? 0) > 0) {
+      return mine && event.a === you ? "feed.eliminatedGold" : "diplo.eventEliminatedGold";
+    }
+    return EVENT_TEXT[event.type];
   }
 
   private eventEntry(
@@ -228,15 +241,11 @@ export class FeedWatcher {
     const mine = this.personal && (event.a === you || event.b === you);
     const other = event.a === you ? event.b : event.a;
     const tone = mine ? this.tone(event, you) : "info";
-    // Told from the player's side: the attacker's front gave way, or the player's own did.
-    const key: MessageKey =
-      event.type === "collapsed" && event.b === you
-        ? "feed.collapsedYours"
-        : EVENT_TEXT[event.type];
-    const text = t(key, {
+    const text = t(this.textKey(event, you, mine), {
       a: name(event.a),
       b: name(event.b),
       phrase: event.phrase === undefined ? "" : t(`quick.${String(event.phrase)}` as MessageKey),
+      gold: formatCount(event.gold ?? 0),
     });
     return {
       key: `${event.type}:${String(event.a)}:${String(event.b)}:${String(event.phrase ?? "")}`,

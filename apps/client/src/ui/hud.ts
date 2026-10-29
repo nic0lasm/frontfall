@@ -76,6 +76,8 @@ export class Hud {
   private readonly troopsCap = h("span", { class: "stat-cap" });
   private readonly gold = h("strong", { class: "stat-value" });
   private readonly goldRate = h("span", { class: "stat-cap gold-rate" });
+  /** R-ECO-08: the gold of a player the player just eliminated, rising off the counter. */
+  private readonly goldGain = h("span", { class: "gold-gain", "aria-hidden": "true" });
   private readonly land = h("strong", { class: "stat-value" });
   private readonly population = new PopulationBar((text) => {
     this.explain(text);
@@ -386,7 +388,7 @@ export class Hud {
           "section",
           { class: "panel stats", "data-i18n-attr": "aria-label:hud.yourEmpire" },
           stat("hud.troops", this.troops, this.troopsCap),
-          stat("hud.gold", this.gold, this.goldRate),
+          stat("hud.gold", this.gold, this.goldRate, this.goldGain),
           stat("hud.land", this.land),
           this.population.element,
         ),
@@ -510,6 +512,8 @@ export class Hud {
   update(update: GameUpdate, now: number, force = false): void {
     const phaseChanged = this.last?.phase !== update.phase;
     this.last = update;
+    // Before the throttle: events come once, in the update that carries them.
+    this.showGoldGain(update);
     if (!force && !phaseChanged && now - this.lastRender < REFRESH_MS) return;
     this.lastRender = now;
     this.render(update);
@@ -545,6 +549,21 @@ export class Hud {
     this.renderGoal(update, human);
     this.renderAttacks(update);
     this.renderPreview(update);
+  }
+
+  /** R-ECO-08: the gold taken from the players the player eliminated in this update. */
+  private showGoldGain(update: GameUpdate): void {
+    let gold = 0;
+    for (const event of update.events) {
+      if (event.type === "eliminated" && event.a === update.you) gold += event.gold ?? 0;
+    }
+    if (gold <= 0) return;
+    this.goldGain.textContent = t("hud.goldGain", { gold: formatCount(gold) });
+    // Restarts the rise when two eliminations follow each other closely.
+    this.goldGain.classList.remove("rising");
+    requestAnimationFrame(() => {
+      this.goldGain.classList.add("rising");
+    });
   }
 
   /** Follows the game's work share, unless the player is moving the slider or waits for theirs. */

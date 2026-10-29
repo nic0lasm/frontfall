@@ -20,6 +20,47 @@
   font-size: 12px;
 }
 
+/* R-ECO-08: gold taken from an eliminated player, over the counter; it takes no room in the bar. */
+.stat {
+  position: relative;
+}
+
+.gold-gain {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  color: var(--ff-warning);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
+}
+
+.gold-gain.rising {
+  animation: gold-rise 2.4s ease-out forwards;
+}
+
+@keyframes gold-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
 .leaderboard {
   top: 12px;
   right: 12px;
@@ -2210,5 +2251,19 @@ button.feed-entry:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .banner.danger {
     animation: none;
+  }
+
+  .gold-gain.rising {
+    animation-name: gold-fade;
+  }
+}
+
+@keyframes gold-fade {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }

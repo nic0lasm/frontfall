@@ -28,6 +28,17 @@ describe("TerritoryMap", () => {
     expect(map.ownerOf(5)).toBe(NEUTRAL);
   });
 
+  it("remembers who last took a tile from each player", () => {
+    const map = new TerritoryMap(new WorldGrid(8, 4), 3);
+    map.setOwner(0, 1);
+    map.setOwner(1, 1);
+    expect(map.lastTakerOf(1)).toBe(NEUTRAL);
+    map.setOwner(0, 2);
+    expect(map.lastTakerOf(1)).toBe(2);
+    map.setOwner(1, NEUTRAL);
+    expect([map.lastTakerOf(1), map.lastTakerOf(2)]).toEqual([NEUTRAL, NEUTRAL]);
+  });
+
   it("counts tiles per owner", () => {
     const map = new TerritoryMap(new WorldGrid(8, 4), 3);
     map.setOwner(0, 1);

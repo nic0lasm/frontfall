@@ -49,6 +49,7 @@ export interface DiplomacyEvent {
    * an attack of `a` around `tile` (R-ATTACK-10). In capital mode (R-CAP),
    * `a` took `b`'s capital and with it all their land ("capital"), or `a`'s
    * capital was razed and moved ("razed", with `b` the same player).
+   * "eliminated": `a` took the last tile of `b`, and with it `gold` (R-ECO-08).
    */
   readonly type:
     | "allied"
@@ -63,13 +64,16 @@ export interface DiplomacyEvent {
     | "quick"
     | "collapsed"
     | "capital"
-    | "razed";
+    | "razed"
+    | "eliminated";
   readonly a: number;
   readonly b: number;
   /** A "quick" event's message, by number (R-DIPLO-07). */
   readonly phrase?: number;
   /** Where a "collapsed" front broke: the tile its attacker took closest to the aim. */
   readonly tile?: number;
+  /** What an "eliminated" player's taker got (R-ECO-08). */
+  readonly gold?: number;
 }
 
 /** Refusals of diplomacy orders, so that interfaces can tell them apart without parsing text. */

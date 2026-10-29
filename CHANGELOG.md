@@ -7,6 +7,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### Added
 
 - **A Graphics setting, and a lighter picture for phones that struggle.** The menu's Accessibility section has a new Graphics choice: Automatic (the default), Light and Sharpest. Automatic picks by your device: a weak one gets the light picture, the flat map drawn at your screen's own pixels, a phone gets the full map at 1.5 times its screen's pixels instead of twice, and a game that still cannot keep up at the lowest sharpness switches to the light picture by itself and remembers it. Sharpest keeps the picture as sharp as the screen allows whatever the device. The choice applies to the next game.
+- **Eliminate a country, take its gold.** Whoever takes the last tile of a player, a bot or a nation now takes all of their gold, instead of it vanishing. In capital mode, taking a capital brings all of its owner's gold too, no longer half. The events feed tells everyone who eliminated whom and for how much, and your own gold counter shows what you just took, rising over it. Land a missile leaves to nobody still eliminates nobody.
 - **Measure a phone with `?perf`.** Add `?perf` to the game's address and a small panel shows the map's frame time, with a button to copy a report of the device, the picture used and how frames fared.
 
 ### Changed

@@ -29,6 +29,7 @@ export class TerritoryMap {
   private readonly borderLists: Int32Array[];
   private readonly borderSizes: Int32Array;
   private readonly tileCounts: Int32Array;
+  private readonly lastTakers: Uint16Array;
   private readonly around = new Int32Array(4);
   private readonly aroundNeighbor = new Int32Array(4);
   private readonly changeLog: Int32Array;
@@ -53,6 +54,7 @@ export class TerritoryMap {
     this.borderSizes = new Int32Array(maxPlayers + 1);
     this.tileCounts = new Int32Array(maxPlayers + 1);
     this.tileCounts[NEUTRAL] = grid.size;
+    this.lastTakers = new Uint16Array(maxPlayers + 1);
     this.changeLog = new Int32Array(changeLogCapacity);
   }
 
@@ -62,6 +64,15 @@ export class TerritoryMap {
 
   tileCount(player: number): number {
     return this.tileCounts[this.checkPlayer(player)] as number;
+  }
+
+  /**
+   * Who last took a tile from `player`: NEUTRAL when it went back to nobody
+   * or nobody ever took one. Only good within the tick of the change, as
+   * snapshots do not keep it.
+   */
+  lastTakerOf(player: number): number {
+    return this.lastTakers[this.checkPlayer(player)] as number;
   }
 
   isBorder(tile: number): boolean {
@@ -86,7 +97,10 @@ export class TerritoryMap {
     const previous = this.owners[tile] as number;
     if (previous === player) return;
 
-    if (previous !== NEUTRAL) this.removeBorder(tile, previous);
+    if (previous !== NEUTRAL) {
+      this.removeBorder(tile, previous);
+      this.lastTakers[previous] = player;
+    }
     this.owners[tile] = player;
     this.tileCounts[previous] = (this.tileCounts[previous] as number) - 1;
     this.tileCounts[player] = (this.tileCounts[player] as number) + 1;

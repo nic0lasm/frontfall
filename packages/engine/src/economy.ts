@@ -1,5 +1,6 @@
 import type { Balance } from "./balance.ts";
 import type { Game, Player } from "./game.ts";
+import { logEvent } from "./diplomacy.ts";
 import { mulDiv, percentOf } from "./integer-math.ts";
 import { spawnSettings } from "./spawn.ts";
 import { workingCities } from "./structures.ts";
@@ -63,7 +64,7 @@ export function installEconomy(game: Game): void {
     for (const player of game.players()) {
       if (!player.alive) continue;
       if (game.territory.tileCount(player.id) === 0) {
-        eliminate(player);
+        eliminate(game, player);
         continue;
       }
       growTroops(game, player);
@@ -107,8 +108,22 @@ function growTroops(game: Game, player: Player): void {
   player.troops += troopGrowth(game.balance, cap, player.troops);
 }
 
-/** R-ECO-05: an eliminated player keeps nothing. */
-function eliminate(player: Player): void {
+/**
+ * R-ECO-05: an eliminated player keeps nothing. R-ECO-08: the player who took
+ * their last tile takes all their gold.
+ */
+function eliminate(game: Game, player: Player): void {
+  const taker = game.player(game.territory.lastTakerOf(player.id));
+  if (taker?.alive === true) {
+    taker.gold += player.gold;
+    logEvent(game, {
+      tick: game.tick,
+      type: "eliminated",
+      a: taker.id,
+      b: player.id,
+      gold: player.gold,
+    });
+  }
   player.alive = false;
   player.troops = 0;
   player.gold = 0;

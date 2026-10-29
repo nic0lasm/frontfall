@@ -232,15 +232,15 @@ With ships for everyone, a scripted player that also sails (free land first, the
 
 ## Capitals
 
-| Key                  | Value | Unit        | Used by    | Notes                                                      |
-| -------------------- | ----: | ----------- | ---------- | ---------------------------------------------------------- |
-| `B-CAPITAL-RADIUS`   |    15 | tiles       | `R-CAP-02` | On a map of 2^19 tiles; 30 on World                        |
-| `B-CAPITAL-STRENGTH` |   300 | % of price  | `R-CAP-02` | Paid by attackers inside the radius; a fort does not add   |
-| `B-CAPITAL-GARRISON` |    20 | % of troops | `R-CAP-02` | Of the owner's soldiers, added to the capital tile's price |
-| `B-CAPITAL-SPOILS`   |    50 | %           | `R-CAP-03` | Of the fallen player's troops and of their gold            |
-| `B-CAPITAL-RAZE`     |    50 | % of troops | `R-CAP-04` | Lost when a missile razes the capital                      |
-| `B-CAPITAL-GRACE`    |   180 | s           | `R-CAP-06` | Of play before a capital can fall                          |
-| `B-CAPITAL-ALERT`    |    30 | tiles       | `R-CAP-05` | Enemy land this close threatens a capital; 60 on World     |
+| Key                  | Value | Unit        | Used by    | Notes                                                         |
+| -------------------- | ----: | ----------- | ---------- | ------------------------------------------------------------- |
+| `B-CAPITAL-RADIUS`   |    15 | tiles       | `R-CAP-02` | On a map of 2^19 tiles; 30 on World                           |
+| `B-CAPITAL-STRENGTH` |   300 | % of price  | `R-CAP-02` | Paid by attackers inside the radius; a fort does not add      |
+| `B-CAPITAL-GARRISON` |    20 | % of troops | `R-CAP-02` | Of the owner's soldiers, added to the capital tile's price    |
+| `B-CAPITAL-SPOILS`   |    50 | %           | `R-CAP-03` | Of the fallen player's troops; the gold all goes (`R-ECO-08`) |
+| `B-CAPITAL-RAZE`     |    50 | % of troops | `R-CAP-04` | Lost when a missile razes the capital                         |
+| `B-CAPITAL-GRACE`    |   180 | s           | `R-CAP-06` | Of play before a capital can fall                             |
+| `B-CAPITAL-ALERT`    |    30 | tiles       | `R-CAP-05` | Enemy land this close threatens a capital; 60 on World        |
 
 Like a fort's, the radius and the alert distance grow with the spawn radius on larger maps. A capital is harder to take than a fort, but it cannot be moved or rebuilt, and it costs everything once lost: the only way to keep it is to keep the fronts away from it.
 

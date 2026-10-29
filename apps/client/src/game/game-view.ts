@@ -308,13 +308,16 @@ export interface DiplomacyEvent {
     | "quick"
     | "collapsed"
     | "capital"
-    | "razed";
+    | "razed"
+    | "eliminated";
   a: number;
   b: number;
   /** Where a front collapsed, for "collapsed" (R-ATTACK-10). */
   tile?: number;
   /** A quick message, by number (R-DIPLO-07). */
   phrase?: number;
+  /** The gold an "eliminated" player's taker got (R-ECO-08). */
+  gold?: number;
 }
 
 /** A warship, where it is this tick. */

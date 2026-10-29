@@ -150,6 +150,32 @@ describe("economy", () => {
     expect([bea.alive, bea.troops, bea.gold]).toEqual([false, 0, 0]);
   });
 
+  it("hands all the gold of a player to whoever took their last tile (R-ECO-08)", () => {
+    const { game, ada, bea, run } = newGame();
+    game.territory.setOwner(50, 2);
+    bea.gold = 40;
+    ada.gold = 7;
+    // Ada takes Bea's last tile at the end of a tick; the economy settles it on the next.
+    game.onTick(() => {
+      if (game.tick === 0) game.territory.setOwner(50, 1);
+    });
+    run(2);
+    expect([bea.alive, bea.gold]).toEqual([false, 0]);
+    // 7 + 40, and what the tick earned.
+    expect(ada.gold).toBeGreaterThanOrEqual(47);
+    expect(game.diplomacyEvents).toEqual([{ tick: 1, type: "eliminated", a: 1, b: 2, gold: 40 }]);
+  });
+
+  it("loses the gold of a player whose last tile went back to nobody (R-ECO-08)", () => {
+    const { game, ada, bea, run } = newGame();
+    game.territory.setOwner(50, 2);
+    game.territory.setOwner(50, 0);
+    bea.gold = 40;
+    run();
+    expect([bea.alive, bea.gold, ada.gold < 40]).toEqual([false, 0, true]);
+    expect(game.diplomacyEvents).toEqual([]);
+  });
+
   it("does nothing during the spawn phase", () => {
     const { ada, bea, run } = newGame({ spawnPhaseTicks: 5 });
     ada.troops = 1000;

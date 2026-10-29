@@ -153,7 +153,7 @@ export interface Balance {
   capitalStrengthPercent: number;
   /** B-CAPITAL-GARRISON, percent of its owner's soldiers the capital's own tile costs on top */
   capitalGarrisonPercent: number;
-  /** B-CAPITAL-SPOILS, percent of a conquered player's troops and gold their conqueror takes */
+  /** B-CAPITAL-SPOILS, percent of a conquered player's troops their conqueror takes; the gold all goes (R-ECO-08) */
   capitalSpoilsPercent: number;
   /** B-CAPITAL-RAZE, percent of their troops a player loses when their capital is razed */
   capitalRazePercent: number;
