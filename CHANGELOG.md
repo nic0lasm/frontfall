@@ -4,7 +4,13 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **One account, several ways to sign in.** Signed in, open your profile and add Google, Discord or an email address to the same account, then sign in with whichever you like. If the one you add already has an account of its own, the game asks before merging the two: you keep your current name and the achievements of both, and the other name becomes free. Nothing is ever joined without you, and a way to sign in can be taken off as long as another is left.
+
 ### Fixed
+
+- **Signing out in plain sight.** Signed in, the menu now says how under your name, with a Sign out button there, instead of a small link inside the closed profile card.
 
 - **The gold a second counts the base income.** The bar showed +13/s while you earned over 500: it left out the 500 gold every player gets. It now counts it, and its tooltip says so.
 - **A game taken back shows itself at once.** After a reload, the solo game waiting in pause now shows its map, figures and first-steps card as they stand, instead of an empty screen and "Loading the map…" until you pressed P. The game is also kept every 15 seconds instead of 30.

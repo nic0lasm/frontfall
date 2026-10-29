@@ -142,7 +142,7 @@ describe("sign-in by email", () => {
     expect(await confirmed.json()).toEqual({
       providers: [],
       email: true,
-      account: { name: "Nelly", provider: "email" },
+      account: { name: "Nelly", provider: "email", methods: ["email"] },
     });
     const session = sessionOf(confirmed) ?? "";
     expect(session).not.toBe("");
@@ -152,6 +152,7 @@ describe("sign-in by email", () => {
     expect(((await me.json()) as { account: unknown }).account).toEqual({
       name: "Nelly",
       provider: "email",
+      methods: ["email"],
     });
     const again = await post(base, "/auth/email/confirm", { token });
     expect(again.status).toBe(400);

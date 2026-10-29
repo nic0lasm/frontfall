@@ -119,3 +119,56 @@
 .account-note {
   color: var(--ff-text);
 }
+
+/* Under the name field of the menu, while signed in. */
+.account-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  color: var(--ff-slate-300);
+  font-size: 13px;
+}
+
+.account-line[hidden] {
+  display: none;
+}
+
+.account-line button.link {
+  padding: 0;
+  font-size: inherit;
+}
+
+.account-line .account-sign-out {
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.account .account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 8px;
+}
+
+.account .account-methods,
+.account .account-add {
+  margin-top: 10px;
+}
+
+.account-add button.account-sign-in {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-merge {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ff-slate-300);
+  border-radius: var(--ff-radius);
+  color: var(--ff-text);
+}

@@ -161,7 +161,12 @@ export function messageHandler(ctx: MessageContext): {
       reply(session, missing);
       return;
     }
-    const operator = session.account !== undefined && ctx.operators.has(session.account);
+    // Any id of the account counts, those of the accounts merged into it too.
+    const operator =
+      session.account !== undefined &&
+      (ctx.accounts?.knownIds(session.account) ?? [session.account]).some((id) =>
+        ctx.operators.has(id),
+      );
     const seat = room.join(session.name ?? "", session.peer, Date.now(), session.address, operator);
     if (typeof seat === "string") {
       reply(session, seat);

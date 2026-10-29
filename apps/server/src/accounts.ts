@@ -1,5 +1,13 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  constants,
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { nameKey as foldName, MAX_NAME_LENGTH, normalizeName } from "@frontfall/protocol";
 
@@ -42,15 +50,23 @@ const MAX_COUNT = 1_000_000_000;
  */
 export interface Account {
   readonly id: string;
-  readonly provider: SignInMethod;
+  /** The first way the player signed in, or the first one left after they took others off. */
+  provider: SignInMethod;
   /**
    * HMAC of the service's id or of the email address, keyed by the file's
    * salt: the file alone does not tell who it is.
    */
-  readonly subject: string;
+  subject: string;
+  /** Other ways the player added to sign in to the same account, hashed as `subject`. */
+  links?: SignInLink[];
+  /**
+   * Ids of the accounts merged into this one: the operator's list may name
+   * any of them.
+   */
+  mergedIds?: string[];
   /** The name the player plays under, reserved for them. */
   name: string;
-  readonly createdAt: number;
+  createdAt: number;
   /** Last sign-in, by the day: an account unused for years can be told apart. */
   seenAt: number;
   /** Raised on every sign-out: the session cookies made before it no longer count. */
@@ -58,6 +74,24 @@ export interface Account {
   /** Achievements the page has sent, once it has. */
   achievements?: AccountAchievements;
 }
+
+/** One more way to sign in to an account. */
+export interface SignInLink {
+  provider: SignInMethod;
+  subject: string;
+}
+
+export type LinkResult =
+  | { ok: true; merged: Account | undefined }
+  | { ok: false; error: "invalid" | "unsaved"; message: string }
+  /** The way leads to another account, and merging was not asked for. */
+  | { ok: false; error: "other"; other: Account; message: string };
+
+export type UnlinkResult =
+  { ok: true } | { ok: false; error: "invalid" | "last" | "unsaved"; message: string };
+
+/** Ways to sign in one account may hold: each service and an address, a few times over after merges. */
+const MAX_LINKS = 8;
 
 export type RenameResult =
   { ok: true; name: string } | { ok: false; error: "invalid" | "taken"; message: string };
@@ -137,6 +171,11 @@ export class Accounts {
     return this.byId.get(id);
   }
 
+  /** The account a hashed way to sign in leads to. */
+  holder(subject: string): Account | undefined {
+    return this.bySubject.get(subject);
+  }
+
   /** The account holding this name, or one that looks like it. */
   owner(name: string): Account | undefined {
     return this.byName.get(nameKey(name));
@@ -205,14 +244,89 @@ export class Accounts {
   remove(id: string): boolean {
     const account = this.byId.get(id);
     if (!account) return false;
-    this.byId.delete(id);
-    this.bySubject.delete(account.subject);
-    this.byName.delete(nameKey(account.name));
+    this.drop(account);
     // A deletion that never reached the file would bring the account back at
     // the next start: the player is told it failed, and the account stays.
     if (this.save()) return true;
     this.add(account);
     return false;
+  }
+
+  /** The ways to sign in to an account, each once, the first one first. */
+  methods(account: Account): SignInMethod[] {
+    return [...new Set([account.provider, ...(account.links ?? []).map((link) => link.provider)])];
+  }
+
+  /** The account's id and those of the accounts merged into it. */
+  knownIds(id: string): string[] {
+    const account = this.byId.get(id);
+    return account ? [account.id, ...(account.mergedIds ?? [])] : [id];
+  }
+
+  /**
+   * Adds a way to sign in to an account, for a subject already hashed with
+   * `subject`. The player proved they hold both: the account they are signed
+   * in to, and the service or address they just went through. When that way
+   * already leads to another account, the other one joins this one: its
+   * achievements and ways to sign in come along, its name is freed, and
+   * this account keeps its own name. That happens only once the player said
+   * yes to it, `merge`; before, the other account is named in the answer.
+   */
+  link(id: string, provider: SignInMethod, subject: string, merge = false): LinkResult {
+    const account = this.byId.get(id);
+    if (!account) return { ok: false, error: "invalid", message: "no such account" };
+    const holder = this.bySubject.get(subject);
+    if (holder === account) return { ok: true, merged: undefined };
+    if (holder && !merge)
+      return { ok: false, error: "other", other: holder, message: "this leads to another account" };
+    const before = structuredClone(account);
+    const added: SignInLink[] = holder
+      ? [{ provider: holder.provider, subject: holder.subject }, ...(holder.links ?? [])]
+      : [{ provider, subject }];
+    if ((account.links?.length ?? 0) + added.length > MAX_LINKS - 1)
+      return { ok: false, error: "invalid", message: "too many ways to sign in" };
+    if (holder) {
+      this.drop(holder);
+      account.mergedIds = [...(account.mergedIds ?? []), holder.id, ...(holder.mergedIds ?? [])];
+      account.createdAt = Math.min(account.createdAt, holder.createdAt);
+      account.seenAt = Math.max(account.seenAt, holder.seenAt);
+      if (holder.achievements) mergeInto(account, holder.achievements);
+    }
+    account.links = [...(account.links ?? []), ...added];
+    for (const link of added) this.bySubject.set(link.subject, account);
+    if (holder) this.keepCopy();
+    if (this.save()) return { ok: true, merged: holder };
+    // Left as it was: a merge only half written would bring both accounts back.
+    this.drop(account);
+    this.add(before);
+    if (holder) this.add(holder);
+    return { ok: false, error: "unsaved", message: "the accounts could not be saved" };
+  }
+
+  /** Takes a way to sign in off an account, as long as another one is left. */
+  unlink(id: string, provider: SignInMethod): UnlinkResult {
+    const account = this.byId.get(id);
+    if (!account) return { ok: false, error: "invalid", message: "no such account" };
+    const all: SignInLink[] = [
+      { provider: account.provider, subject: account.subject },
+      ...(account.links ?? []),
+    ];
+    const kept = all.filter((link) => link.provider !== provider);
+    if (kept.length === all.length)
+      return { ok: false, error: "invalid", message: "this way to sign in is not on the account" };
+    const [first] = kept;
+    if (!first) return { ok: false, error: "last", message: "the last way to sign in stays" };
+    const before = structuredClone(account);
+    for (const link of all) if (link.provider === provider) this.bySubject.delete(link.subject);
+    account.provider = first.provider;
+    account.subject = first.subject;
+    account.links = kept.slice(1);
+    if (account.links.length === 0) delete account.links;
+    if (this.save()) return { ok: true };
+    // A way taken off only in memory would come back at the next start.
+    this.drop(account);
+    this.add(before);
+    return { ok: false, error: "unsaved", message: "the accounts could not be saved" };
   }
 
   /**
@@ -224,30 +338,9 @@ export class Accounts {
   mergeAchievements(id: string, sent: AccountAchievements): AccountAchievements | undefined {
     const account = this.byId.get(id);
     if (!account) return undefined;
-    const kept: AccountAchievements = account.achievements ?? { earned: {}, counts: {} };
-    let changed = account.achievements === undefined;
-    for (const [key, { at, level }] of Object.entries(sent.earned)) {
-      const before = Object.hasOwn(kept.earned, key) ? kept.earned[key] : undefined;
-      if (!before && Object.keys(kept.earned).length >= MAX_ACHIEVEMENTS) continue;
-      const merged = before
-        ? { at: Math.min(before.at, at), level: Math.max(before.level, level) }
-        : { at, level };
-      if (!before || merged.at !== before.at || merged.level !== before.level) {
-        kept.earned[key] = merged;
-        changed = true;
-      }
-    }
-    for (const [key, count] of Object.entries(sent.counts)) {
-      const before = Object.hasOwn(kept.counts, key) ? kept.counts[key] : undefined;
-      if (before === undefined && Object.keys(kept.counts).length >= MAX_COUNTERS) continue;
-      if (before === undefined || count > before) {
-        kept.counts[key] = count;
-        changed = true;
-      }
-    }
-    account.achievements = kept;
+    const changed = mergeInto(account, sent);
     if (changed) this.save();
-    return kept;
+    return account.achievements;
   }
 
   /** The hash an account of this method and id is known by. */
@@ -275,10 +368,33 @@ export class Accounts {
     }
   }
 
+  /**
+   * Copies the file aside before the first merge it ever sees, so that the
+   * operator can go back if merges turn out wrong. Kept once: later merges
+   * leave the copy as it was.
+   */
+  private keepCopy(): void {
+    if (this.file === undefined) return;
+    try {
+      copyFileSync(this.file, `${this.file}.before-merges`, constants.COPYFILE_EXCL);
+      chmodSync(`${this.file}.before-merges`, 0o600);
+    } catch {
+      // Already kept, or no file yet: nothing to go back to.
+    }
+  }
+
   private add(account: Account): void {
     this.byId.set(account.id, account);
     this.bySubject.set(account.subject, account);
+    for (const link of account.links ?? []) this.bySubject.set(link.subject, account);
     this.byName.set(nameKey(account.name), account);
+  }
+
+  private drop(account: Account): void {
+    this.byId.delete(account.id);
+    this.bySubject.delete(account.subject);
+    for (const link of account.links ?? []) this.bySubject.delete(link.subject);
+    this.byName.delete(nameKey(account.name));
   }
 
   private restore(text: string): boolean {
@@ -344,6 +460,33 @@ function cleanSuggestion(raw: string): string {
     .trimEnd();
 }
 
+/** Adds achievements to an account's, as `mergeAchievements` tells; true when any changed. */
+function mergeInto(account: Account, sent: AccountAchievements): boolean {
+  const kept: AccountAchievements = account.achievements ?? { earned: {}, counts: {} };
+  let changed = account.achievements === undefined;
+  for (const [key, { at, level }] of Object.entries(sent.earned)) {
+    const before = Object.hasOwn(kept.earned, key) ? kept.earned[key] : undefined;
+    if (!before && Object.keys(kept.earned).length >= MAX_ACHIEVEMENTS) continue;
+    const merged = before
+      ? { at: Math.min(before.at, at), level: Math.max(before.level, level) }
+      : { at, level };
+    if (!before || merged.at !== before.at || merged.level !== before.level) {
+      kept.earned[key] = merged;
+      changed = true;
+    }
+  }
+  for (const [key, count] of Object.entries(sent.counts)) {
+    const before = Object.hasOwn(kept.counts, key) ? kept.counts[key] : undefined;
+    if (before === undefined && Object.keys(kept.counts).length >= MAX_COUNTERS) continue;
+    if (before === undefined || count > before) {
+      kept.counts[key] = count;
+      changed = true;
+    }
+  }
+  account.achievements = kept;
+  return changed;
+}
+
 function dayOf(time: number): number {
   return time - (time % DAY_MS);
 }
@@ -367,6 +510,17 @@ function isAccount(value: unknown): value is Account {
     typeof value.createdAt === "number" &&
     typeof value.seenAt === "number" &&
     Number.isInteger(value.sessions) &&
+    (value.links === undefined ||
+      (Array.isArray(value.links) &&
+        value.links.every(
+          (link) =>
+            isRecord(link) &&
+            typeof link.provider === "string" &&
+            isSignInMethod(link.provider) &&
+            typeof link.subject === "string",
+        ))) &&
+    (value.mergedIds === undefined ||
+      (Array.isArray(value.mergedIds) && value.mergedIds.every((id) => typeof id === "string"))) &&
     (value.achievements === undefined || parseAchievements(value.achievements) !== undefined)
   );
 }

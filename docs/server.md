@@ -185,27 +185,30 @@ curl -s localhost:8080/metrics
 
 ## HTTP routes
 
-| Path                   | Answer                                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `/healthz`             | `ok`, or `503` (see below), with the build in the `X-Frontfall-Version` header and the release in `X-Frontfall-Release`           |
-| `/api/games`           | Public games that have not started, and the number of games running, as JSON                                                      |
-| `/status`              | A page for people: players online, games running, lobbies, an announced restart, release and build                                |
-| `/api/status`          | The same as JSON: `version`, `release`, `simulation`, `keepsGames`, `state`, `players`, `running`, `lobbies`, `restartInMs`       |
-| `/admin/maintenance`   | `POST ?minutes=N` announces a restart in N minutes to every player, `0` calls it off; from inside the container only              |
-| `/admin/reports`       | `GET ?days=N`: the reports of the last N days, 30 at most; from inside the container only ([Reports and bans](#reports-and-bans)) |
-| `/admin/bans`          | `GET` lists the bans, `POST` adds one or reads the file again, `DELETE` lifts one; from inside the container only                 |
-| `/admin/errors`        | `GET ?days=N`: players' errors of the last N days, grouped; from inside the container only ([errors](#errors-of-players))         |
-| `/api/stats`           | Usage counts per day and in total, as JSON ([privacy.md](privacy.md)); the last 7 days are also on `/status`                      |
-| `/api/usage`           | `POST` only: a report of a player's page ([privacy.md](privacy.md)); `204`, or `400`, `403`, `413`, `415`, `429`                  |
-| `/api/me`              | The services offered and the account signed in, as JSON; `POST {"name"}` renames it, `DELETE` deletes it ([Accounts](#accounts))  |
-| `/api/me/achievements` | `POST` only: the page's achievements, kept with the account; answers with them all ([Accounts](#achievements-of-an-account))      |
-| `/auth/<service>`      | Sends the player to sign in with `discord` or `google`; the service sends them back to `/auth/<service>/callback`                 |
-| `/auth/email`          | `POST {"email", "name", "language"}` only: sends a sign-in link; `202` whoever the address is ([Accounts](#sign-in-by-email))     |
-| `/auth/email/confirm`  | `POST {"token"}` only: signs in the player who opened the link, once                                                              |
-| `/auth/logout`         | `POST` only: signs the player out                                                                                                 |
-| `/metrics`             | Metrics, from the host only                                                                                                       |
-| `/ws`                  | WebSocket upgrade                                                                                                                 |
-| anything else          | Files of the built client                                                                                                         |
+| Path                   | Answer                                                                                                                                                                                         |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/healthz`             | `ok`, or `503` (see below), with the build in the `X-Frontfall-Version` header and the release in `X-Frontfall-Release`                                                                        |
+| `/api/games`           | Public games that have not started, and the number of games running, as JSON                                                                                                                   |
+| `/status`              | A page for people: players online, games running, lobbies, an announced restart, release and build                                                                                             |
+| `/api/status`          | The same as JSON: `version`, `release`, `simulation`, `keepsGames`, `state`, `players`, `running`, `lobbies`, `restartInMs`                                                                    |
+| `/admin/maintenance`   | `POST ?minutes=N` announces a restart in N minutes to every player, `0` calls it off; from inside the container only                                                                           |
+| `/admin/reports`       | `GET ?days=N`: the reports of the last N days, 30 at most; from inside the container only ([Reports and bans](#reports-and-bans))                                                              |
+| `/admin/bans`          | `GET` lists the bans, `POST` adds one or reads the file again, `DELETE` lifts one; from inside the container only                                                                              |
+| `/admin/errors`        | `GET ?days=N`: players' errors of the last N days, grouped; from inside the container only ([errors](#errors-of-players))                                                                      |
+| `/api/stats`           | Usage counts per day and in total, as JSON ([privacy.md](privacy.md)); the last 7 days are also on `/status`                                                                                   |
+| `/api/usage`           | `POST` only: a report of a player's page ([privacy.md](privacy.md)); `204`, or `400`, `403`, `413`, `415`, `429`                                                                               |
+| `/api/me`              | The services offered and the account signed in, as JSON; `POST {"name"}` renames it, `DELETE` deletes it ([Accounts](#accounts))                                                               |
+| `/api/me/achievements` | `POST` only: the page's achievements, kept with the account; answers with them all ([Accounts](#achievements-of-an-account))                                                                   |
+| `/api/me/merge`        | `POST {"merge"}` only: merges, or not, the other account a way just added leads to ([Accounts](#several-ways-to-sign-in))                                                                      |
+| `/api/me/unlink`       | `POST {"method"}` only: takes a way to sign in off the account, never the last                                                                                                                 |
+| `/auth/<service>/link` | `POST` only, from the game's page, signed in: answers where to go to add the service to the account                                                                                            |
+| `/auth/<service>`      | Sends the player to sign in with `discord` or `google`; the service sends them back to `/auth/<service>/callback`                                                                              |
+| `/auth/email`          | `POST {"email", "name", "language", "link"}` only: sends a sign-in link, or with `link` one that adds the address to the account; `202` whoever the address is ([Accounts](#sign-in-by-email)) |
+| `/auth/email/confirm`  | `POST {"token"}` only: signs in the player who opened the link, once                                                                                                                           |
+| `/auth/logout`         | `POST` only: signs the player out                                                                                                                                                              |
+| `/metrics`             | Metrics, from the host only                                                                                                                                                                    |
+| `/ws`                  | WebSocket upgrade                                                                                                                                                                              |
+| anything else          | Files of the built client                                                                                                                                                                      |
 
 HTML, scripts, styles, JSON, SVG and map files (`.bin`) of 1 KiB or more are sent gzipped to browsers that accept it, with `Vary: Accept-Encoding`. Each file is compressed once, on its first request. Every file carries an `ETag` drawn from its content; maps and other files without a hashed name are sent with `no-cache`, so browsers revalidate them and get `304 Not Modified` until they change. Caddy and Cloudflare pass the compressed body on, and would not compress `.bin` files themselves.
 
@@ -243,13 +246,24 @@ Port 465 is TLS from the start, 587 STARTTLS; both require TLS 1.2 and a valid c
 
 Limits: one address may ask for 3 links, then one every 5 minutes (`429`); one email address gets 2 links, then one every 10 minutes, the others held back without a word; and the server sends `FRONTFALL_EMAIL_DAILY_LIMIT` links a day in all, then answers `503` until the next day (UTC), logged once as `sign_in_links_held`. An account made by email is not the account of the same address at Google: the game never asks Google for it.
 
+### Several ways to sign in
+
+A signed-in player may add the other services, or an address, to their account from the menu's profile card, and then sign in with any of them. Nothing is ever joined by itself: the game never learns a player's address from Google or Discord, so two ways become one account only when the player, signed in, goes through the other one.
+
+- A service is added by `POST /auth/<service>/link`, from the game's page only (the `Origin` is checked, so no other site can start it). The server answers where to go, with the sign-in cookie, and the page goes there; back at `/auth/<service>/callback`, the service is added to the account still signed in in that browser, the one that asked, and to no other.
+- An address is added by `POST /auth/email` with `"link": true`, signed in. The email names no account, and its link only finishes in a browser signed in to that account (`403` elsewhere, and the link is spent): the owner of an address cannot be led to hand it to someone else's account.
+- When the way added already leads to another account, nothing changes yet: `/api/me` names that account (`merge`), and the page asks the player whether to merge it, saying which name stays and which is freed. On yes (`POST /api/me/merge {"merge": true}`), the account signed in keeps its id, name and sessions, and takes the other's ways to sign in, achievements (merged as below), the earlier day of creation and the ids of the accounts merged into it. The other account goes away with its sessions, and its name becomes free. The server logs `accounts_merged` with both ids and the service. Before the first merge it ever does, it copies the file to `accounts.json.before-merges`, kept as it is after that. A question not answered within 10 minutes, or a restart, drops the merge.
+- `POST /api/me/unlink {"method"}` takes a service or the address off the account, all of that kind, as long as another way is left (`409` for the last). Signing in again that way then makes a new account.
+
+Each account keeps the first way it was made with, and the others in `links`, each the service and the HMAC of its id; merged accounts leave their ids in `mergedIds`. The file's version does not change: a release before this one reads it and keeps those fields, but only the first way of each account signs in to it there, the others making new accounts.
+
 ### Achievements of an account
 
 Signed in, the menu posts the device's achievements to `/api/me/achievements` (8 KiB at most) and keeps what comes back, so that they follow the player. The server adds them to the account's: each achievement keeps its higher level and earlier day, each count its larger value, and nothing is ever taken away; at most 64 achievements and 8 counts, with ids of lowercase letters, digits and dashes. Two devices played apart between two visits to the menu keep the larger count, not their sum. They are counted by the page, as before: an account only carries them. Deleting the account deletes them.
 
 ## Operator gold bonus
 
-The operator of a server may want to try a long game, a late-game structure or a balance change without playing an hour to afford it. `FRONTFALL_OPERATOR_ACCOUNTS` lists the ids of their accounts ([Accounts](#accounts)); a player signed in to one of them, host of a private game, then sees "Operator's test: double my gold" among the lobby's settings (`R-MODE-09`, [protocol](protocol.md#configure)). Ticked, it doubles the gold that player earns from their troops and workers, never anyone else's, for the whole game.
+The operator of a server may want to try a long game, a late-game structure or a balance change without playing an hour to afford it. `FRONTFALL_OPERATOR_ACCOUNTS` lists the ids of their accounts ([Accounts](#accounts)), or of accounts merged into them; a player signed in to one of them, host of a private game, then sees "Operator's test: double my gold" among the lobby's settings (`R-MODE-09`, [protocol](protocol.md#configure)). Ticked, it doubles the gold that player earns from their troops and workers, never anyone else's, for the whole game.
 
 It is never offered in a public game or "Play now", nor to a guest, nor by name: only the signed-in account counts, so nobody can claim it by taking a name. It is not hidden from the other players either: the lobby and the end screen of that game say who has it, and the game counts towards no player's statistics or achievements. Every client simulates the bonus, as it is part of the game's setup (`goldBonus` in `started`), so it changes no rule of other games, and a game without it plays and hashes as it did before the bonus existed. The server logs `operator_gold` with the game's id when it is turned on, and `server_started` gives the number of operator accounts it read.
 

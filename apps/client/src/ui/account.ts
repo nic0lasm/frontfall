@@ -8,13 +8,21 @@ import { h } from "./dom.ts";
 import "./account.css";
 
 type Provider = "discord" | "google";
+type Method = Provider | "email";
 
 /** What the server says at `/api/me`: which services to offer, and who is signed in. */
 interface Me {
   providers: Provider[];
   /** Whether the server can send a sign-in link by email; older servers leave it out. */
   email?: boolean;
-  account: { name: string; provider: Provider | "email" } | null;
+  account: {
+    name: string;
+    provider: Method;
+    /** Every way to sign in to the account; older servers leave it out. */
+    methods?: Method[];
+    /** Another account of the player's, to merge once they say yes. */
+    merge?: { name: string; methods: Method[] };
+  } | null;
 }
 
 /**
@@ -25,8 +33,23 @@ const TEXT = {
   en: {
     offer: "Optional: sign in to keep your name and achievements.",
     signInWith: "Sign in with {service}",
-    signedIn: "Signed in with {service}. Your name and achievements are yours alone.",
-    signedInEmail: "Signed in by email. Your name and achievements are yours alone.",
+    signedIn:
+      "Signed in as {name} with {services}. This name and your achievements are yours alone.",
+    line: "Signed in with {services}.",
+    manage: "Account",
+    methods: "Ways to sign in:",
+    removeMethod: "Remove {service}",
+    add: "Add a way to sign in to this account:",
+    addWith: "Add {service}",
+    addEmail: "Add an email address",
+    linkSentAdd:
+      "If this address is right, a link is on its way. Open it on this device, signed in to this account, within 15 minutes.",
+    elsewhere: "Open this link on the device where you are signed in to the account.",
+    mergeAsk:
+      "You already have another account, {other} ({services}). Merge it into this one? You keep the name {name} and the achievements of both; the account {other} goes away and its name becomes free.",
+    mergeYes: "Merge the two accounts",
+    mergeNo: "Keep them apart",
+    last: "This is your last way to sign in: it stays.",
     emailOpen: "Sign in with email",
     emailLabel: "Email address",
     emailSend: "Send me a link",
@@ -50,8 +73,23 @@ const TEXT = {
   fr: {
     offer: "Facultatif : connectez-vous pour garder votre nom et vos succès.",
     signInWith: "Se connecter avec {service}",
-    signedIn: "Connecté avec {service}. Ce nom et vos succès ne sont qu'à vous.",
-    signedInEmail: "Connecté par e-mail. Ce nom et vos succès ne sont qu'à vous.",
+    signedIn:
+      "Connecté en tant que {name} avec {services}. Ce nom et vos succès ne sont qu'à vous.",
+    line: "Connecté avec {services}.",
+    manage: "Compte",
+    methods: "Vos façons de vous connecter :",
+    removeMethod: "Retirer {service}",
+    add: "Ajouter une façon de vous connecter à ce compte :",
+    addWith: "Ajouter {service}",
+    addEmail: "Ajouter une adresse e-mail",
+    linkSentAdd:
+      "Si cette adresse est la bonne, un lien est en route. Ouvrez-le sur cet appareil, connecté à ce compte, dans les 15 minutes.",
+    elsewhere: "Ouvrez ce lien sur l'appareil où vous êtes connecté à ce compte.",
+    mergeAsk:
+      "Vous avez déjà un autre compte, {other} ({services}). Le réunir avec celui-ci ? Vous gardez le nom {name} et les succès des deux ; le compte {other} disparaît et son nom redevient libre.",
+    mergeYes: "Réunir les deux comptes",
+    mergeNo: "Les garder séparés",
+    last: "C'est votre dernière façon de vous connecter : elle reste.",
     emailOpen: "Se connecter par e-mail",
     emailLabel: "Adresse e-mail",
     emailSend: "M'envoyer un lien",
@@ -77,13 +115,30 @@ const TEXT = {
 type TextKey = keyof (typeof TEXT)["en"];
 
 /** Messages that are news, not errors. */
-const NOTES: ReadonlySet<TextKey> = new Set(["linkSent"]);
+const NOTES: ReadonlySet<TextKey> = new Set(["linkSent", "linkSentAdd"]);
 
-function text(key: TextKey, service = ""): string {
-  return TEXT[getLanguage()][key].replace("{service}", service);
+function text(key: TextKey, values: Record<string, string> = {}): string {
+  return TEXT[getLanguage()][key].replace(/\{(\w+)\}/g, (all, name: string) => values[name] ?? all);
 }
 
 const PROVIDER_NAMES: Record<Provider, string> = { discord: "Discord", google: "Google" };
+
+function methodName(method: Method): string {
+  if (method !== "email") return PROVIDER_NAMES[method];
+  return getLanguage() === "fr" ? "e-mail" : "email";
+}
+
+/** "Discord and Google", in the page's language. */
+function methodList(methods: readonly Method[]): string {
+  return new Intl.ListFormat(getLanguage(), { type: "conjunction" }).format(
+    methods.map(methodName),
+  );
+}
+
+/** The ways to sign in to an account, as older servers tell them too. */
+function methodsOf(account: NonNullable<Me["account"]>): Method[] {
+  return account.methods ?? [account.provider];
+}
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -147,13 +202,16 @@ function isMe(value: unknown): value is Me {
 }
 
 /**
- * Optional sign-in, under the name field: a player who signs in with Discord,
- * Google or a link sent by email keeps their name and achievements for
- * themselves. Shows nothing when the server offers no way to sign in, or
+ * Optional sign-in, in the profile card of the menu: a player who signs in
+ * with Discord, Google or a link sent by email keeps their name and
+ * achievements for themselves, and may add the other ways to the same
+ * account. Shows nothing when the server offers no way to sign in, or
  * cannot be reached: the game is played as a guest.
  */
 export class AccountBox {
   readonly element = h("div", { class: "account", hidden: true, "aria-live": "polite" });
+  /** Under the name field of the menu, while signed in: who, and the way out. */
+  readonly line = h("p", { class: "account-line", hidden: true });
   private me: Me | undefined;
   private message: TextKey | undefined;
   /** The token of a sign-in link the player opened, until they finish or it fails. */
@@ -174,10 +232,15 @@ export class AccountBox {
   /**
    * @param name the name field of the menu: signed in, it shows and renames the account.
    * @param setName tells the menu the name changed.
+   * @param openCard opens the profile card the box is in.
    */
   constructor(
     private readonly name: HTMLInputElement,
     private readonly setName: (name: string) => void,
+    private readonly openCard: () => void = () => {
+      const card = this.element.closest("details");
+      if (card) card.open = true;
+    },
   ) {
     const query = new URLSearchParams(location.search);
     // The link of the email: its token stays out of the address bar and the history.
@@ -223,14 +286,18 @@ export class AccountBox {
   }
 
   private async sendLink(): Promise<void> {
+    const adding = this.me?.account != null;
     const response = await this.post("auth/email", {
       email: this.emailInput.value,
       name: this.name.value,
       language: getLanguage(),
+      ...(adding && { link: true }),
     });
     this.message =
       response?.status === 202
-        ? "linkSent"
+        ? adding
+          ? "linkSentAdd"
+          : "linkSent"
         : response?.status === 400
           ? "badEmail"
           : response?.status === 429
@@ -238,7 +305,7 @@ export class AccountBox {
             : response?.status === 503
               ? "busy"
               : "failed";
-    if (this.message === "linkSent") this.emailOpen = false;
+    if (NOTES.has(this.message)) this.emailOpen = false;
     this.show(this.me);
   }
 
@@ -256,16 +323,22 @@ export class AccountBox {
       this.show(me);
       void syncAchievements();
     } else {
-      this.message = response?.status === 400 ? "expired" : "failed";
+      this.message =
+        response?.status === 400 ? "expired" : response?.status === 403 ? "elsewhere" : "failed";
       this.show(this.me);
     }
   }
 
-  /** Sends a request to `/api/me` or `/auth/logout`; undefined when it fails. */
+  /**
+   * Sends a request to `/api/me`, under it or to `/auth/logout`; undefined
+   * when it fails. A refusal leaves a word for the player: `refused` by
+   * the answer's status.
+   */
   private async request(
     method: "GET" | "POST" | "DELETE",
     path = "api/me",
     body?: unknown,
+    refused: Partial<Record<number, TextKey>> = { 409: "taken", 400: "invalid" },
   ): Promise<Me | undefined> {
     try {
       const response = await fetch(new URL(path, location.href), {
@@ -277,8 +350,8 @@ export class AccountBox {
           body: JSON.stringify(body),
         }),
       });
-      if (response.status === 409) this.message = "taken";
-      else if (response.status === 400) this.message = "invalid";
+      const word = refused[response.status];
+      if (word) this.message = word;
       if (!response.ok) return undefined;
       const value: unknown = await response.json();
       return isMe(value) ? value : undefined;
@@ -300,6 +373,8 @@ export class AccountBox {
     // The account's name is no longer the player's to use as a guest.
     this.name.value = "";
     this.setName("");
+    this.message = undefined;
+    this.emailOpen = false;
     this.show(me);
   }
 
@@ -312,19 +387,55 @@ export class AccountBox {
     this.show(me);
   }
 
+  /** Goes to the service to add it to the account; it sends the player back to the menu. */
+  private async addService(provider: Provider): Promise<void> {
+    try {
+      const response = await fetch(new URL(`auth/${provider}/link`, location.href), {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const body = response.ok ? ((await response.json()) as { location?: unknown }) : {};
+      if (typeof body.location === "string") {
+        location.assign(body.location);
+        return;
+      }
+    } catch {
+      // Told below.
+    }
+    this.message = "failed";
+    this.show(this.me);
+  }
+
+  private async removeMethod(method: Method): Promise<void> {
+    const me = await this.request("POST", "api/me/unlink", { method }, { 409: "last" });
+    if (me) this.message = undefined;
+    this.show(me ?? this.me);
+  }
+
+  private async answerMerge(merge: boolean): Promise<void> {
+    const me = await this.request("POST", "api/me/merge", { merge });
+    this.show(me ?? this.me);
+    if (me && merge) void syncAchievements();
+  }
+
+  private button(label: string, className: string, act: () => void): HTMLButtonElement {
+    const button = h("button", { type: "button", class: className }, label);
+    button.addEventListener("click", act);
+    return button;
+  }
+
   private show(me: Me | undefined): void {
     if (!me) return;
     this.me = me;
     const { account } = me;
-    this.element.hidden = me.providers.length === 0 && !account;
+    const email = me.email === true;
+    this.element.hidden = me.providers.length === 0 && !account && !email;
     if (account) {
       this.name.value = account.name;
       this.setName(account.name);
     }
-    const signOut = h("button", { type: "button", class: "link" }, text("signOut"));
-    signOut.addEventListener("click", () => void this.signOut());
-    const remove = h("button", { type: "button", class: "link" }, text("delete"));
-    remove.addEventListener("click", () => void this.remove());
+    this.showLine(account);
     const fr = getLanguage() === "fr";
     const legal = h(
       "p",
@@ -341,39 +452,10 @@ export class AccountBox {
         text("terms"),
       ),
     );
-    const email = me.email === true && !account;
-    const status = account
-      ? h(
-          "p",
-          { class: "account-status" },
-          account.provider === "email"
-            ? text("signedInEmail")
-            : text("signedIn", PROVIDER_NAMES[account.provider]),
-          " ",
-          signOut,
-          " · ",
-          remove,
-        )
-      : h(
-          "p",
-          { class: "account-status" },
-          text("offer"),
-          " ",
-          ...me.providers.map((provider) =>
-            h(
-              "a",
-              { class: `account-sign-in ${provider}`, href: `./auth/${provider}` },
-              logo(provider),
-              h("span", {}, text("signInWith", PROVIDER_NAMES[provider])),
-            ),
-          ),
-          ...(email && !this.emailOpen && !this.linkToken ? [this.emailButton()] : []),
-        );
-    this.element.hidden = this.element.hidden && !email;
     this.element.replaceChildren(
-      status,
+      ...(account ? this.signedIn(me, account) : this.signedOut(me)),
       ...(email && this.emailOpen ? [this.emailForm()] : []),
-      ...(this.linkToken && !account ? [this.finishPrompt()] : []),
+      ...(this.linkToken ? [this.finishPrompt()] : []),
       ...(this.message
         ? [
             h(
@@ -387,8 +469,132 @@ export class AccountBox {
     );
   }
 
-  private emailButton(): HTMLButtonElement {
-    const open = h("button", { type: "button", class: "account-sign-in email" }, text("emailOpen"));
+  /** The line under the name field: a signed-in player sees how, and can sign out at once. */
+  private showLine(account: Me["account"]): void {
+    this.line.hidden = !account;
+    if (!account) {
+      this.line.replaceChildren();
+      return;
+    }
+    this.line.replaceChildren(
+      text("line", { services: methodList(methodsOf(account)) }),
+      " ",
+      this.button(text("signOut"), "secondary account-sign-out", () => void this.signOut()),
+      " ",
+      this.button(text("manage"), "link", () => {
+        this.openCard();
+      }),
+    );
+  }
+
+  private signedOut(me: Me): HTMLElement[] {
+    return [
+      h(
+        "p",
+        { class: "account-status" },
+        text("offer"),
+        " ",
+        ...me.providers.map((provider) =>
+          h(
+            "a",
+            { class: `account-sign-in ${provider}`, href: `./auth/${provider}` },
+            logo(provider),
+            h("span", {}, text("signInWith", { service: PROVIDER_NAMES[provider] })),
+          ),
+        ),
+        ...(me.email === true && !this.emailOpen && !this.linkToken
+          ? [this.emailButton(text("emailOpen"))]
+          : []),
+      ),
+    ];
+  }
+
+  private signedIn(me: Me, account: NonNullable<Me["account"]>): HTMLElement[] {
+    const methods = methodsOf(account);
+    const parts: HTMLElement[] = [
+      h(
+        "p",
+        { class: "account-status" },
+        text("signedIn", { name: account.name, services: methodList(methods) }),
+      ),
+    ];
+    if (account.merge) {
+      // The profile card opens to show the question.
+      this.openCard();
+      parts.push(
+        h(
+          "div",
+          { class: "account-merge", role: "group", "aria-label": text("mergeYes") },
+          h(
+            "p",
+            {},
+            text("mergeAsk", {
+              other: account.merge.name,
+              services: methodList(account.merge.methods),
+              name: account.name,
+            }),
+          ),
+          h(
+            "p",
+            { class: "account-actions" },
+            this.button(text("mergeYes"), "primary", () => void this.answerMerge(true)),
+            this.button(text("mergeNo"), "secondary", () => void this.answerMerge(false)),
+          ),
+        ),
+      );
+    }
+    parts.push(
+      h(
+        "p",
+        { class: "account-actions" },
+        this.button(text("signOut"), "secondary", () => void this.signOut()),
+        this.button(text("delete"), "link", () => void this.remove()),
+      ),
+    );
+    if (methods.length > 1)
+      parts.push(
+        h(
+          "p",
+          { class: "account-methods" },
+          text("methods"),
+          ...methods.flatMap((method) => [
+            " ",
+            this.button(
+              text("removeMethod", { service: methodName(method) }),
+              "link",
+              () => void this.removeMethod(method),
+            ),
+          ]),
+        ),
+      );
+    const missing = me.providers.filter((provider) => !methods.includes(provider));
+    const addEmail = me.email === true && !methods.includes("email");
+    // Older servers cannot add a way to an account: they tell no methods.
+    if (account.methods && (missing.length > 0 || addEmail))
+      parts.push(
+        h(
+          "p",
+          { class: "account-add" },
+          text("add"),
+          " ",
+          ...missing.map((provider) => {
+            const add = h(
+              "button",
+              { type: "button", class: `account-sign-in ${provider}` },
+              logo(provider),
+              h("span", {}, text("addWith", { service: PROVIDER_NAMES[provider] })),
+            );
+            add.addEventListener("click", () => void this.addService(provider));
+            return add;
+          }),
+          ...(addEmail && !this.emailOpen ? [this.emailButton(text("addEmail"))] : []),
+        ),
+      );
+    return parts;
+  }
+
+  private emailButton(label: string): HTMLButtonElement {
+    const open = h("button", { type: "button", class: "account-sign-in email" }, label);
     open.addEventListener("click", () => {
       this.emailOpen = true;
       this.message = undefined;
@@ -417,8 +623,7 @@ export class AccountBox {
   /** Finishing takes a press: a mail filter that opens links must not sign anyone in. */
   private finishPrompt(): HTMLParagraphElement {
     // In the profile card of the menu, which opens to show it.
-    const card = this.element.closest("details");
-    if (card) card.open = true;
+    this.openCard();
     const finish = h("button", { type: "button", class: "primary" }, text("finish"));
     finish.addEventListener("click", () => void this.finish());
     return h("p", { class: "account-finish" }, text("finishPrompt"), " ", finish);

@@ -69,20 +69,27 @@ export class Menu {
     });
     // Sign-in comes after the menu shows: its code is no part of the first visit.
     const account = h("div", { class: "account", hidden: true });
+    const accountLine = h("p", { class: "account-line", hidden: true });
+    const openProfile = (): void => {
+      for (const panel of this.element.querySelectorAll<HTMLDetailsElement>(".menu-panel")) {
+        panel.open = panel.id === "menu-profile";
+      }
+    };
     void import("./account.ts").then(({ AccountBox }) => {
       if (this.disposed) return;
-      const box = new AccountBox(name, (chosen) => {
-        this.setup.playerName = cleanName(chosen);
-      });
+      const box = new AccountBox(
+        name,
+        (chosen) => {
+          this.setup.playerName = cleanName(chosen);
+        },
+        openProfile,
+      );
       this.cleanups.push(box.dispose);
       account.replaceWith(box.element);
+      accountLine.replaceWith(box.line);
       // A sign-in that failed says so in the profile card: open it.
       const watch = new MutationObserver(() => {
-        if (box.element.querySelector(".account-error")) {
-          for (const panel of this.element.querySelectorAll<HTMLDetailsElement>(".menu-panel")) {
-            panel.open = panel.id === "menu-profile";
-          }
-        }
+        if (box.element.querySelector(".account-error")) openProfile();
       });
       watch.observe(box.element, { childList: true });
       this.cleanups.push(() => {
@@ -234,6 +241,7 @@ export class Menu {
         { class: "field" },
         h("label", { for: "player-name", "data-i18n": "menu.name" }),
         name,
+        accountLine,
       ),
       h(
         "details",

@@ -91,8 +91,37 @@ export interface Me {
   providers: Provider[];
   /** Whether a link can be sent by email. */
   email: boolean;
-  account: { name: string; provider: SignInMethod } | null;
+  account: {
+    name: string;
+    provider: SignInMethod;
+    /** Every way to sign in to the account, the first one first. */
+    methods: SignInMethod[];
+    /**
+     * A way the player just added that leads to another account of theirs:
+     * the two merge once the player says yes to it.
+     */
+    merge?: { name: string; methods: SignInMethod[] };
+  } | null;
 }
+
+/** A way to sign in the player added, that leads to another account: held until they say yes. */
+interface PendingMerge {
+  provider: SignInMethod;
+  subject: string;
+  /** The account named to the player: another one found there by then is not merged. */
+  holderId: string;
+  expires: number;
+}
+
+/** Time a player has to say yes to a merge. */
+const MERGE_MS = 10 * 60 * 1000;
+/** The paths of `/api/me` and under it this module answers. */
+const ME_PATHS: ReadonlySet<string> = new Set([
+  "/api/me",
+  "/api/me/achievements",
+  "/api/me/merge",
+  "/api/me/unlink",
+]);
 
 /** A sign-in link sent and not yet opened, known by the hash of its token. */
 interface PendingLink {
@@ -101,6 +130,8 @@ interface PendingLink {
   /** Name of a new account: the one the player had in the menu. */
   name: string;
   expires: number;
+  /** The account the address is added to, when a signed-in player asked for the link. */
+  linkTo?: string;
 }
 
 /** Words of the email, in the language of the page that asked for it. */
@@ -119,6 +150,19 @@ const LINK_MAIL = {
         "",
         "Frontfall",
       ].join("\n"),
+    linkSubject: "Add this address to your Frontfall account",
+    linkText: (link: string) =>
+      [
+        "Hello,",
+        "",
+        "To add this address to your Frontfall account, open this link within 15 minutes on the device where you are signed in, then press Finish:",
+        "",
+        link,
+        "",
+        "The link works once. If you did not ask for it, you can ignore this email: nothing changes without it.",
+        "",
+        "Frontfall",
+      ].join("\n"),
   },
   fr: {
     subject: "Votre lien de connexion à Frontfall",
@@ -131,6 +175,19 @@ const LINK_MAIL = {
         link,
         "",
         "Le lien ne sert qu'une fois. Si vous ne l'avez pas demandé, ignorez ce message : aucun compte n'est créé sans lui.",
+        "",
+        "Frontfall",
+      ].join("\n"),
+    linkSubject: "Ajoutez cette adresse à votre compte Frontfall",
+    linkText: (link: string) =>
+      [
+        "Bonjour,",
+        "",
+        "Pour ajouter cette adresse à votre compte Frontfall, ouvrez ce lien dans les 15 minutes sur l'appareil où vous êtes connecté, puis appuyez sur Terminer :",
+        "",
+        link,
+        "",
+        "Le lien ne sert qu'une fois. Si vous ne l'avez pas demandé, ignorez ce message : rien ne change sans lui.",
         "",
         "Frontfall",
       ].join("\n"),
@@ -189,6 +246,8 @@ export function createAuth(
   const dailyLinks = mail?.dailyLimit ?? DEFAULT_DAILY_LINKS;
   let linksToday = { day: Math.floor(now() / DAY_MS), sent: 0 };
   const pending = new Map<string, PendingLink>();
+  /** Merges waiting for the player's yes, by the id of the account signed in. */
+  const merges = new Map<string, PendingMerge>();
   const tokenHash = (token: string): string =>
     createHash("sha256").update(token).digest("base64url");
 
@@ -227,11 +286,48 @@ export function createAuth(
   }
 
   function me(account: Account | undefined): Me {
+    if (!account) return { providers, email: mail !== undefined, account: null };
+    const held = merges.get(account.id);
+    const other = held && held.expires > now() ? accounts.holder(held.subject) : undefined;
     return {
       providers,
       email: mail !== undefined,
-      account: account ? { name: account.name, provider: account.provider } : null,
+      account: {
+        name: account.name,
+        provider: account.provider,
+        methods: accounts.methods(account),
+        ...(other &&
+          other !== account && {
+            merge: { name: other.name, methods: accounts.methods(other) },
+          }),
+      },
     };
+  }
+
+  /**
+   * Adds a way to sign in to the account. One that leads to another account
+   * is held for the player's yes, and named to them by `me`.
+   */
+  function addMethod(account: Account, provider: SignInMethod, subject: string): boolean {
+    const result = accounts.link(account.id, provider, subject);
+    if (result.ok) {
+      merges.delete(account.id);
+      logger.info("sign_in_added", { provider });
+      return true;
+    }
+    if (result.error !== "other") return false;
+    merges.set(account.id, {
+      provider,
+      subject,
+      holderId: result.other.id,
+      expires: now() + MERGE_MS,
+    });
+    return true;
+  }
+
+  function session(account: Account): string {
+    const value = `${account.id}.${String(account.sessions)}.${String(now() + SESSION_MS)}`;
+    return cookie(SESSION_COOKIE, `${value}.${sign("session", value)}`, SESSION_MS);
   }
 
   /** Back to the menu, with a word for the page when the sign-in did not go through. */
@@ -245,7 +341,11 @@ export function createAuth(
       .end();
   }
 
-  function start(provider: Provider, response: ServerResponse): void {
+  /**
+   * Sends the player to the service. `linkTo`, the id of the account signed
+   * in, adds the service to that account instead of signing in with it.
+   */
+  function start(provider: Provider, response: ServerResponse, linkTo = ""): void {
     const client = options.clients[provider];
     if (!client) {
       response.writeHead(404, { "content-type": "text/plain" }).end("not found");
@@ -253,7 +353,7 @@ export function createAuth(
     }
     const state = randomBytes(16).toString("base64url");
     const verifier = randomBytes(32).toString("base64url");
-    const payload = `${provider}.${state}.${verifier}.${String(now() + SIGN_IN_MS)}`;
+    const payload = `${provider}.${state}.${verifier}.${String(now() + SIGN_IN_MS)}.${linkTo}`;
     const target = new URL(endpoints(provider).authorize);
     target.search = new URLSearchParams({
       response_type: "code",
@@ -265,15 +365,22 @@ export function createAuth(
       code_challenge_method: "S256",
       prompt: provider === "discord" ? "none" : "select_account",
     }).toString();
+    const signInCookie = cookie(
+      SIGN_IN_COOKIE,
+      `${payload}.${sign("sign-in", payload)}`,
+      SIGN_IN_MS,
+      `${cookiePath}auth/`,
+    );
+    // Adding a service is asked by the page itself, which then goes there:
+    // the page's policy allows it no form to post.
+    if (linkTo !== "") {
+      json(response, 200, { location: target.href }, [signInCookie]);
+      return;
+    }
     response
       .writeHead(302, {
         location: target.href,
-        "set-cookie": cookie(
-          SIGN_IN_COOKIE,
-          `${payload}.${sign("sign-in", payload)}`,
-          SIGN_IN_MS,
-          `${cookiePath}auth/`,
-        ),
+        "set-cookie": signInCookie,
         "cache-control": "no-store",
       })
       .end();
@@ -287,7 +394,8 @@ export function createAuth(
     const clear = cookie(SIGN_IN_COOKIE, "", 0, `${cookiePath}auth/`);
     const query = new URL(request.url ?? "/", "http://localhost").searchParams;
     const payload = verify("sign-in", readCookie(request, SIGN_IN_COOKIE));
-    const [started = "", state = "", verifier = "", expires = ""] = payload?.split(".") ?? [];
+    const [started = "", state = "", verifier = "", expires = "", linkTo = ""] =
+      payload?.split(".") ?? [];
     const client = options.clients[provider];
     // The player said no at the service: back to the menu without a fuss.
     if (query.get("error") === "access_denied") {
@@ -306,21 +414,26 @@ export function createAuth(
       home(response, [clear], true);
       return;
     }
-    let account: Account;
+    let found: { id: string; name: string };
     try {
-      const { id, name } = await identify(provider, client, code, verifier);
-      account = accounts.signIn(provider, id, name, now());
+      found = await identify(provider, client, code, verifier);
     } catch (error) {
       logger.warn("sign_in_failed", { provider, reason: (error as Error).message });
       home(response, [clear], true);
       return;
     }
-    const session = `${account.id}.${String(account.sessions)}.${String(now() + SESSION_MS)}`;
-    home(
-      response,
-      [clear, cookie(SESSION_COOKIE, `${session}.${sign("session", session)}`, SESSION_MS)],
-      false,
-    );
+    if (linkTo !== "") {
+      // Added only to the account still signed in in this browser, the one that asked.
+      const account = accountOf(request);
+      const added =
+        account?.id === linkTo &&
+        addMethod(account, provider, accounts.subject(provider, found.id));
+      if (!added) logger.warn("sign_in_failed", { provider, reason: "link" });
+      home(response, [clear], !added);
+      return;
+    }
+    const account = accounts.signIn(provider, found.id, found.name, now());
+    home(response, [clear, session(account)], false);
   }
 
   /** Trades the code for a token, then asks the service who the player is. */
@@ -478,6 +591,12 @@ export function createAuth(
         json(response, 503, { error: "busy", message: "no more links today" });
         return;
       }
+      // Asked by a signed-in player: the address joins their account.
+      const linkTo = body.link === true ? accountOf(request) : undefined;
+      if (body.link === true && !linkTo) {
+        json(response, 401, { error: "signed_out", message: "not signed in" });
+        return;
+      }
       const subject = accounts.subject("email", email);
       json(response, 202, { sent: true });
       // Held back without a word: saying so would tell that someone asked for this address.
@@ -492,11 +611,15 @@ export function createAuth(
         subject,
         name: typeof body.name === "string" ? body.name : "",
         expires: time + LINK_MS,
+        ...(linkTo && { linkTo: linkTo.id }),
       });
       const link = new URL(base);
       link.hash = `signin=${token}`;
       const words = body.language === "fr" ? LINK_MAIL.fr : LINK_MAIL.en;
-      mailer.send({ to: email, subject: words.subject, text: words.text(link.href) }).then(
+      const message = linkTo
+        ? { subject: words.linkSubject, text: words.linkText(link.href) }
+        : { subject: words.subject, text: words.text(link.href) };
+      mailer.send({ to: email, ...message }).then(
         () => {
           logger.info("sign_in_link_sent");
         },
@@ -517,11 +640,74 @@ export function createAuth(
         json(response, 400, { error: "expired", message: "this link is no longer valid" });
         return;
       }
+      if (link.linkTo !== undefined) {
+        // Finished where the account is signed in, never elsewhere: the
+        // address's owner cannot be led to give it to someone else's account.
+        const account = accountOf(request);
+        if (account?.id !== link.linkTo) {
+          json(response, 403, { error: "elsewhere", message: "open the link where you signed in" });
+          return;
+        }
+        if (addMethod(account, "email", link.subject)) json(response, 200, me(account));
+        else json(response, 500, { error: "unsaved", message: "the address could not be added" });
+        return;
+      }
       const account = accounts.signInAs("email", link.subject, link.name, now());
-      const session = `${account.id}.${String(account.sessions)}.${String(now() + SESSION_MS)}`;
-      json(response, 200, me(account), [
-        cookie(SESSION_COOKIE, `${session}.${sign("session", session)}`, SESSION_MS),
-      ]);
+      json(response, 200, me(account), [session(account)]);
+    });
+  }
+
+  /** Merges the account the player added a way to, or lets it be, as they answer. */
+  function answerMerge(account: Account, request: IncomingMessage, response: ServerResponse): void {
+    readJson(request, response, MAX_BODY_BYTES, ({ merge }) => {
+      const held = merges.get(account.id);
+      merges.delete(account.id);
+      if (
+        merge !== true ||
+        !held ||
+        held.expires <= now() ||
+        accounts.holder(held.subject)?.id !== held.holderId
+      ) {
+        json(response, 200, me(account));
+        return;
+      }
+      const result = accounts.link(account.id, held.provider, held.subject, true);
+      if (!result.ok) {
+        json(response, 500, { error: "unsaved", message: "the accounts could not be merged" });
+        return;
+      }
+      if (result.merged)
+        logger.info("accounts_merged", {
+          account: account.id,
+          merged: result.merged.id,
+          provider: held.provider,
+        });
+      json(response, 200, me(account));
+    });
+  }
+
+  /** Takes a way to sign in off the account, as long as another one is left. */
+  function removeMethod(
+    account: Account,
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): void {
+    readJson(request, response, MAX_BODY_BYTES, ({ method }) => {
+      if (typeof method !== "string" || (method !== "email" && !isProvider(method))) {
+        json(response, 400, { error: "invalid", message: "a way to sign in is expected" });
+        return;
+      }
+      const result = accounts.unlink(account.id, method);
+      if (!result.ok) {
+        json(
+          response,
+          result.error === "last" ? 409 : result.error === "unsaved" ? 500 : 400,
+          result,
+        );
+        return;
+      }
+      logger.info("sign_in_removed", { provider: method });
+      json(response, 200, me(account));
     });
   }
 
@@ -531,8 +717,7 @@ export function createAuth(
     path: string,
     address: string,
   ): boolean {
-    if (path !== "/api/me" && path !== "/api/me/achievements" && !path.startsWith("/auth/"))
-      return false;
+    if (!ME_PATHS.has(path) && !path.startsWith("/auth/")) return false;
     if (!rate.take(address, now())) {
       response.writeHead(429, { "content-type": "text/plain", "retry-after": "6" }).end();
       return true;
@@ -561,20 +746,34 @@ export function createAuth(
       }
       return true;
     }
-    if (path === "/api/me/achievements") {
+    if (path === "/api/me/achievements" || path === "/api/me/merge" || path === "/api/me/unlink") {
       if (method !== "POST" || !sameSite(request)) {
         response.writeHead(method === "POST" ? 403 : 405, { allow: "POST" }).end();
         return true;
       }
       const account = accountOf(request);
-      if (account) syncAchievements(account, request, response);
-      else json(response, 401, { error: "signed_out", message: "not signed in" });
+      if (!account) json(response, 401, { error: "signed_out", message: "not signed in" });
+      else if (path === "/api/me/achievements") syncAchievements(account, request, response);
+      else if (path === "/api/me/merge") answerMerge(account, request, response);
+      else removeMethod(account, request, response);
       return true;
     }
-    const signIn = /^\/auth\/([a-z]+)(\/callback)?$/.exec(path);
+    const signIn = /^\/auth\/([a-z]+)(\/callback|\/link)?$/.exec(path);
     if (signIn) {
       const provider = signIn[1] ?? "";
-      if (method !== "GET" || !isProvider(provider)) {
+      if (!isProvider(provider)) {
+        response.writeHead(404, { "content-type": "text/plain" }).end("not found");
+      } else if (signIn[2] === "/link") {
+        // A form of the game's page, never a link another site could lead to.
+        const account = accountOf(request);
+        if (method !== "POST" || !sameSite(request)) {
+          response.writeHead(method === "POST" ? 403 : 405, { allow: "POST" }).end();
+        } else if (!account) {
+          json(response, 401, { error: "signed_out", message: "not signed in" });
+        } else {
+          start(provider, response, account.id);
+        }
+      } else if (method !== "GET") {
         response.writeHead(404, { "content-type": "text/plain" }).end("not found");
       } else if (signIn[2]) {
         void finish(provider, request, response);

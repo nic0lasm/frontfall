@@ -180,7 +180,7 @@ describe("sign-in", () => {
     expect(await (await me(base, session)).json()).toEqual({
       providers: ["discord"],
       email: false,
-      account: { name: "Nelly", provider: "discord" },
+      account: { name: "Nelly", provider: "discord", methods: ["discord"] },
     });
   });
 
