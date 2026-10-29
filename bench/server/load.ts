@@ -1,14 +1,13 @@
 import type { Summary } from "../engine/stats.ts";
-import { GameStats, LoadClient, TURN_MS } from "./client.ts";
-import { Histogram } from "./histogram.ts";
+import { GameStats, LoadClient, TURN_MS, type GameData } from "./client.ts";
+import { Histogram, type HistogramData } from "./histogram.ts";
 import { LoopDelay, type LoopDelaySummary } from "./loop-delay.ts";
 
-export interface LoadOptions {
+/** How the clients play, whatever process runs them. */
+export interface SessionOptions {
   /** WebSocket endpoint, such as ws://localhost:8080/ws. */
   url: string;
-  games: number;
   players: number;
-  durationMs: number;
   /**
    * Private games are created by one client and joined by id, then started
    * by their creator. Public games are filled by the server's matchmaking,
@@ -19,9 +18,42 @@ export interface LoadOptions {
   orderIntervalMs: number;
   /** Orders target random tiles below this index. */
   mapTiles: number;
+  /** Share of the clients, in %, that stop reading their socket once their game starts. */
+  slowPercent?: number;
+}
+
+export interface LoadOptions extends SessionOptions {
+  games: number;
+  durationMs: number;
   /** Progress lines, every `progressMs` while the games run. */
   log?: (line: string) => void;
   progressMs?: number;
+}
+
+/** What a set of clients measured, as plain JSON: samples of several processes add up. */
+export interface LoadSample {
+  games: GameData[];
+  clients: number;
+  slowClients: number;
+  /** Time to join and start the games added last, in ms. */
+  connectMs: number;
+  /** Event loop delay of the process running the clients; the worst process when merged. */
+  clientLoopDelay: LoopDelaySummary;
+}
+
+export interface RejoinSample {
+  clients: number;
+  failures: number;
+  /** `rejoin` answered `token_in_use` and sent again. */
+  retries: number;
+  catchUp: HistogramData;
+  /** The first failure, if any. */
+  error: string | undefined;
+}
+
+export interface TurnRange {
+  min: number;
+  max: number;
 }
 
 export interface GameReport {
@@ -30,11 +62,12 @@ export interface GameReport {
   minTurns: number;
   maxTurns: number;
   outOfOrder: number;
+  changedTurns: number;
   desyncs: number;
   ordersSent: number;
   ordersSeen: number;
-  /** Time between consecutive turns on one client, in ms. */
-  interval: Summary;
+  /** Time between consecutive turns on one client, in ms; undefined when no client measured any. */
+  interval: Summary | undefined;
   /** Order sent to turn received, in ms; undefined when no order came back. */
   orderLatency: Summary | undefined;
 }
@@ -47,130 +80,296 @@ export interface LoadReport {
   connectMs: number;
   /** Event loop delay of the process running the clients, in ms: high values skew the rest. */
   clientLoopDelay: LoopDelaySummary;
+  clients: number;
+  slowClients: number;
 }
 
-/** Joins every client to a game and starts it; resolves once every client has `started`. */
-async function startGames(
-  options: LoadOptions,
-  statsFor: (game: string) => GameStats,
-): Promise<LoadClient[]> {
-  let next = 0;
-  const connect = () => {
-    const index = next++;
-    return LoadClient.connect({
-      url: options.url,
-      name: `Load ${String(index)}`,
-      address: `10.${String((index >> 16) & 255)}.${String((index >> 8) & 255)}.${String(index & 255)}`,
-      statsFor,
-    });
-  };
+export interface RejoinReport {
+  clients: number;
+  failures: number;
+  retries: number;
+  /** From the drop to holding the current turn, in ms. */
+  catchUp: Summary | undefined;
+  error: string | undefined;
+}
 
-  if (options.mode === "public") {
-    const clients = await Promise.all(
-      Array.from({ length: options.games * options.players }, async () => {
-        const client = await connect();
-        client.send({ type: "play" });
-        return client;
-      }),
-    );
-    // Public games count down 30 s by default once they have two players.
-    await Promise.all(clients.map((client) => client.next("started", 120_000)));
-    return clients;
+/**
+ * Whether the client with this index stops reading: spreads `percent` % of
+ * the clients evenly over the games.
+ */
+export function isSlow(index: number, percent: number): boolean {
+  return Math.floor(((index + 1) * percent) / 100) > Math.floor((index * percent) / 100);
+}
+
+/** The clients of one process: joins games, plays them, measures what they receive. */
+export class LoadSession {
+  private readonly stats = new Map<string, GameStats>();
+  private readonly clients: LoadClient[] = [];
+  private readonly loopDelay = new LoopDelay();
+  private connectMs = 0;
+
+  constructor(private readonly options: SessionOptions) {}
+
+  /**
+   * Joins the clients of these games, numbered across every process so that
+   * names and addresses never repeat, starts the games and plays them.
+   */
+  async add(games: readonly number[]): Promise<number> {
+    const start = performance.now();
+    const clients = await this.startGames(games);
+    for (const { client, index } of clients) {
+      client.play(this.options.orderIntervalMs, this.options.mapTiles);
+      if (isSlow(index, this.options.slowPercent ?? 0)) client.stall();
+      this.clients.push(client);
+    }
+    this.connectMs = performance.now() - start;
+    return this.connectMs;
   }
 
-  const games = await Promise.all(
-    Array.from({ length: options.games }, async () => {
-      const host = await connect();
-      host.send({ type: "create" });
-      const { game } = await host.next("lobby");
-      const guests = await Promise.all(
-        Array.from({ length: options.players - 1 }, async () => {
-          const guest = await connect();
-          guest.send({ type: "join", game });
-          await guest.next("lobby");
-          return guest;
-        }),
-      );
-      while ((await host.next("lobby")).players.length < options.players);
-      host.send({ type: "start" });
-      const clients = [host, ...guests];
-      await Promise.all(clients.map((client) => client.next("started")));
-      return clients;
-    }),
-  );
-  return games.flat();
-}
+  progress(): TurnRange {
+    const turns = this.clients.filter((client) => !client.stalled).map((client) => client.turns);
+    return { min: Math.min(...turns), max: Math.max(...turns) };
+  }
 
-/** Plays the games for the given duration and reports what every client saw. */
-export async function runLoad(options: LoadOptions): Promise<LoadReport> {
-  const stats = new Map<string, GameStats>();
-  const statsFor = (game: string): GameStats => {
-    let found = stats.get(game);
+  /** Measures since the previous sample; histograms and loop delay start again empty. */
+  sample(): LoadSample {
+    const sample: LoadSample = {
+      games: [...this.stats.values()].map((game) => game.take()),
+      clients: this.clients.length,
+      slowClients: this.clients.filter((client) => client.stalled).length,
+      connectMs: this.connectMs,
+      clientLoopDelay: this.loopDelay.summary(),
+    };
+    this.loopDelay.reset();
+    return sample;
+  }
+
+  /** Every client that still reads drops its socket at once, then rejoins. */
+  async rejoinStorm(fromZero: boolean): Promise<RejoinSample> {
+    const catchUp = new Histogram();
+    let failures = 0;
+    let retries = 0;
+    let error: string | undefined;
+    const readers = this.clients.filter((client) => !client.stalled);
+    await Promise.all(
+      readers.map(async (client) => {
+        try {
+          const result = await client.rejoin(fromZero);
+          catchUp.record(result.caughtUpMs);
+          retries += result.retries;
+        } catch (cause) {
+          failures++;
+          error ??= cause instanceof Error ? cause.message : String(cause);
+        }
+      }),
+    );
+    return { clients: readers.length, failures, retries, catchUp: catchUp.toData(), error };
+  }
+
+  /** Stops every client at the same instant and returns the last sample. */
+  stop(): LoadSample {
+    // Taken first: the pass below blocks the loop on purpose.
+    const clientLoopDelay = this.loopDelay.summary();
+    this.loopDelay.stop();
+    // One synchronous pass, so every client's turn count is taken at the same instant.
+    for (const client of this.clients) client.stop();
+    return { ...this.sample(), clientLoopDelay };
+  }
+
+  private statsFor = (game: string): GameStats => {
+    let found = this.stats.get(game);
     if (!found) {
       found = new GameStats(game);
-      stats.set(game, found);
+      this.stats.set(game, found);
     }
     return found;
   };
 
-  const connectStart = performance.now();
-  const clients = await startGames(options, statsFor);
-  const connectMs = performance.now() - connectStart;
+  private connect(index: number): Promise<LoadClient> {
+    return LoadClient.connect({
+      url: this.options.url,
+      name: `Load ${String(index)}`,
+      address: `10.${String((index >> 16) & 255)}.${String((index >> 8) & 255)}.${String(index & 255)}`,
+      statsFor: this.statsFor,
+    });
+  }
 
-  const loopDelay = new LoopDelay();
-  for (const client of clients) client.play(options.orderIntervalMs, options.mapTiles);
-  const runStart = performance.now();
-  const progress = setInterval(() => {
-    const turns = clients.map((client) => client.turns);
-    const seconds = Math.round((performance.now() - runStart) / 1000);
-    options.log?.(
-      `${String(seconds)} s: ${String(Math.min(...turns))} to ${String(Math.max(...turns))} turns per client`,
+  /** Resolves once every client has `started`. */
+  private async startGames(
+    games: readonly number[],
+  ): Promise<{ client: LoadClient; index: number }[]> {
+    const { players } = this.options;
+    if (this.options.mode === "public") {
+      const clients = await Promise.all(
+        games.flatMap((game) =>
+          Array.from({ length: players }, async (_, seat) => {
+            const index = game * players + seat;
+            const client = await this.connect(index);
+            client.send({ type: "play" });
+            return { client, index };
+          }),
+        ),
+      );
+      // Public games count down 30 s by default once they have two players.
+      await Promise.all(clients.map(({ client }) => client.next("started", 120_000)));
+      return clients;
+    }
+
+    const started = await Promise.all(
+      games.map(async (game) => {
+        const first = game * players;
+        const host = await this.connect(first);
+        host.send({ type: "create" });
+        const { game: id } = await host.next("lobby");
+        const guests = await Promise.all(
+          Array.from({ length: players - 1 }, async (_, seat) => {
+            const guest = await this.connect(first + 1 + seat);
+            guest.send({ type: "join", game: id });
+            await guest.lobbyOrStarted();
+            return guest;
+          }),
+        );
+        for (;;) {
+          const lobby = await host.lobbyOrStarted();
+          if (!lobby) break;
+          if (lobby.players.length < players) continue;
+          // A game set to start when full starts by itself.
+          if (!lobby.autoStart || players < lobby.capacity) host.send({ type: "start" });
+          break;
+        }
+        const clients = [host, ...guests];
+        await Promise.all(clients.map((client) => client.next("started")));
+        return clients.map((client, seat) => ({ client, index: first + seat }));
+      }),
     );
-  }, options.progressMs ?? 30_000);
-  await new Promise((resolve) => setTimeout(resolve, options.durationMs));
-  clearInterval(progress);
-  loopDelay.stop();
-  // One synchronous pass, so every client's turn count is taken at the same instant.
-  for (const client of clients) client.stop();
+    return started.flat();
+  }
+}
 
-  const games = [...stats.values()].map((game): GameReport => {
+/** Adds up the samples of several processes; a game split between them is merged by id. */
+export function mergeSamples(samples: readonly LoadSample[]): LoadSample {
+  const games = new Map<string, GameData>();
+  for (const sample of samples) {
+    for (const game of sample.games) {
+      const found = games.get(game.id);
+      if (!found) {
+        games.set(game.id, game);
+        continue;
+      }
+      const intervals = Histogram.fromData(found.intervals);
+      intervals.add(Histogram.fromData(game.intervals));
+      const latency = Histogram.fromData(found.orderLatency);
+      latency.add(Histogram.fromData(game.orderLatency));
+      games.set(game.id, {
+        id: game.id,
+        intervals: intervals.toData(),
+        orderLatency: latency.toData(),
+        outOfOrder: found.outOfOrder + game.outOfOrder,
+        changedTurns: found.changedTurns + game.changedTurns,
+        desyncs: found.desyncs + game.desyncs,
+        ordersSent: found.ordersSent + game.ordersSent,
+        ordersSeen: found.ordersSeen + game.ordersSeen,
+        turnsPerClient: [...found.turnsPerClient, ...game.turnsPerClient],
+      });
+    }
+  }
+  return {
+    games: [...games.values()],
+    clients: samples.reduce((sum, sample) => sum + sample.clients, 0),
+    slowClients: samples.reduce((sum, sample) => sum + sample.slowClients, 0),
+    connectMs: Math.max(0, ...samples.map((sample) => sample.connectMs)),
+    clientLoopDelay: {
+      p99: Math.max(0, ...samples.map((sample) => sample.clientLoopDelay.p99)),
+      max: Math.max(0, ...samples.map((sample) => sample.clientLoopDelay.max)),
+    },
+  };
+}
+
+export function mergeRejoins(samples: readonly RejoinSample[]): RejoinSample {
+  const catchUp = new Histogram();
+  for (const sample of samples) catchUp.add(Histogram.fromData(sample.catchUp));
+  return {
+    clients: samples.reduce((sum, sample) => sum + sample.clients, 0),
+    failures: samples.reduce((sum, sample) => sum + sample.failures, 0),
+    retries: samples.reduce((sum, sample) => sum + sample.retries, 0),
+    catchUp: catchUp.toData(),
+    error: samples.find((sample) => sample.error !== undefined)?.error,
+  };
+}
+
+const summaryOf = (data: HistogramData): Summary | undefined =>
+  data.count > 0 ? Histogram.fromData(data).summary() : undefined;
+
+export function summarizeRejoin(sample: RejoinSample): RejoinReport {
+  return {
+    clients: sample.clients,
+    failures: sample.failures,
+    retries: sample.retries,
+    catchUp: summaryOf(sample.catchUp),
+    error: sample.error,
+  };
+}
+
+/** Percentiles of a sample. */
+export function summarizeLoad(sample: LoadSample): LoadReport {
+  const intervals = new Histogram();
+  const latency = new Histogram();
+  const games = sample.games.map((game): GameReport => {
     const turns = game.turnsPerClient;
+    intervals.add(Histogram.fromData(game.intervals));
+    latency.add(Histogram.fromData(game.orderLatency));
     return {
       id: game.id,
       players: turns.length,
-      minTurns: Math.min(...turns),
-      maxTurns: Math.max(...turns),
+      minTurns: turns.length > 0 ? Math.min(...turns) : 0,
+      maxTurns: turns.length > 0 ? Math.max(...turns) : 0,
       outOfOrder: game.outOfOrder,
+      changedTurns: game.changedTurns,
       desyncs: game.desyncs,
       ordersSent: game.ordersSent,
       ordersSeen: game.ordersSeen,
-      interval: game.intervals.summary(),
-      orderLatency: game.orderLatency.samples > 0 ? game.orderLatency.summary() : undefined,
+      interval: summaryOf(game.intervals),
+      orderLatency: summaryOf(game.orderLatency),
     };
   });
-  const intervals = new Histogram();
-  const latency = new Histogram();
-  for (const game of stats.values()) {
-    intervals.add(game.intervals);
-    latency.add(game.orderLatency);
-  }
   return {
     games,
     interval: intervals.summary(),
     orderLatency: latency.samples > 0 ? latency.summary() : undefined,
-    connectMs,
-    clientLoopDelay: loopDelay.summary(),
+    connectMs: sample.connectMs,
+    clientLoopDelay: sample.clientLoopDelay,
+    clients: sample.clients,
+    slowClients: sample.slowClients,
   };
 }
 
+/** Plays the games for the given duration in this process and reports what every client saw. */
+export async function runLoad(options: LoadOptions): Promise<LoadReport> {
+  const session = new LoadSession(options);
+  await session.add(Array.from({ length: options.games }, (_, game) => game));
+  session.sample();
+  const runStart = performance.now();
+  const progress = setInterval(() => {
+    const turns = session.progress();
+    const seconds = Math.round((performance.now() - runStart) / 1000);
+    options.log?.(
+      `${String(seconds)} s: ${String(turns.min)} to ${String(turns.max)} turns per client`,
+    );
+  }, options.progressMs ?? 30_000);
+  await new Promise((resolve) => setTimeout(resolve, options.durationMs));
+  clearInterval(progress);
+  return summarizeLoad(session.stop());
+}
+
 const ms = (value: number): string => value.toFixed(1);
-const late = (value: number): string => `${value >= TURN_MS ? "+" : ""}${ms(value - TURN_MS)}`;
+export const late = (value: number): string =>
+  `${value >= TURN_MS ? "+" : ""}${ms(value - TURN_MS)}`;
 
 /** The report as Markdown tables, lateness counted against the 100 ms turn. */
 export function formatReport(report: LoadReport): string {
   const lines = [
-    "| Game | Players | Turns | Out of order | Desyncs | Orders sent / seen | Lateness p50 | p95 | max | Order latency p50 / p95 |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Game | Players | Turns | Out of order | Changed | Desyncs | Orders sent / seen | Lateness p50 | p95 | max | Order latency p50 / p95 |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
   for (const game of report.games) {
     const turns =
@@ -180,8 +379,11 @@ export function formatReport(report: LoadReport): string {
     const latency = game.orderLatency
       ? `${ms(game.orderLatency.p50)} / ${ms(game.orderLatency.p95)} ms`
       : "–";
+    const lateness = game.interval
+      ? `${late(game.interval.p50)} ms | ${late(game.interval.p95)} ms | ${late(game.interval.max)} ms`
+      : "– | – | –";
     lines.push(
-      `| ${game.id} | ${String(game.players)} | ${turns} | ${String(game.outOfOrder)} | ${String(game.desyncs)} | ${String(game.ordersSent)} / ${String(game.ordersSeen)} | ${late(game.interval.p50)} ms | ${late(game.interval.p95)} ms | ${late(game.interval.max)} ms | ${latency} |`,
+      `| ${game.id} | ${String(game.players)} | ${turns} | ${String(game.outOfOrder)} | ${String(game.changedTurns)} | ${String(game.desyncs)} | ${String(game.ordersSent)} / ${String(game.ordersSeen)} | ${lateness} | ${latency} |`,
     );
   }
   const { interval, orderLatency } = report;
@@ -194,8 +396,22 @@ export function formatReport(report: LoadReport): string {
       `Order to turn: p50 ${ms(orderLatency.p50)} ms, p95 ${ms(orderLatency.p95)} ms, max ${ms(orderLatency.max)} ms.`,
     );
   }
+  if (report.slowClients > 0) {
+    lines.push(
+      `${String(report.slowClients)} of ${String(report.clients)} clients stopped reading their socket and are left out of the turns above.`,
+    );
+  }
   lines.push(
     `Joining and starting every game took ${ms(report.connectMs)} ms. Client event loop delay: p99 ${ms(report.clientLoopDelay.p99)} ms, max ${ms(report.clientLoopDelay.max)} ms.`,
   );
   return lines.join("\n");
+}
+
+export function formatRejoin(report: RejoinReport, fromZero: boolean): string {
+  const catchUp = report.catchUp
+    ? `caught up p50 ${ms(report.catchUp.p50)} ms, p95 ${ms(report.catchUp.p95)} ms, max ${ms(report.catchUp.max)} ms`
+    : "none caught up";
+  const failed =
+    report.failures > 0 ? `, ${String(report.failures)} failed (${report.error ?? "?"})` : "";
+  return `Rejoin storm${fromZero ? " from tick 0" : ""}: ${String(report.clients)} clients dropped and rejoined, ${catchUp}, ${String(report.retries)} token_in_use retries${failed}.`;
 }
