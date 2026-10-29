@@ -101,8 +101,21 @@ export class LocalSession implements GameSession {
     else this.post({ type: "order", order });
   }
 
-  click(tile: number, ratio: number, mode: ClickMode = "attack", reach?: number): void {
-    this.post({ type: "click", tile, ratio, mode, ...(reach === undefined ? {} : { reach }) });
+  click(
+    tile: number,
+    ratio: number,
+    mode: ClickMode = "attack",
+    reach?: number,
+    seen?: number,
+  ): void {
+    this.post({
+      type: "click",
+      tile,
+      ratio,
+      mode,
+      ...(reach === undefined ? {} : { reach }),
+      ...(seen === undefined ? {} : { seen }),
+    });
   }
 
   peek(tile: number, mode: ClickMode, reach?: number): void {

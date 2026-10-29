@@ -64,7 +64,7 @@ export type WorkerRequest =
   | { type: "turns"; turns: Turn[] }
   | { type: "order"; order: Order }
   /** A click on the map, turned into an order by the worker, which knows the game. */
-  | { type: "click"; tile: number; ratio: number; mode: ClickMode; reach?: number }
+  | { type: "click"; tile: number; ratio: number; mode: ClickMode; reach?: number; seen?: number }
   /** What a click would do, without doing it: answered by a `peek` with the same `seq`. */
   | { type: "peek"; seq: number; tile: number; mode: ClickMode; reach?: number }
   | { type: "pause"; paused: boolean }

@@ -189,7 +189,13 @@ scope.onmessage = (event) => {
       break;
     case "click": {
       if (!game) break;
-      const result = game.orderForClick(request.tile, request.ratio, request.mode, request.reach);
+      const result = game.orderForClick(
+        request.tile,
+        request.ratio,
+        request.mode,
+        request.reach,
+        request.seen,
+      );
       if ("order" in result) {
         if (online) {
           scope.postMessage({

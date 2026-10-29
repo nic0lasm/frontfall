@@ -108,6 +108,7 @@ export function orderForClick(
   ratio: number,
   mode: ClickMode = "attack",
   reach = PORT_REACH,
+  seen?: number,
 ): ClickResult {
   const { terrain, territory } = game;
   const human = game.player(you);
@@ -146,7 +147,15 @@ export function orderForClick(
     return { refused: isBuildError(error) ? BUILD_REFUSALS[error] : "terrain" };
   }
   if (game.phase === "spawn") return { order: { type: "spawn", tile } };
-  if (territory.ownerOf(tile) === you) return { refused: "own" };
+  if (territory.ownerOf(tile) === you) {
+    // The screen runs a little behind the game: the tile shown as someone
+    // else's may have just fallen to the player. The click was meant for that
+    // holder, so it aims at the closest land still theirs.
+    const stale = seen !== undefined && seen !== you ? staleTarget(game, tile, seen) : undefined;
+    return stale === undefined
+      ? { refused: "own" }
+      : orderForClick(game, you, stale, ratio, mode, reach);
+  }
   // R-ECO-07: the ratio is a share of the soldiers; workers stay at home.
   const troops = Math.floor((soldiers(human) * Math.min(100, Math.max(0, ratio))) / 100);
   if (troops < 1) return { refused: "troops" };
@@ -182,6 +191,26 @@ export function orderForClick(
     return { order: { type: "embark", target: landing, troops } };
   }
   return { refused: "unreachable" };
+}
+
+/** How far from a click that fell to the player the land still held by the owner shown is looked for. */
+const STALE_REACH = 3;
+
+/** The land of `owner` closest to `tile`, within `STALE_REACH`. */
+function staleTarget(game: Game, tile: number, owner: number): number | undefined {
+  const { terrain, territory } = game;
+  const topology = terrain.topology;
+  let best: number | undefined;
+  let distance = Infinity;
+  for (const near of topology.tilesWithin(tile, STALE_REACH)) {
+    if (!terrain.isOwnable(near) || territory.ownerOf(near) !== owner) continue;
+    const d = topology.squaredDistance(near, tile);
+    if (d < distance) {
+      distance = d;
+      best = near;
+    }
+  }
+  return best;
 }
 
 /** Coast tiles not the player's within `reach` of the click and passing `accept`, closest first. */

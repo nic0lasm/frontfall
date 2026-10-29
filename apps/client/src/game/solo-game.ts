@@ -152,8 +152,9 @@ export class SoloGame {
     ratio: number,
     mode: ClickMode = "attack",
     reach?: number,
+    seen?: number,
   ): ClickResult {
-    return orderForClick(this.game, this.you, tile, ratio, mode, reach);
+    return orderForClick(this.game, this.you, tile, ratio, mode, reach, seen);
   }
 
   /** What a click in a build mode would do, without doing it. */

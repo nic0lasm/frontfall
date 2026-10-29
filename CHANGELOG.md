@@ -50,6 +50,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **A tutorial you reload comes back.** Reloading the page a few seconds into a solo game or the tutorial now takes you back into it, where it was kept after only three seconds of play instead of fifteen.
 - **The music slider starts at 35 %.** It showed 40 % because its steps were too coarse; it now moves in steps of 5.
 
+### Fixed
+
+- **No more "This land is already yours" on an enemy.** When your attack took a tile a moment before you clicked it, the click was refused although the map still showed the enemy there. It now goes at the enemy's land right beside it.
+
 ### Security
 
 - **Names that only look like someone else's are refused.** A player name can no longer pass for a staff name with look-alike letters from another alphabet, full-width letters or accents, be invisible, or pile up stacked accents. In a game, and against an account's name, two names that read the same count as one: the second player gets a number after it.

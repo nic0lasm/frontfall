@@ -32,11 +32,11 @@ export class Orders {
   }
 
   /** A click on the map, which the game reads by its mode; whether it went out. */
-  click(tile: number, mode: ClickMode, reach: number): boolean {
+  click(tile: number, mode: ClickMode, reach: number, seen?: number): boolean {
     const update = this.state.latest();
     if (!update || !this.clickable) return false;
     this.ordered(update);
-    this.session.click(tile, this.state.ratio(), mode, reach);
+    this.session.click(tile, this.state.ratio(), mode, reach, seen);
     return true;
   }
 

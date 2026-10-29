@@ -712,7 +712,7 @@ export class GameScreen {
 
   private commit(tile: number, finger: boolean): void {
     const reach = aimReach(this.scene.camera.scale, finger);
-    if (!this.orders.click(tile, this.mode, reach)) {
+    if (!this.orders.click(tile, this.mode, reach, this.scene.ownerAt(tile))) {
       this.marks.unpress(performance.now());
       return;
     }

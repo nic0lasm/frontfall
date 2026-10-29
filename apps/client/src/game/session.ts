@@ -39,8 +39,9 @@ export interface GameSession {
    * A click on the map, with the attack ratio in percent and the HUD's mode;
    * the session picks the order. `reach`: tiles around the click that still
    * count as aiming at the coast or the sea, from the zoom (aimReach).
+   * `seen`: who held the tile on the screen, which may be a tick behind.
    */
-  click(tile: number, ratio: number, mode?: ClickMode, reach?: number): void;
+  click(tile: number, ratio: number, mode?: ClickMode, reach?: number, seen?: number): void;
   /** Asks what a click in a build mode would do, without doing it: answered by `onPeek`. */
   peek(tile: number, mode: ClickMode, reach?: number): void;
   /** Solo only: online games never pause. */

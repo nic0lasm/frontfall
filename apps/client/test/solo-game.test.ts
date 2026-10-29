@@ -184,6 +184,28 @@ describe("SoloGame clicks", () => {
     });
   });
 
+  it("aims a click at the holder shown when the tile has just fallen to the player", () => {
+    const solo = newGame({ ...options, bots: 1 });
+    const { terrain, territory } = solo.game;
+    let update = solo.step([]);
+    while (update.phase === "spawn") update = solo.step([]);
+    const bot = solo.game.player(2);
+    const shown = [...terrain.kinds.keys()].find(
+      (tile) => terrain.isOwnable(tile) && territory.ownerOf(tile) === bot?.id,
+    );
+    if (shown === undefined) throw new Error("the bot holds no land");
+    // The screen still shows the bot's flag here; the game has it as the player's already.
+    territory.setOwner(shown, HUMAN_ID);
+    expect(solo.orderForClick(shown, 30, "attack")).toEqual({ refused: "own" });
+    expect(solo.orderForClick(shown, 30, "attack", undefined, HUMAN_ID)).toEqual({
+      refused: "own",
+    });
+    const click = solo.orderForClick(shown, 30, "attack", undefined, bot?.id);
+    if (!("order" in click) || click.order.type !== "attack") throw new Error("refused");
+    expect(territory.ownerOf(click.order.target)).toBe(bot?.id);
+    expect(click.order.target).not.toBe(shown);
+  });
+
   it("launches a missile from a loaded silo, shows it in flight, then the fallout (R-UNIT-05, R-UNIT-06)", () => {
     const solo = newGame({ ...options, bots: 1 });
     const { terrain, territory } = solo.game;

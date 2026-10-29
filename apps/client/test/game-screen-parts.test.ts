@@ -179,9 +179,9 @@ describe("orders", () => {
 
   it("lets clicks go out in the spawn phase, but neither diplomacy nor the usage report", () => {
     const { orders, sent, firstOrders } = setup({ phase: "spawn", players: [] });
-    expect(orders.click(3, "attack", 1)).toBe(true);
+    expect(orders.click(3, "attack", 1, 2)).toBe(true);
     expect(orders.diplomatic("ally", 2)).toBe(false);
-    expect(sent).toEqual([["click", 3, 50, "attack", 1]]);
+    expect(sent).toEqual([["click", 3, 50, "attack", 1, 2]]);
     expect(firstOrders).toEqual([]);
   });
 
