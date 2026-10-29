@@ -80,6 +80,7 @@ function update(changes: Partial<GameUpdate> & { tiles?: number } = {}): GameUpd
       embargoedBy: [],
       atWar: [],
       quickIn: 0,
+      moods: [],
     },
     events: [],
     ...rest,

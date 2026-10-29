@@ -284,8 +284,20 @@ export function sail(
  * two of them hold less than B-WIN-SHARE of the land together and it has
  * fewer than `max` allies. In a team game, each side's land is its whole
  * team's, and teammates count among its allies.
+ *
+ * A nation passes `judge` to weigh the size of the other side with what it
+ * remembers of them (R-BOT-23), and `refused` to hear of each request it
+ * turns down.
  */
-export function answerAlliances(game: Game, bot: Player, sizePercent: number, max: number): void {
+export function answerAlliances(
+  game: Game,
+  bot: Player,
+  sizePercent: number,
+  max: number,
+  judge: (other: number, theirs: number, ours: number) => boolean = (_, theirs, ours) =>
+    theirs * 100 < ours * sizePercent,
+  refused?: (from: number, expiresAt: number) => void,
+): void {
   const { territory, terrain, balance } = game;
   // Attacks either way, and ships of theirs sailing for the bot's coast.
   const fighting = (other: number) =>
@@ -309,9 +321,7 @@ export function answerAlliances(game: Game, bot: Player, sizePercent: number, ma
   const worth = (other: number) => {
     const theirs = game.teams > 0 ? sideLand(other) : territory.tileCount(other);
     const traitor = isTraitor(game, game.player(other) as Player);
-    return (
-      theirs * 100 < ours * sizePercent && ours + theirs < room && !fighting(other) && !traitor
-    );
+    return judge(other, theirs, ours) && ours + theirs < room && !fighting(other) && !traitor;
   };
   let teammates = 0;
   for (const player of game.players()) {
@@ -326,7 +336,9 @@ export function answerAlliances(game: Game, bot: Player, sizePercent: number, ma
   }
   // Oldest request first, the same on every client.
   for (const request of [...game.allianceRequests]) {
-    if (request.to !== bot.id || alliesOf(game, bot.id).length + teammates >= max) continue;
-    if (worth(request.from)) game.apply(bot.id, { type: "ally", target: request.from });
+    if (request.to !== bot.id) continue;
+    if (alliesOf(game, bot.id).length + teammates < max && worth(request.from)) {
+      game.apply(bot.id, { type: "ally", target: request.from });
+    } else refused?.(request.from, request.expiresAt);
   }
 }

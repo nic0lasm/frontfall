@@ -14,3 +14,4 @@ export {
   type BotParameters,
   type NationParameters,
 } from "./difficulty.ts";
+export { nationMood, type Mood } from "./relations.ts";

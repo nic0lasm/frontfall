@@ -27,6 +27,7 @@ function update(patch: Partial<GameUpdate> = {}): GameUpdate {
       embargoedBy: [],
       atWar: [],
       quickIn: 0,
+      moods: [],
     },
     ...patch,
   } as unknown as GameUpdate;
@@ -241,6 +242,12 @@ describe("player card", () => {
     expect(relation(allied, 2, rules)).toBe(
       "Your ally · 25 s left · Traitor · 5 s · Under your embargo",
     );
+  });
+
+  it("tells how a nation feels about you, unless it is neutral (R-BOT-20)", () => {
+    const base = update();
+    const wary = update({ diplomacy: { ...base.diplomacy, moods: [{ id: 3, mood: "wary" }] } });
+    expect(relation(wary, 3, rules)).toBe("A nation, not allied with you · Wary of you");
   });
 
   it("gives troops out of their cap, gold and the share of the map", () => {

@@ -44,6 +44,12 @@ export interface NationParameters {
   huntPercent: number;
   /** B-NATION-MISSILE-PAUSE, in seconds from one of its missiles to the next */
   missilePauseSeconds: number;
+  /** B-NATION-GRUDGE: whether it turns on a player it is hostile to once settled (R-BOT-22); a traitor always */
+  grudge: boolean;
+  /** B-NATION-BETRAY-LAND: an ally whose land is at most this % of its own is worth betraying (R-BOT-25) */
+  betrayLandPercent: number;
+  /** B-NATION-BETRAY-TROOPS: ... and whose troops are at most this % of its own */
+  betrayTroopsPercent: number;
 }
 
 export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<NationParameters>>> = {
@@ -56,6 +62,9 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     reservePercent: 25,
     huntPercent: 0,
     missilePauseSeconds: 240,
+    grudge: false,
+    betrayLandPercent: 30,
+    betrayTroopsPercent: 20,
   },
   normal: {
     intervalSeconds: 1,
@@ -66,6 +75,9 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     reservePercent: 40,
     huntPercent: 20,
     missilePauseSeconds: 120,
+    grudge: true,
+    betrayLandPercent: 50,
+    betrayTroopsPercent: 35,
   },
   hard: {
     intervalSeconds: 1,
@@ -76,5 +88,8 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     reservePercent: 40,
     huntPercent: 20,
     missilePauseSeconds: 60,
+    grudge: true,
+    betrayLandPercent: 70,
+    betrayTroopsPercent: 50,
   },
 };

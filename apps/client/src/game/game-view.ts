@@ -288,6 +288,8 @@ export interface DiplomacyView {
   atWar: number[];
   /** Ticks before the player at this screen may send another quick message (R-DIPLO-07). */
   quickIn: number;
+  /** How nations feel about the player at this screen (R-BOT-20); the neutral ones are left out. */
+  moods: { id: number; mood: "hostile" | "wary" | "friendly" }[];
 }
 
 export interface AllyView {

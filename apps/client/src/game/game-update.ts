@@ -12,6 +12,7 @@ import {
   launchSilo,
   missileCost,
   missileTile,
+  nationMood,
   populationCap,
   quickAllowedAt,
   sameTeam,
@@ -79,10 +80,22 @@ function diplomacy(game: Game, you: number): DiplomacyView {
       .filter((player) => player.alive && atWar(game, you, player.id))
       .map((player) => player.id),
     quickIn: Math.max(0, quickAllowedAt(game, you) - tick),
+    moods: moods(game, you),
   };
 }
 
 /** What the engine logged between players since the last update, in order (R-DIPLO-04). */
+/** How each living nation feels about `you`, when not neutral (R-BOT-20). */
+function moods(game: Game, you: number): DiplomacyView["moods"] {
+  const found: DiplomacyView["moods"] = [];
+  for (const player of game.players()) {
+    if (!player.alive) continue;
+    const mood = nationMood(game, player.id, you);
+    if (mood !== undefined && mood !== "neutral") found.push({ id: player.id, mood });
+  }
+  return found;
+}
+
 function diplomacyEvents(game: Game): DiplomacyEvent[] {
   return game.diplomacyEvents.splice(0).map(({ type, a, b, phrase, tile, gold, landmark }) => {
     const event: DiplomacyEvent = { type, a, b };

@@ -20,6 +20,8 @@ export function relation(update: GameUpdate, id: number, rules: TipRules): strin
   } else if (diplomacy.atWar.includes(id)) parts.push(t("tip.atWar"));
   else if (id >= rules.firstNation) parts.push(t("tip.nation"));
   else parts.push(t("tip.notAllied"));
+  const mood = diplomacy.moods.find((m) => m.id === id);
+  if (mood) parts.push(t(`mood.${mood.mood}`));
   const traitor = diplomacy.traitors.find((x) => x.id === id);
   if (traitor) {
     parts.push(t("tip.traitor", { seconds: Math.ceil(traitor.ticksLeft / rules.ticksPerSecond) }));

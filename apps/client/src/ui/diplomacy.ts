@@ -203,6 +203,9 @@ export class DiplomacyPanel {
     const traitorText = traitor
       ? t("diplo.traitorFor", { seconds: this.seconds(traitor.ticksLeft) })
       : "";
+    // R-BOT-20: what a nation thinks of the player, unless it is neutral.
+    const mood = diplomacy.moods.find((m) => m.id === id)?.mood;
+    const moodText = mood ? t(`mood.${mood}`) : "";
     const embargoing = diplomacy.embargoes.includes(id);
     const embargoText = [
       ...(embargoing ? [t("diplo.embargoing")] : []),
@@ -356,6 +359,7 @@ export class DiplomacyPanel {
       player.name,
       hiddenText,
       status,
+      moodText,
       traitorText,
       embargoText,
       warText,
@@ -395,6 +399,7 @@ export class DiplomacyPanel {
         close,
       ),
       h("p", { class: "player-menu-status" }, status),
+      ...(moodText ? [h("p", { class: `player-menu-mood mood-${mood ?? ""}` }, moodText)] : []),
       h("p", { class: "player-menu-facts" }, factsText),
       ...(traitorText ? [h("p", { class: "player-menu-traitor" }, traitorText)] : []),
       ...(embargoText ? [h("p", { class: "player-menu-embargo" }, embargoText)] : []),

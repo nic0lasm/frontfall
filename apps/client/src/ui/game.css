@@ -945,13 +945,23 @@
 
 .player-menu-status,
 .player-menu-facts,
+.player-menu-mood,
 .player-menu-traitor {
   margin: 0;
   color: var(--ff-slate-300);
 }
 
-.player-menu-traitor {
+.player-menu-traitor,
+.player-menu-mood.mood-hostile {
   color: var(--ff-danger);
+}
+
+.player-menu-mood.mood-wary {
+  color: var(--ff-warning);
+}
+
+.player-menu-mood.mood-friendly {
+  color: var(--ff-success);
 }
 
 .menu-action,

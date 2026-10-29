@@ -203,6 +203,9 @@ export type OrderHandler = (game: Game, player: Player, order: Order) => boolean
 /** Runs once per tick, after the orders of that tick, in registration order. */
 export type TickSystem = (game: Game) => void;
 
+/** Told of an order once a handler has carried it out. */
+export type OrderObserver = (game: Game, player: Player, order: Order) => void;
+
 /**
  * State a rule keeps outside the game's own fields, which a snapshot must
  * carry too (docs/engine.md). `load` reads what `save` wrote, into a game
@@ -288,6 +291,7 @@ export class Game {
   private readonly sortedPlayers: readonly Player[];
   private readonly handlers: OrderHandler[] = [];
   private readonly systems: TickSystem[] = [];
+  private readonly observers: OrderObserver[] = [];
   private readonly persisted: { readonly name: string; readonly part: PersistedPart }[] = [];
   private currentTick = 0;
   private setup: number | undefined;
@@ -648,6 +652,15 @@ export class Game {
     this.handlers.push(handler);
   }
 
+  /**
+   * Observers hear of every order carried out, after its handler: computer
+   * players remember what was done to them (R-BOT-20). An observer must not
+   * apply orders itself.
+   */
+  onApplied(observer: OrderObserver): void {
+    this.observers.push(observer);
+  }
+
   onTick(system: TickSystem): void {
     this.systems.push(system);
   }
@@ -661,7 +674,9 @@ export class Game {
   apply(playerId: number, order: Order): boolean {
     const player = this.playersById.get(playerId);
     if (!player?.alive || orderError(this, player, order) !== undefined) return false;
-    return this.handlers.some((handle) => handle(this, player, order));
+    if (!this.handlers.some((handle) => handle(this, player, order))) return false;
+    for (const observe of this.observers) observe(this, player, order);
+    return true;
   }
 
   /**

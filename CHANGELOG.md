@@ -6,6 +6,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Added
 
+- **Nations with a memory and a voice.** Each nation now remembers what you do to it and tells you how it feels about you when you hover over it or open its menu: hostile, wary, neutral or friendly. Attacks, landings and missiles anger it, gifts, alliances and help against its enemies win it over, and time heals both. Nations talk with quick messages and emoji: they greet new neighbours, ask you to leave them alone, thank you for a gift, answer alliance requests with a thumbs up or down, and call on their allies to turn on the leader. They ask their friends and the neighbours of a runaway leader for alliances, heed your "Let's be allies" and "Help me!", attack whoever attacks their allies or send them troops, place an embargo on players they are hostile to, and never forgive a betrayal soon: the betrayed nation turns on the traitor at once. And they can betray too, at every level, rarely at easy: a nation eyes a much weaker ally on its border, grows wary of them in plain sight, gives a thumbs down, then says sorry and attacks. Grow, keep troops at home or stay in its good books, and it thinks twice.
 - **Half speed.** Games can now also run at ×0.5, for a calmer game or to learn: in solo with the speed button (or T) and in the pause screen, and for the whole game in a private lobby. Everything happens twice as slowly, the time limit included, and the replay is the same at any speed.
 
 ### Changed

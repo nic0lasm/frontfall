@@ -98,6 +98,8 @@ export {
   type BotDifficulty,
   type BotParameters,
   type NationParameters,
+  nationMood,
+  type Mood,
 } from "./bots/index.ts";
 export {
   DISABLE_ALL,
@@ -117,6 +119,7 @@ export {
   type GameSetup,
   type Order,
   type OrderHandler,
+  type OrderObserver,
   type PersistedPart,
   type Phase,
   type Player,
