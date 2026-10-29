@@ -141,7 +141,7 @@ export interface RoomObserver {
 /**
  * Ticks during which hashes for one tick are collected. Clients that are
  * behind report late; whoever has not reported by then is left out. At speed
- * 1: a faster game waits as long, for more ticks.
+ * 1: a faster game waits as long, for more ticks, a slower one for fewer.
  */
 const HASH_WINDOW_TICKS = 600;
 
@@ -161,6 +161,8 @@ export class Room {
   private openedAt: number | undefined;
   private startedAt = 0;
   private pending: Turn["orders"] = [];
+  /** Turns owed by the beats so far but not yet closed: half a turn a beat at speed 0.5. */
+  private turnCredit = 0;
   /** Hashes reported for each checked tick, by seat. */
   private readonly hashes = new Map<number, Map<Seat, number>>();
   /** Seats found out of step, with the first tick they disagreed on. */
@@ -543,7 +545,12 @@ export class Room {
         }
         return;
       case "running":
-        this.closeTurns(this.settings.speed);
+        this.turnCredit += this.settings.speed;
+        if (this.turnCredit >= 1) {
+          const count = Math.floor(this.turnCredit);
+          this.turnCredit -= count;
+          this.closeTurns(count);
+        }
         this.compareLateHashes();
         this.expireSeats(now);
         return;
@@ -679,7 +686,7 @@ export class Room {
 
   /** Ticks a late hash is waited for: the same time at every speed. */
   private get hashWindow(): number {
-    return HASH_WINDOW_TICKS * this.settings.speed;
+    return Math.ceil(HASH_WINDOW_TICKS * this.settings.speed);
   }
 
   private compareLateHashes(): void {

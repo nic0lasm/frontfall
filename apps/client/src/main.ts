@@ -1,7 +1,14 @@
 // First: before the schemas are built, so that none is compiled (the page forbids it).
 import "@frontfall/protocol/jitless";
 import type { GameRecord } from "@frontfall/engine";
-import { DEFAULT_RULES, type GameOptions, type Teams, type Visibility } from "@frontfall/protocol";
+import {
+  DEFAULT_RULES,
+  GAME_SPEEDS,
+  type GameOptions,
+  type GameSpeed,
+  type Teams,
+  type Visibility,
+} from "@frontfall/protocol";
 import {
   applyTranslations,
   loadLanguage,
@@ -879,6 +886,12 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
   else client.join(entry.game);
 }
 
+/** The pace of the game before, unless it is the normal one or a test's own (R-MODE-07). */
+function rematchSpeed(speed: number | undefined): { speed?: GameSpeed } {
+  const pace = GAME_SPEEDS.find((candidate) => candidate === speed);
+  return pace === undefined || pace === 1 ? {} : { speed: pace };
+}
+
 /** The menu's choices as settings of a new game, kept within what the server accepts. */
 function initialOptions(
   chosen: GameSetup,
@@ -899,7 +912,7 @@ function initialOptions(
     capacity: seatLimit(map, bots),
     autoStart: true,
     // A rematch keeps the pace of the game before (R-MODE-07).
-    ...(chosen.speed === 2 || chosen.speed === 4 ? { speed: chosen.speed } : {}),
+    ...rematchSpeed(chosen.speed),
     // The special rules chosen in the menu, which only a private game may change (R-MODE-08).
     ...(visibility === "private" && chosen.rules
       ? { rules: { ...DEFAULT_RULES, ...chosen.rules } }

@@ -232,7 +232,7 @@ test("pauses and shows the controls", async ({ page }) => {
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("runs at ×1, ×2 or ×4 from its button or T (R-MODE-07)", async ({ page }) => {
+test("runs at ×0.5, ×1, ×2 or ×4 from its button or T (R-MODE-07)", async ({ page }) => {
   await page.goto("./?map=skirmish&bots=1");
   await page.locator("#play").click();
   const speed = page.locator("#speed");
@@ -245,6 +245,9 @@ test("runs at ×1, ×2 or ×4 from its button or T (R-MODE-07)", async ({ page }
   await page.keyboard.press("KeyT");
   await expect(speed).toHaveText(/×4/);
   await expect(speed).toHaveAttribute("aria-label", "Game speed: ×4");
+  await page.keyboard.press("KeyT");
+  await expect(speed).toHaveText(/×0\.5/);
+  await expect(speed).toHaveAttribute("aria-label", "Game speed: ×0.5");
   await page.keyboard.press("KeyT");
   await expect(speed).toHaveText(/×1/);
   // The pause banner offers the paces too, and keeps the game paused.

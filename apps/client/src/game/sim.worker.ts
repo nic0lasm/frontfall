@@ -27,6 +27,8 @@ const SNAPSHOT_TICKS = 1200;
 const SOLO_FIRST_SNAPSHOT_TICKS = 30;
 const SOLO_SNAPSHOT_TICKS = 150;
 
+/** The slowest pace of a game (R-MODE-07): one tick every other beat. */
+const HALF_SPEED = 0.5;
 /** Fastest a replay runs, in ticks per beat. */
 const MAX_SPEED = Math.max(...REPLAY_SPEEDS);
 
@@ -34,8 +36,10 @@ let game: SoloGame | undefined;
 let started = false;
 let clock: BeatClock | undefined;
 let paused = false;
-/** Ticks run per beat of the clock. */
+/** Ticks run per beat of the clock: below 1, a tick every few beats (R-MODE-07). */
 let speed = 1;
+/** Ticks owed by the beats so far but not yet run, below one. */
+let tickCredit = 0;
 let pending: Order[] = [];
 /** Online games advance with the server's turns, never with a clock of their own. */
 let online = false;
@@ -168,18 +172,37 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
   if (game.snapshotRefused !== undefined) {
     scope.postMessage({ type: "snapshotRefused", reason: game.snapshotRefused });
   }
-  speed = Math.max(1, Math.floor(request.options.speed ?? 1));
+  speed = gameSpeed(request.options.speed ?? 1);
   clock = new BeatClock(() => {
     // A replay runs its ticks in one go, so that its update covers them all.
-    if (game?.options.record) tick();
-    else for (let i = 0; i < speed; i++) tick();
+    if (game?.options.record) {
+      tick();
+      return;
+    }
+    if (paused) return;
+    tickCredit += speed;
+    for (; tickCredit >= 1; tickCredit--) tick();
   }, 1000 / ticksPerSecond);
   clock.start();
 }
 
-/** Solo: the player's order plays at once rather than at the next beat (beat-clock.ts). */
+/**
+ * A pace the worker runs at: half speed, the one pace of GAME_SPEEDS below 1
+ * (written out here, as importing it would bring the protocol's schemas into
+ * the worker), or a whole number of ticks per beat.
+ */
+function gameSpeed(requested: number): number {
+  if (requested === HALF_SPEED) return requested;
+  return Math.max(1, Math.min(MAX_SPEED, Math.floor(requested)));
+}
+
+/**
+ * Solo: the player's order plays at once rather than at the next beat
+ * (beat-clock.ts). At half speed only a beat that runs a tick is pulled: one
+ * that runs none would show nothing sooner.
+ */
 function hurry(): void {
-  if (!paused && !game?.options.record) clock?.pull();
+  if (!paused && !game?.options.record && tickCredit + speed >= 1) clock?.pull();
 }
 
 scope.onmessage = (event) => {
@@ -251,7 +274,8 @@ scope.onmessage = (event) => {
       }
       break;
     case "speed":
-      speed = Math.max(1, Math.min(MAX_SPEED, Math.floor(request.speed)));
+      speed = gameSpeed(request.speed);
+      tickCredit = 0;
       break;
     case "pause":
       paused = request.paused;

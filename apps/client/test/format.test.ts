@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n/index.ts";
-import { formatCount, formatDuration, formatPercent } from "../src/ui/format.ts";
+import { formatCount, formatDuration, formatPercent, formatSpeed } from "../src/ui/format.ts";
 
 describe("HUD numbers", () => {
   afterEach(() => {
@@ -21,6 +21,13 @@ describe("HUD numbers", () => {
     expect(formatCount(999_900)).toBe("1M");
     expect(formatCount(1_240_000)).toBe("1.24M");
     expect(formatCount(123_400_000)).toBe("123M");
+  });
+
+  it("writes half speed with the reader's decimal mark (R-MODE-07)", () => {
+    setLanguage("en");
+    expect([0.5, 1, 4].map(formatSpeed)).toEqual(["0.5", "1", "4"]);
+    setLanguage("fr");
+    expect(formatSpeed(0.5)).toBe("0,5");
   });
 
   it("follows the reader's language", () => {

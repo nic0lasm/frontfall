@@ -1,10 +1,11 @@
 import { GAME_SPEEDS } from "@frontfall/protocol";
 import { t } from "../i18n/index.ts";
 import { h } from "./dom.ts";
+import { formatSpeed } from "./format.ts";
 
 /**
  * The button that sets how fast a solo game runs (R-MODE-07): each press, or
- * T, goes to the next pace, ×1, ×2, ×4 and back to ×1. Only the cadence of
+ * T, goes to the next pace, ×0.5, ×1, ×2, ×4 and back to ×0.5. Only the cadence of
  * the ticks changes, so a record of the game replays the same at any pace.
  */
 export class SpeedControl {
@@ -27,9 +28,9 @@ export class SpeedControl {
     this.show();
   }
 
-  /** The next pace, after the one running; a test's own pace goes back to ×1. */
+  /** The next pace, after the one running; after ×4, or a test's own pace, the slowest. */
   next(): void {
-    this.speed = GAME_SPEEDS.find((speed) => speed > this.speed) ?? 1;
+    this.speed = GAME_SPEEDS.find((speed) => speed > this.speed) ?? GAME_SPEEDS[0];
     this.onSpeed(this.speed);
     this.show();
   }
@@ -49,7 +50,7 @@ export class SpeedControl {
           "aria-pressed": String(speed === this.speed),
           "data-speed": speed,
         },
-        t("replay.speed", { speed: String(speed) }),
+        t("replay.speed", { speed: formatSpeed(speed) }),
       );
       button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -69,7 +70,7 @@ export class SpeedControl {
 
   /** Again in the language just picked. */
   show(): void {
-    const speed = String(this.speed);
+    const speed = formatSpeed(this.speed);
     this.label.textContent = t("replay.speed", { speed });
     this.element.setAttribute("aria-label", t("hud.speed", { speed }));
     this.element.title = t("hud.speedKey", { speed });

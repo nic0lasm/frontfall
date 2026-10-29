@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  GAME_SPEEDS,
   encodeClientMessage,
   encodeServerMessage,
   parseClientMessage,
@@ -159,7 +160,7 @@ describe("client messages", () => {
     expect(configure(-1).ok).toBe(false);
   });
 
-  it("takes the speeds 1, 2 and 4 only, or none (R-MODE-07)", () => {
+  it("takes the speeds 0.5, 1, 2 and 4 only, or none (R-MODE-07)", () => {
     const options = {
       map: "world",
       bots: 0,
@@ -172,13 +173,17 @@ describe("client messages", () => {
     };
     const configure = (speed?: number) =>
       parseClientMessage(JSON.stringify({ type: "configure", options: { ...options, speed } }));
-    expect([undefined, 1, 2, 4].map((speed) => configure(speed).ok)).toEqual([
+    expect([undefined, 0.5, 1, 2, 4].map((speed) => configure(speed).ok)).toEqual([
+      true,
       true,
       true,
       true,
       true,
     ]);
-    expect([0, 3, 8, 1.5].map((speed) => configure(speed).ok)).toEqual([
+    // The simulation worker writes half speed out rather than import this list.
+    expect(GAME_SPEEDS).toEqual([0.5, 1, 2, 4]);
+    expect([0, 0.25, 3, 8, 1.5].map((speed) => configure(speed).ok)).toEqual([
+      false,
       false,
       false,
       false,

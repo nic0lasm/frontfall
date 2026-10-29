@@ -15,17 +15,18 @@ import { Order, PlayerNumber, type Turn } from "./orders.ts";
  * turn frames, so it bumps this version too; a test pins the order kinds of
  * the current version.
  */
-export const PROTOCOL_VERSION = 25;
+export const PROTOCOL_VERSION = 26;
 
 /** Ticks per second of the simulation at speed 1. The server closes one turn per tick. */
 export const TICK_RATE = 10;
 
 /**
  * Paces a game can run at (R-MODE-07): ticks per beat of the clock, a beat
- * lasting 1 / TICK_RATE seconds. Only the cadence changes, never the rules.
+ * lasting 1 / TICK_RATE seconds; at 0.5, one tick every other beat. Only the
+ * cadence changes, never the rules.
  */
-export const GAME_SPEEDS = [1, 2, 4] as const;
-export const GameSpeed = z.union([z.literal(1), z.literal(2), z.literal(4)]);
+export const GAME_SPEEDS = [0.5, 1, 2, 4] as const;
+export const GameSpeed = z.union([z.literal(0.5), z.literal(1), z.literal(2), z.literal(4)]);
 export type GameSpeed = z.infer<typeof GameSpeed>;
 
 /** Clients send a hash of their state after every tick that is a multiple of this. */
@@ -285,7 +286,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
     teams: Teams,
     /** What every client leaves out of the game (R-MODE-03). */
     disabled: Disabled,
-    /** Beats per second; the server closes `speed` turns at each one. */
+    /** Beats per second; the server closes `speed` turns at each one, on average. */
     tickRate: z.number().int().positive(),
     /** Ticks per beat (R-MODE-07): turns come `tickRate` × `speed` per second. */
     speed: GameSpeed,

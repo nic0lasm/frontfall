@@ -813,6 +813,30 @@ describe("running game", () => {
     expect(alice.peer.inbox.filter((message) => message.type === "turns")).toHaveLength(1);
   });
 
+  it("closes one turn every other tick at half speed, with the orders of both (R-MODE-07)", () => {
+    const room = new Room("game0000", { ...PRIVATE, speed: 0.5 }, 1);
+    const alice = seated(room, "Alice");
+    room.requestStart(alice.seat, 0);
+    expect(alice.peer.last("started")).toMatchObject({ speed: 0.5, tickRate: 10 });
+    room.submit(alice.seat, { type: "spawn", tile: 1 });
+    room.update(100);
+    expect(alice.peer.turns()).toEqual([]);
+    room.submit(alice.seat, { type: "spawn", tile: 2 });
+    room.update(200);
+    room.update(300);
+    room.update(400);
+    expect(alice.peer.turns()).toEqual([
+      {
+        tick: 0,
+        orders: [
+          { player: 1, order: { type: "spawn", tile: 1 } },
+          { player: 1, order: { type: "spawn", tile: 2 } },
+        ],
+      },
+      { tick: 1, orders: [] },
+    ]);
+  });
+
   it("drops orders beyond the cap of one player in one turn", () => {
     const { room, alice, bob } = running();
     for (let tile = 0; tile < 5; tile++) room.submit(alice.seat, { type: "spawn", tile });

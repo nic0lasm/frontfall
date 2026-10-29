@@ -39,6 +39,11 @@ export function formatPercent(share: number): string {
   }).format(share);
 }
 
+/** A pace of the game (R-MODE-07) without its ×: 0.5, 0,5 in French. */
+export function formatSpeed(speed: number): string {
+  return numberFormat("speed", { maximumFractionDigits: 1 }).format(speed);
+}
+
 /** Game time as m:ss, or h:mm:ss past an hour. */
 export function formatDuration(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));

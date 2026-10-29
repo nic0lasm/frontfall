@@ -20,6 +20,7 @@ import { applyTranslations, getLanguage, t, type MessageKey, type Params } from 
 import type { LobbyState } from "../net/online.ts";
 import { playerColor, teamColor } from "../palette.ts";
 import { h, swatch } from "./dom.ts";
+import { formatSpeed } from "./format.ts";
 
 const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
 
@@ -520,7 +521,7 @@ export class LobbyScreen {
     const withSpeed =
       lobby.speed === 1
         ? withMode
-        : t("online.summarySpeed", { summary: withMode, speed: String(lobby.speed) });
+        : t("online.summarySpeed", { summary: withMode, speed: formatSpeed(lobby.speed) });
     this.summary.textContent =
       off.length === 0
         ? withSpeed
@@ -600,7 +601,7 @@ export class LobbyScreen {
     this.speed.hidden = listed;
     this.speed.replaceChildren(
       ...GAME_SPEEDS.map((speed) =>
-        h("option", { value: speed }, t("replay.speed", { speed: String(speed) })),
+        h("option", { value: speed }, t("replay.speed", { speed: formatSpeed(speed) })),
       ),
     );
     this.speed.value = String(lobby.speed);
