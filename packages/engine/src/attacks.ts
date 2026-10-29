@@ -35,6 +35,8 @@ export function installAttacks(game: Game): void {
   const { territory, terrain, balance } = game;
   const topology = terrain.topology;
   const attacks = game.attacks;
+  // Read directly in the loops below, past the checks of ownerOf().
+  const owners = territory.owners;
 
   // Scratch space reused every tick: tiles already listed as candidates in the current scan.
   const seen = new Uint32Array(topology.size);
@@ -86,7 +88,6 @@ export function installAttacks(game: Game): void {
       if (own) own.push(a);
       else attacksOf.set(attack.player, [a]);
     }
-    const owners = territory.owners;
     // Map iteration follows insertion, which follows the attack list: the same on every client.
     for (const [player, own] of attacksOf) {
       scan++;
@@ -180,7 +181,6 @@ export function installAttacks(game: Game): void {
    * spreads as a wedge towards its aim instead of a thin line.
    */
   function priority(player: number, tile: number, squaredDistance: number): number {
-    const owners = territory.owners;
     let sides = 0;
     const count = topology.neighborsInto(tile, ownAround);
     for (let k = 0; k < count; k++) if (owners[ownAround[k] as number] === player) sides++;
@@ -216,7 +216,7 @@ export function installAttacks(game: Game): void {
       const count = topology.neighborsInto(territory.borderTile(player, i), around);
       for (let j = 0; j < count; j++) {
         const tile = around[j] as number;
-        if (territory.ownerOf(tile) === target && game.usable(tile)) return true;
+        if (owners[tile] === target && game.usable(tile)) return true;
       }
     }
     return false;
@@ -286,7 +286,7 @@ export function installAttacks(game: Game): void {
     captured.length = 0;
     for (const tile of tiles) {
       // Another attack, or an encirclement, may have taken it earlier in the tick.
-      if (territory.ownerOf(tile) !== attack.target) continue;
+      if (owners[tile] !== attack.target) continue;
       const cost = tileCost(tile, defender);
       if (attack.troops < cost) {
         finish(attack);
@@ -321,7 +321,7 @@ export function installAttacks(game: Game): void {
       let start = -1;
       for (let j = 0; j < count && start < 0; j++) {
         const tile = around[j] as number;
-        if (territory.ownerOf(tile) === defender.id && game.usable(tile)) start = tile;
+        if (owners[tile] === defender.id && game.usable(tile)) start = tile;
       }
       if (start < 0) continue;
       // Forts close enough to cover some of the stretch; the others cannot.
@@ -346,7 +346,7 @@ export function installAttacks(game: Game): void {
       const size = collapseFill.fill(
         start,
         (tile) =>
-          territory.ownerOf(tile) === defender.id &&
+          owners[tile] === defender.id &&
           game.usable(tile) &&
           topology.squaredDistance(tile, tip) <= depth * depth &&
           !holds(tile),
@@ -396,26 +396,14 @@ export function installAttacks(game: Game): void {
       const count = topology.neighborsInto(tile, nextToCapture);
       for (let i = 0; i < count; i++) {
         const start = nextToCapture[i] as number;
-        const defender = territory.ownerOf(start);
+        const defender = owners[start] as number;
         if (defender === attacker || defender === NEUTRAL) continue;
         // R-DIPLO-02: an ally's pocket stays theirs.
         if (isAllied(game, attacker, defender)) continue;
         if (examined[start] === examination) continue;
-        const size = pocketFill.fill(
-          start,
-          (candidate) => {
-            const owner = territory.ownerOf(candidate);
-            if (owner === defender) {
-              if (examined[candidate] !== examination) return true;
-              pocketFill.stop(); // joins a region already known to be open
-              return false;
-            }
-            // Any land not held by the attacker means the region still has a way out.
-            if (owner !== attacker && terrain.isOwnable(candidate)) pocketFill.stop();
-            return false;
-          },
-          balance.encircleMaxTiles,
-        );
+        pocketDefender = defender;
+        pocketAttacker = attacker;
+        const size = pocketFill.fill(start, inPocket, balance.encircleMaxTiles);
         if (size > 0 && !holds(defender)) {
           for (const pocket of pocketFill.tiles()) territory.setOwner(pocket, attacker);
         } else {
@@ -423,6 +411,23 @@ export function installAttacks(game: Game): void {
         }
       }
     }
+  }
+
+  // The two sides of the pocket fill under way, read by inPocket(), which is made once rather than per fill.
+  let pocketDefender = NEUTRAL;
+  let pocketAttacker = NEUTRAL;
+
+  /** Whether a tile belongs to the pocket being filled; stops the fill at any way out. */
+  function inPocket(candidate: number): boolean {
+    const owner = owners[candidate] as number;
+    if (owner === pocketDefender) {
+      if (examined[candidate] !== examination) return true;
+      pocketFill.stop(); // joins a region already known to be open
+      return false;
+    }
+    // Any land not held by the attacker means the region still has a way out.
+    if (owner !== pocketAttacker && terrain.isOwnable(candidate)) pocketFill.stop();
+    return false;
   }
 
   /**
