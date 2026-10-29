@@ -322,7 +322,7 @@ describe("bots", () => {
       expect(game.territory.isBorder(city.tile)).toBe(false);
       expect(grid.distance(city.tile, bot.start)).toBeLessThanOrEqual(2 * balance.buildSpacing);
     }
-    expect(bot.gold).toBe(10_000 - 750 - 1125);
+    expect(bot.gold).toBe(10_000 - 1000 - 2000);
   });
   it("build their port on the ocean, not on a lake closer to their start (R-BOT-06)", () => {
     const grid = new WorldGrid(60, 30, { wrapsX: false });

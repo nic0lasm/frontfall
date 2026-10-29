@@ -12,6 +12,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Changed
 
+- **Each new building of a kind costs twice the last one**, instead of half again as much, warships included. The gold taken from eliminated countries goes into them, so the game does not get easier.
 - **Taps on a touch screen no longer turn into drags.** A finger that wobbles up to 12 pixels while it taps still picks the tile, instead of moving the map by a hair and picking nothing.
 
 - **A smoother map on high-density screens.** Moving, zooming and playing no longer stutter on a laptop whose graphics chip cannot draw every pixel of a Retina screen sixty times a second: the map is drawn a little less sharp while frames fall behind, and back at full sharpness as soon as they keep up. Phones draw the map at most at twice their screen's resolution. The map's shading also does less work for the same picture: borders up close, the sea's swell and the grain of the ground are cheaper to draw.

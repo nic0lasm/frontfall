@@ -78,7 +78,7 @@ describe("warships (R-UNIT-04)", () => {
     const [ship] = game.warships;
     expect(ship).toMatchObject({ player: 1, health: 1000 });
     expect(game.terrain.kind(ship?.patrol ?? -1)).toBe(TileKind.Water);
-    expect(warshipCost(game, 1)).toBe(15_000);
+    expect(warshipCost(game, 1)).toBe(20_000);
     step([{ player: 1, order: buy(adaPort) }]);
     expect(orderError(game, ada, buy(adaPort))).toBe("too many warships");
     ada.gold = 0;

@@ -123,22 +123,22 @@ Like the other lengths, the range grows with the side of the map. At 500 tiles o
 
 ## Structures
 
-| Key                  |   Value | Unit       | Used by      | Notes                                                   |
-| -------------------- | ------: | ---------- | ------------ | ------------------------------------------------------- |
-| `B-BUILD-TIME`       |       5 | s          | `R-BUILD-*`  | For every structure but the two below                   |
-| `B-BUILD-TIME-LONG`  |      10 | s          | `R-BUILD-*`  | Missile silo and air defense                            |
-| `B-COST-CITY`        |   60000 | gold       | `R-BUILD-01` | First city                                              |
-| `B-COST-FORT`        |   30000 | gold       | `R-BUILD-03` | First fort                                              |
-| `B-COST-PORT`        |  100000 | gold       | `R-BUILD-02` | First port                                              |
-| `B-COST-SILO`        |  800000 | gold       | `R-BUILD-04` | First missile silo                                      |
-| `B-COST-AIR-DEFENSE` | 1000000 | gold       | `R-BUILD-05` | First air defense                                       |
-| `B-COST-GROWTH`      |     1.5 | multiplier | `R-BUILD-*`  | Cost of the n-th structure of a kind: base × 1.5^(n−1)  |
-| `B-PALACE-CITIES`    |       2 | cities     | `R-BUILD-08` | Fixed: what a palace counts as, for cost, land and pop. |
-| `B-BUILD-SPACING`    |      10 | tiles      | `R-BUILD-07` | Between any two structures                              |
-| `B-CITY-LAND`        |   10000 | tiles      | `R-BUILD-07` | Land each city beyond the first needs                   |
-| `B-FORT-RADIUS`      |      25 | tiles      | `R-BUILD-03` |                                                         |
-| `B-FORT-STRENGTH`    |     200 | % of price | `R-BUILD-03` | Paid by attackers inside the radius                     |
-| `B-FORT-LOSSES`      |      50 | % of loss  | `R-BUILD-03` | Lost by the defender inside the radius                  |
+| Key                  |   Value | Unit       | Used by      | Notes                                                                                                |
+| -------------------- | ------: | ---------- | ------------ | ---------------------------------------------------------------------------------------------------- |
+| `B-BUILD-TIME`       |       5 | s          | `R-BUILD-*`  | For every structure but the two below                                                                |
+| `B-BUILD-TIME-LONG`  |      10 | s          | `R-BUILD-*`  | Missile silo and air defense                                                                         |
+| `B-COST-CITY`        |   60000 | gold       | `R-BUILD-01` | First city                                                                                           |
+| `B-COST-FORT`        |   30000 | gold       | `R-BUILD-03` | First fort                                                                                           |
+| `B-COST-PORT`        |  100000 | gold       | `R-BUILD-02` | First port                                                                                           |
+| `B-COST-SILO`        |  800000 | gold       | `R-BUILD-04` | First missile silo                                                                                   |
+| `B-COST-AIR-DEFENSE` | 1000000 | gold       | `R-BUILD-05` | First air defense                                                                                    |
+| `B-COST-GROWTH`      |       2 | multiplier | `R-BUILD-*`  | Cost of the n-th structure of a kind: base × 2^(n−1); spends the gold of the eliminated (`R-ECO-08`) |
+| `B-PALACE-CITIES`    |       2 | cities     | `R-BUILD-08` | Fixed: what a palace counts as, for cost, land and pop.                                              |
+| `B-BUILD-SPACING`    |      10 | tiles      | `R-BUILD-07` | Between any two structures                                                                           |
+| `B-CITY-LAND`        |   10000 | tiles      | `R-BUILD-07` | Land each city beyond the first needs                                                                |
+| `B-FORT-RADIUS`      |      25 | tiles      | `R-BUILD-03` |                                                                                                      |
+| `B-FORT-STRENGTH`    |     200 | % of price | `R-BUILD-03` | Paid by attackers inside the radius                                                                  |
+| `B-FORT-LOSSES`      |      50 | % of loss  | `R-BUILD-03` | Lost by the defender inside the radius                                                               |
 
 Structure values were set on World with eight normal bots, five seeds. Before structures, a bot reached `B-WIN-SHARE` after 8.8 to 13.0 minutes (median 10.1). With cities worth 10 % and one per 20,000 tiles of World, the snowball brought that down to 7.5 to 9.8 minutes; at 5 % and one per 40,000 tiles it is 7.9 to 10.6 (median 10.1), and a scripted casual player that also builds cities wins against seven normal bots as often as before (2 seeds out of 5).
 

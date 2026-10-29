@@ -201,7 +201,7 @@ export const DEFAULT_BALANCE: Balance = {
   cityCost: 60_000,
   fortCost: 30_000,
   portCost: 100_000,
-  costGrowthPercent: 150,
+  costGrowthPercent: 200,
   buildSpacing: 10,
   cityLand: 10_000,
   fortRadius: 25,
