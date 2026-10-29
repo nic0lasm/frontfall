@@ -20,10 +20,11 @@ const FIRST_SNAPSHOT_TICKS = 300;
 const SNAPSHOT_TICKS = 1200;
 /**
  * Solo, the page keeps the game for a reload with nobody to replay the
- * turns since: a snapshot every 30 seconds, the first once the spawn phase
- * is over, and one whenever the page goes to the background.
+ * turns since: a snapshot every 30 seconds, the first after 3 seconds so
+ * that a reload at the very start (the tutorial's, say) finds the game, and
+ * one whenever the page goes to the background.
  */
-const SOLO_FIRST_SNAPSHOT_TICKS = 150;
+const SOLO_FIRST_SNAPSHOT_TICKS = 30;
 const SOLO_SNAPSHOT_TICKS = 300;
 
 /** Fastest a replay runs, in ticks per beat. */

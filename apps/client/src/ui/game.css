@@ -431,6 +431,11 @@
     font-size: 12px;
   }
 
+  /* The slider is what a finger drags: it never gets less than 44 px, whatever the text beside it. */
+  .ratio {
+    grid-template-columns: auto minmax(44px, 1fr) auto;
+  }
+
   /* In the tray there is room for the name. */
   .build > .work-row .ratio-name {
     display: inline;
@@ -1626,6 +1631,13 @@ button.feed-entry:focus-visible {
 
   .ratio input[type="range"] {
     min-height: 44px;
+  }
+}
+
+/* On the narrowest phones the slider gives up the icon of its label before it gives up its width. */
+@media (pointer: coarse) and (width < 380px) {
+  .ratio label .icon {
+    display: none;
   }
 }
 

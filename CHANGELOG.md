@@ -45,6 +45,11 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **Orders answer sooner.** A ring now shows under the pointer the moment you press on the map, instead of after you let go and the game has read the click; it turns into the usual answer once the order is read. Online, a turn that the network or a busy page delays no longer holds back every turn after it for three seconds: it plays a little late on its own, so your orders come back sooner, by about 60 ms in our measurements and much more after a hiccup.
 - **Fewer hitches on every tick.** Taking in each turn of the game costs the page about a fifth of what it did: the panels, the names over the land and the leaderboard no longer redraw what has not changed, so frames keep coming while the bots attack. Names over the land are also placed faster.
 
+- **The attack slider is wide enough for a finger on a phone.** On a narrow screen it was squeezed to a few pixels beside the buttons while attacks were open or the buildings tray was out; it now keeps at least 44 pixels, and on the narrowest phones its sword icon steps aside to make room.
+- **The first steps keep off the buildings tray.** On a phone, the first steps' card no longer sits behind the open tray: it moves under your figures, and in a short window it waits until the tray closes.
+- **A tutorial you reload comes back.** Reloading the page a few seconds into a solo game or the tutorial now takes you back into it, where it was kept after only three seconds of play instead of fifteen.
+- **The music slider starts at 35 %.** It showed 40 % because its steps were too coarse; it now moves in steps of 5.
+
 ### Security
 
 - **Names that only look like someone else's are refused.** A player name can no longer pass for a staff name with look-alike letters from another alphabet, full-width letters or accents, be invisible, or pile up stacked accents. In a game, and against an account's name, two names that read the same count as one: the second player gets a number after it.

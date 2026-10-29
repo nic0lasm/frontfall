@@ -411,3 +411,23 @@ test("a reload takes a solo game back where it was, and leaving forgets it", asy
   await expect(page.locator("#menu")).toBeVisible();
   await expect(page.locator("#resume")).toHaveCount(0);
 });
+
+test("a tutorial reloaded a few seconds in comes back to the game", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto("./");
+  await page.locator("#tutorial").click();
+  await expect(page.locator("#map")).toBeVisible();
+  // Kept within seconds of the start, not only once the spawn phase is over.
+  await expect.poll(() => keptTick(page), { timeout: 9000 }).toBeGreaterThan(0);
+
+  await page.reload();
+  await expect(page.locator("#menu")).toHaveCount(0);
+  await expect(page.locator("#map")).toBeVisible();
+  await expect(page.locator(".overlay.paused")).toBeVisible();
+});
+
+test("the music slider shows its default of 35", async ({ page }) => {
+  await page.goto("./");
+  await page.locator("#open-accessibility").click();
+  await expect(page.locator("#music-volume")).toHaveValue("35");
+});

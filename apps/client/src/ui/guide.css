@@ -91,6 +91,19 @@
   .game:has(.leaderboard.open) .guide {
     display: none;
   }
+
+  /* The open tray rises over the place of the banner: the banner moves under the figures. */
+  .game:has(.build.open) .guide {
+    top: 96px;
+    bottom: auto;
+  }
+}
+
+/* A short window has no room above the tray: the banner waits for it to close. */
+@media (height < 560px) {
+  .game:has(.build.open) .guide {
+    display: none;
+  }
 }
 
 /* Wide: the figures are in the bottom bar, so the guide takes the top left. */

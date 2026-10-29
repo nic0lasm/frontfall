@@ -39,7 +39,7 @@ export function soundPanel(): HTMLElement[] {
     id: "music-volume",
     min: "0",
     max: "100",
-    step: "10",
+    step: "5",
   });
   music.value = String(soundSettings().music);
   music.addEventListener("change", () => {
