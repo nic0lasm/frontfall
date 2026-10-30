@@ -302,6 +302,18 @@ export class MapView implements Renderer {
           scene: this.scene,
           anchor: this.territory.mesh.position,
           moving: this.moving,
+          explosions: [
+            THREE.Mesh,
+            THREE.ShaderMaterial,
+            THREE.BufferGeometry,
+            THREE.BufferAttribute,
+            THREE.Scene,
+            THREE.OrthographicCamera,
+            THREE.WebGLRenderTarget,
+            THREE.Color,
+          ],
+          renderer: this.renderer,
+          saver: this.options.flat ?? false,
         });
       },
       // The map is as playable without them.

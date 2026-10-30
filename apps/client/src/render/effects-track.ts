@@ -360,6 +360,11 @@ export class EffectTracker {
     }
   }
 
+  /** The blast radius of a missile on this map, in tiles. */
+  blastRadius(heavy: boolean): number {
+    return (heavy ? HEAVY_MISSILE_RADIUS : MISSILE_RADIUS) * this.blast;
+  }
+
   /** A missile has come down on its target: the flash, the shock ring and the sparks. */
   struck(x: number, y: number, heavy: boolean, now: number): void {
     if (!this.visible(x, y)) return;

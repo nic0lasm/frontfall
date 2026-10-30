@@ -1,6 +1,7 @@
 import type * as Three from "three";
 import type { CameraView } from "./camera.ts";
 import { EffectTracker, type Particle } from "./effects-track.ts";
+import { ExplosionLayer, type ExplosionParts } from "./explosion-layer.ts";
 import type { UnitMark } from "./renderer.ts";
 
 /** Marks alive at once; the oldest is overwritten when more are asked for. */
@@ -40,6 +41,11 @@ export interface EffectsLayerOptions {
   readonly anchor: Three.Vector3;
   /** Whether the player accepts motion. */
   readonly moving: boolean;
+  /** What the volumetric explosions draw with, and the renderer whose half-resolution targets they use. */
+  readonly explosions: ExplosionParts;
+  readonly renderer: Three.WebGLRenderer;
+  /** The light picture (graphics.ts): explosions without their finest details. */
+  readonly saver: boolean;
 }
 
 const vertexShader = /* glsl */ `
@@ -118,6 +124,8 @@ export class EffectsLayer {
   private readonly shape = new Float32Array(CAPACITY * 2);
   private readonly attributes: Three.InstancedBufferAttribute[];
   private readonly tracker: EffectTracker;
+  private readonly explosions: ExplosionLayer;
+  private moving: boolean;
   private next = 0;
   private used = 0;
   private dirty = false;
@@ -177,6 +185,17 @@ export class EffectsLayer {
     this.mesh.frustumCulled = false;
     this.mesh.position.copy(options.anchor);
     options.scene.add(this.mesh);
+    this.moving = options.moving;
+    this.explosions = new ExplosionLayer({
+      parts: options.explosions,
+      renderer: options.renderer,
+      scene: options.scene,
+      anchor: options.anchor,
+      mapWidth: options.map.width,
+      mapHeight: options.map.height,
+      wrapsX: options.map.wrapsX,
+      saver: options.saver,
+    });
     this.tracker = new EffectTracker(
       (particle) => {
         this.spawn(particle);
@@ -191,6 +210,7 @@ export class EffectsLayer {
 
   /** Whether the player accepts motion; held still, only trails and fading marks remain. */
   setMotion(moving: boolean): void {
+    this.moving = moving;
     this.tracker.setMotion(moving);
   }
 
@@ -204,8 +224,14 @@ export class EffectsLayer {
     this.tracker.fronts(tiles, this.options.map.owners, now);
   }
 
-  /** A missile came down at a point of the map: a flash, a shock ring and sparks. */
+  /**
+   * A missile came down at a point of the map: a volumetric explosion, or, when
+   * four are already playing or the player accepts no motion, the plain marks.
+   */
   missileStruck(x: number, y: number, heavy: boolean, now: number): void {
+    if (this.moving && this.explosions.start(x, y, this.tracker.blastRadius(heavy), heavy, now)) {
+      return;
+    }
     this.tracker.struck(x, y, heavy, now);
   }
 
@@ -253,7 +279,7 @@ export class EffectsLayer {
 
   /** Whether any mark is still alive at `now`, which keeps frames coming. */
   alive(now: number): boolean {
-    return now < this.liveUntil || this.tracker.pulsing;
+    return now < this.liveUntil || this.tracker.pulsing || this.explosions.alive(now);
   }
 
   /** Follows the clock and the camera, and uploads the marks started since the last frame. */
@@ -264,6 +290,7 @@ export class EffectsLayer {
     (uniforms.tilesPerPixel as Three.IUniform<number>).value = tilesPerPixel;
     this.tracker.setView(view, tilesPerPixel);
     this.tracker.tick(now);
+    this.explosions.update(now, cameraX, tilesPerPixel);
     if (!this.dirty) return;
     this.dirty = false;
     for (const attribute of this.attributes) attribute.needsUpdate = true;
@@ -272,10 +299,11 @@ export class EffectsLayer {
 
   /** Bytes of instance data on the GPU. */
   gpuBytes(): number {
-    return CAPACITY * (4 + 4 + 4 + 2) * 4;
+    return CAPACITY * (4 + 4 + 4 + 2) * 4 + this.explosions.gpuBytes();
   }
 
   dispose(): void {
+    this.explosions.dispose();
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();
   }
