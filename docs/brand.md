@@ -116,7 +116,7 @@ Both typefaces are under the SIL Open Font License 1.1: free to use, embed and s
 | `docs/assets/banner-light.svg`                                       | 1280 × 320 | README header, light theme              |
 | `docs/assets/social-preview.png`                                     | 1280 × 640 | GitHub repository social preview        |
 | `docs/assets/logo.svg`                                               | 512 × 512  | Avatars (Discord, itch.io)              |
-| `apps/client/public/og-image.png`                                    | 1200 × 630 | Link previews of the game page          |
+| `apps/client/public/og-image.jpg`                                    | 1200 × 630 | Link previews of the game page          |
 | `apps/client/public/favicon.*`, `icon-*.png`, `apple-touch-icon.png` |            | Browser tab, home screen, installed app |
 
 The map in the banners is a generated tile map in the territory colours, not a real game.

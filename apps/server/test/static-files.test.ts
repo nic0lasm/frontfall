@@ -21,6 +21,7 @@ describe("loadStaticFile", () => {
     await writeFile(join(root, "world.bin"), new Uint8Array(64 * 1024).fill(1));
     await writeFile(join(root, "noise.json"), randomBytes(4096).toString("base64"));
     await writeFile(join(root, "flag.png"), new Uint8Array(4096));
+    await writeFile(join(root, "preview.jpg"), new Uint8Array(4096));
   });
 
   it("serves index.html at the root", async () => {
@@ -39,6 +40,7 @@ describe("loadStaticFile", () => {
     expect((await loadStaticFile(root, "/manifest.webmanifest"))?.contentType).toBe(
       "application/manifest+json",
     );
+    expect((await loadStaticFile(root, "/preview.jpg"))?.contentType).toBe("image/jpeg");
   });
 
   it("refuses to leave the root", async () => {
