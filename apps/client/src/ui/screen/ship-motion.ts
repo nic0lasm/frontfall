@@ -48,7 +48,7 @@ interface Tracked {
   /** It lands or docks on the next tick. */
   arriving: boolean;
   /** A missile's route: its launch tile and aim, and the ticks it was launched and arrives at. */
-  flight?: { from: number; to: number; launchedAt: number; arrivesAt: number };
+  flight?: { from: number; to: number; launchedAt: number; arrivesAt: number; radius: number };
 }
 
 interface Ghost {
@@ -151,8 +151,8 @@ export class ShipMotion {
       see(MISSILE_IDS + missile.id, kind, missile.player, missile.tile, false);
       const tracked = this.known.get(MISSILE_IDS + missile.id);
       if (tracked) {
-        const { from, to, launchedAt, arrivesAt } = missile;
-        tracked.flight = { from, to, launchedAt, arrivesAt };
+        const { from, to, launchedAt, arrivesAt, radius } = missile;
+        tracked.flight = { from, to, launchedAt, arrivesAt, radius };
       }
     }
     for (const [id, tracked] of this.known) {
@@ -205,7 +205,9 @@ export class ShipMotion {
         ...(ship.kind === "transport" ? {} : { kind: ship.kind }),
         heading: ship.fromHeading + turn(ship.fromHeading, ship.toHeading) * progress,
         speed: ship.speed,
-        ...(ship.flight ? this.flight(ship.flight, progress) : {}),
+        ...(ship.flight
+          ? { ...this.flight(ship.flight, progress), owner: colorOf(ship.player) }
+          : {}),
       });
     }
     for (const ghost of this.ghosts) {
@@ -231,13 +233,14 @@ export class ShipMotion {
   private flight(
     route: NonNullable<Tracked["flight"]>,
     progress: number,
-  ): Pick<UnitMark, "from" | "to" | "flown"> {
+  ): Pick<UnitMark, "from" | "to" | "flown" | "radius"> {
     const span = Math.max(1, route.arrivesAt - route.launchedAt);
     const flown = (this.tickAt - 1 + progress - route.launchedAt) / span;
     return {
       from: { x: route.from % this.width, y: Math.floor(route.from / this.width) },
       to: { x: route.to % this.width, y: Math.floor(route.to / this.width) },
       flown: Math.min(1, Math.max(0, flown)),
+      radius: route.radius,
     };
   }
 

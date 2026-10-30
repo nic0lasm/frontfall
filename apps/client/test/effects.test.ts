@@ -42,16 +42,15 @@ describe("EffectTracker", () => {
     expect(particles).toEqual([]);
   });
 
-  it("rings a launch, trails a missile and flashes where it lands", () => {
+  it("rings a launch, leaves the trail to the missile layer and flashes where it lands", () => {
     const { tracker: t, particles } = tracker();
     t.ships([], 0);
     t.ships([missile(1, 10)], 0.1);
     expect(particles.map((p) => p.shape)).toEqual(["ring"]);
     particles.length = 0;
+    // The trail of a missile is the missile layer's (missile-layer.ts), not a dotted line.
     t.ships([missile(1, 14)], 0.2);
-    expect(particles).toHaveLength(1);
-    expect(particles[0]?.life).toBeGreaterThan(2);
-    particles.length = 0;
+    expect(particles).toEqual([]);
     t.ships([], 0.3);
     // Vanishing is not landing: the end of the missile arrives apart.
     expect(particles).toEqual([]);

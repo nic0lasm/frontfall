@@ -105,7 +105,17 @@ const sea = {
   warships: [],
   tick: 11,
   missiles: [
-    { id: 1, player: 2, tile: 5, heavy: true, from: 0, to: 9, launchedAt: 8, arrivesAt: 14 },
+    {
+      id: 1,
+      player: 2,
+      tile: 5,
+      heavy: true,
+      from: 0,
+      to: 9,
+      radius: 3,
+      launchedAt: 8,
+      arrivesAt: 14,
+    },
   ],
 } as unknown as GameUpdate;
 

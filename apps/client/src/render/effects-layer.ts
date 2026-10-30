@@ -2,6 +2,7 @@ import type * as Three from "three";
 import type { CameraView } from "./camera.ts";
 import { EffectTracker, type Particle } from "./effects-track.ts";
 import { ExplosionLayer, type ExplosionParts } from "./explosion-layer.ts";
+import { MissileLayer } from "./missile-layer.ts";
 import type { UnitMark } from "./renderer.ts";
 
 /** Marks alive at once; the oldest is overwritten when more are asked for. */
@@ -126,6 +127,8 @@ export class EffectsLayer {
   private readonly tracker: EffectTracker;
   private readonly explosions: ExplosionLayer;
   private moving: boolean;
+  /** The missiles in flight: bodies on an arc, shadows, trails and the circle on the target. */
+  private readonly missiles: MissileLayer;
   private next = 0;
   private used = 0;
   private dirty = false;
@@ -196,6 +199,14 @@ export class EffectsLayer {
       wrapsX: options.map.wrapsX,
       saver: options.saver,
     });
+    this.missiles = new MissileLayer({
+      three: options.three,
+      map: options.map,
+      scene: options.scene,
+      anchor: options.anchor,
+      moving: options.moving,
+      rich: !options.saver,
+    });
     this.tracker = new EffectTracker(
       (particle) => {
         this.spawn(particle);
@@ -212,11 +223,13 @@ export class EffectsLayer {
   setMotion(moving: boolean): void {
     this.moving = moving;
     this.tracker.setMotion(moving);
+    this.missiles.setMotion(moving);
   }
 
   /** Ships, trade ships and missiles of this frame, to start the effects of those that came or went. */
   ships(marks: readonly UnitMark[], now: number): void {
     this.tracker.ships(marks, now);
+    this.missiles.ships(marks, now);
   }
 
   /** Tiles that just changed hands: the front moving. */
@@ -279,7 +292,12 @@ export class EffectsLayer {
 
   /** Whether any mark is still alive at `now`, which keeps frames coming. */
   alive(now: number): boolean {
-    return now < this.liveUntil || this.tracker.pulsing || this.explosions.alive(now);
+    return (
+      now < this.liveUntil ||
+      this.tracker.pulsing ||
+      this.explosions.alive(now) ||
+      this.missiles.alive(now)
+    );
   }
 
   /** Follows the clock and the camera, and uploads the marks started since the last frame. */
@@ -291,6 +309,7 @@ export class EffectsLayer {
     this.tracker.setView(view, tilesPerPixel);
     this.tracker.tick(now);
     this.explosions.update(now, cameraX, tilesPerPixel);
+    this.missiles.update(now, cameraX, tilesPerPixel);
     if (!this.dirty) return;
     this.dirty = false;
     for (const attribute of this.attributes) attribute.needsUpdate = true;
@@ -302,8 +321,14 @@ export class EffectsLayer {
     return CAPACITY * (4 + 4 + 4 + 2) * 4 + this.explosions.gpuBytes();
   }
 
+  /** Whether the missiles in flight are drawn here, so that the map leaves out their plates. */
+  get drawsMissiles(): boolean {
+    return true;
+  }
+
   dispose(): void {
     this.explosions.dispose();
+    this.missiles.dispose();
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();
   }

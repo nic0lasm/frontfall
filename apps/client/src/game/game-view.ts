@@ -351,6 +351,8 @@ export interface MissileView {
   from: number;
   to: number;
   target: number;
+  /** Blast radius in tiles, for the circle drawn on the target while it flies. */
+  radius: number;
   /** Ticks it was launched and strikes at, to tell how far along its flight it is. */
   launchedAt: number;
   arrivesAt: number;
