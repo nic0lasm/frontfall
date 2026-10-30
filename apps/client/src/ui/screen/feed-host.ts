@@ -3,7 +3,7 @@ import type { GameUpdate } from "../../game/game-view.ts";
 import type { MapLandmarkData } from "../../game/maps.ts";
 import { EventsFeed, type FeedTarget } from "../events-feed.ts";
 import { FeedWatcher, landLost, type LandLost } from "../feed-events.ts";
-import { PlayerTip } from "../player-tip.ts";
+import { PlayerTip, type ShipRef } from "../player-tip.ts";
 
 export { facts } from "../player-tip.ts";
 
@@ -73,6 +73,26 @@ export class FeedHost {
   /** The pointer is over `landmark`, undefined for none (R-LAND-02). */
   overLandmark(landmark: MapLandmarkData | undefined): void {
     this.tip.overLandmark(landmark);
+  }
+
+  /** The pointer is over `ship`, undefined for none. */
+  overShip(ship: ShipRef | undefined): void {
+    this.tip.overShip(ship);
+  }
+
+  /** The pointer is over the fallout around `zone`, undefined for none. */
+  overFallout(zone: number | undefined): void {
+    this.tip.overFallout(zone);
+  }
+
+  /** A long press on the fallout around `zone`, at (x, y) on screen. */
+  pinFallout(zone: number, x: number, y: number): void {
+    this.tip.pinFallout(zone, x, y);
+  }
+
+  /** A long press on `ship`, at (x, y) on screen. */
+  pinShip(ship: ShipRef, x: number, y: number): void {
+    this.tip.pinShip(ship, x, y);
   }
 
   /** A long press on `landmark`, at (x, y) on screen. */

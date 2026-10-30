@@ -183,6 +183,15 @@ export class MapScene {
   }
 
   /** Who owns the tile, 0 for nobody. */
+  /** Whether `a` and `b` are within `radius` tiles in a straight line, across the seam of a wrapping map. */
+  within(a: number, b: number, radius: number): boolean {
+    const { width } = this.mapSize;
+    let dx = Math.abs((a % width) - (b % width));
+    if (this.wrapsX && dx > width / 2) dx = width - dx;
+    const dy = Math.floor(a / width) - Math.floor(b / width);
+    return dx * dx + dy * dy <= radius * radius;
+  }
+
   ownerAt(tile: number): number {
     return this.owners[tile] ?? 0;
   }

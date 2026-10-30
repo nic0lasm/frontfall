@@ -343,6 +343,8 @@ export interface WarshipView {
   player: number;
   tile: number;
   health: number;
+  /** Its health when new, to read `health` against. */
+  maxHealth?: number;
 }
 
 /** A missile in flight, where it is this tick (R-UNIT-05). */
@@ -390,6 +392,8 @@ export interface FalloutView {
   /** Ticks until the land can be taken again, and how long the fallout lasted in all. */
   ticksLeft: number;
   duration: number;
+  /** What taking a tile under it costs, in % of the usual price (B-FALLOUT-COST). */
+  costPercent?: number;
 }
 
 /** A trade ship at sea, where it is this tick. */
@@ -397,6 +401,8 @@ export interface TradeShipView {
   id: number;
   player: number;
   tile: number;
+  /** The port tile it sails for. */
+  to?: number;
   /** It docks on the next tick; one that leaves without this was sunk. */
   arriving?: boolean;
 }
@@ -407,6 +413,8 @@ export interface BoatView {
   player: number;
   tile: number;
   troops: number;
+  /** The coastal tile it lands on. */
+  to?: number;
   /** It lands on the next tick; one that leaves without this was sunk. */
   arriving?: boolean;
 }

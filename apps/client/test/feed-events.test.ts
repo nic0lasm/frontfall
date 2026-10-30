@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameUpdate } from "../src/game/solo-game.ts";
 import { FeedWatcher, landLost } from "../src/ui/feed-events.ts";
-import { facts, landmarkLines, relation } from "../src/ui/player-tip.ts";
+import { facts, falloutLines, landmarkLines, relation, shipLines } from "../src/ui/player-tip.ts";
 
 function update(patch: Partial<GameUpdate> = {}): GameUpdate {
   return {
@@ -115,6 +115,44 @@ describe("FeedWatcher", () => {
     const yours = landmarkLines(update(), tower, 1);
     expect(yours.holder).toBe("Yours");
     expect(yours.hint).toContain("as long as you hold");
+  });
+
+  it("reads a ship: owner, load and destination", () => {
+    const ships = update({
+      boats: [{ id: 7, player: 2, tile: 0, troops: 40.6, to: 5 }],
+      tradeShips: [{ id: 8, player: 3, tile: 0, to: 6 }],
+      warships: [{ id: 9, player: 1, tile: 0, health: 500, maxHealth: 1000 }],
+    });
+    const owners = (tile: number): number => (tile === 5 ? 1 : 0);
+    expect(shipLines(ships, { kind: "transport", id: 7 }, owners)).toEqual({
+      owner: 2,
+      kind: "Transport ship",
+      lines: ["40 troops aboard", "Landing on the coast of You"],
+    });
+    expect(shipLines(ships, { kind: "trade", id: 8 }, owners)?.lines).toEqual([
+      "Carries goods",
+      "Sailing to a port",
+    ]);
+    expect(shipLines(ships, { kind: "warship", id: 9 }, owners)?.lines).toEqual(["50% health"]);
+    expect(shipLines(ships, { kind: "warship", id: 1 }, owners)).toBeUndefined();
+  });
+
+  it("reads a zone of fallout: cost, time left and who fired", () => {
+    const zone = {
+      tile: 3,
+      radius: 5,
+      heavy: true,
+      ticksLeft: 205,
+      duration: 900,
+      costPercent: 200,
+    };
+    const rules = { ticksPerSecond: 10 };
+    expect(falloutLines(update(), zone, 2, rules)).toEqual([
+      "Taking a tile here costs 2 times the usual price",
+      "Clears in 21 s",
+      "Fired by Bo",
+    ]);
+    expect(falloutLines(update(), zone, undefined, rules)).toHaveLength(2);
   });
 
   it("warns once when a front reaches the player's capital, and tells of a capital taken (R-CAP)", () => {

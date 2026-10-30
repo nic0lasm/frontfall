@@ -36,6 +36,7 @@ import { DiplomacyPanel } from "./diplomacy.ts";
 import type { FeedTarget } from "./events-feed.ts";
 import type { LandLost } from "./feed-events.ts";
 import type { FeedHost } from "./screen/feed-host.ts";
+import type { ShipRef } from "./player-tip.ts";
 import { Hud } from "./hud.ts";
 import { withHidden } from "./hidden-players.ts";
 import { PlayerLabels } from "./labels.ts";
@@ -53,6 +54,8 @@ import { usage, type GameFacts, type GameTracker } from "../usage.ts";
 
 /** How often the turns of an online game are checked for being due. */
 const PACER_MS = 10;
+/** How far from a ship, in screen pixels, the pointer still points at it. */
+const SHIP_REACH = 16;
 /** How far from a landmark's mark, in screen pixels, the pointer still points at it. */
 const LANDMARK_REACH = 18;
 
@@ -608,8 +611,21 @@ export class GameScreen {
       },
       onTileHold: (tile) => {
         // A long press on a landmark shows what it gives; elsewhere it opens the player menu.
+        const ship = this.shipNear(tile);
         const landmark = this.landmarkNear(tile);
-        if (landmark && this.feed) {
+        if (ship && this.feed) {
+          const at = this.scene.camera.tileToScreen(ship.tile);
+          this.feed.pinShip(ship.ref, at.x, at.y);
+        } else if (
+          !landmark &&
+          this.feed &&
+          this.fallingOn(tile) !== undefined &&
+          this.scene.ownerAt(tile) === 0
+        ) {
+          const zone = this.fallingOn(tile) as number;
+          const at = this.scene.camera.tileToScreen(tile);
+          this.feed.pinFallout(zone, at.x, at.y);
+        } else if (landmark && this.feed) {
           const at = this.scene.camera.tileToScreen(landmark.tile);
           this.feed.pinLandmark(landmark, at.x, at.y);
         } else if (!this.replayBar) this.diplomacy.pick(this.scene.ownerAt(tile), tile);
@@ -626,10 +642,45 @@ export class GameScreen {
         this.hud.hover(land ? this.scene.ownerAt(tile) : undefined);
         // The card is about land too, whoever holds it.
         this.feed?.over(land ? this.scene.ownerAt(tile) : 0);
+        this.feed?.overShip(tile === undefined ? undefined : this.shipNear(tile)?.ref);
+        this.feed?.overFallout(tile === undefined ? undefined : this.fallingOn(tile));
         this.feed?.overLandmark(tile === undefined ? undefined : this.landmarkNear(tile));
         this.previews.hover(tile);
       },
     });
+  }
+
+  /** The centre of the zone of fallout that covers `tile`, the newest when several do. */
+  private fallingOn(tile: number): number | undefined {
+    let found: number | undefined;
+    for (const zone of this.latest?.fallout ?? []) {
+      if (zone.ticksLeft > 0 && this.scene.within(tile, zone.tile, zone.radius)) found = zone.tile;
+    }
+    return found;
+  }
+
+  /** The nearest ship within reach of `tile` on screen (a warship first, then a transport). */
+  private shipNear(tile: number): { ref: ShipRef; tile: number } | undefined {
+    const update = this.latest;
+    if (!update) return undefined;
+    const camera = this.scene.camera;
+    const at = camera.tileToScreen(tile);
+    let nearest: { ref: ShipRef; tile: number } | undefined;
+    let best = SHIP_REACH * SHIP_REACH;
+    const look = (kind: ShipRef["kind"], ships: readonly { id: number; tile: number }[]): void => {
+      for (const ship of ships) {
+        const mark = camera.tileToScreen(ship.tile);
+        const d = (mark.x - at.x) ** 2 + (mark.y - at.y) ** 2;
+        if (d <= best) {
+          best = d;
+          nearest = { ref: { kind, id: ship.id }, tile: ship.tile };
+        }
+      }
+    };
+    look("trade", update.tradeShips);
+    look("transport", update.boats);
+    look("warship", update.warships);
+    return nearest;
   }
 
   /**

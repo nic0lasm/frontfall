@@ -6,6 +6,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Added
 
+- **Point at a ship to read it.** Resting the mouse on a transport, trade or war ship shows a card with its owner, what it carries (troops aboard, goods, or its health left) and where it is bound. On a touch screen, press and hold the ship.
+- **Point at bombed land to read it.** Resting the mouse on land under fallout shows a card with the missile (light or heavy), that taking a tile there costs twice the usual price, the seconds before it clears, and who fired it when the missile came down in this game. On a touch screen, press and hold unclaimed irradiated land.
 - **Land by boat along a shared border.** When you touch a player by land, a click always attacked by land. You can now choose the boat: hold Shift and click their coast, or press and hold their land and pick "Land here by boat" in the player menu. The troops sail from your closest coast and land where you pointed.
 
 ### Changed
