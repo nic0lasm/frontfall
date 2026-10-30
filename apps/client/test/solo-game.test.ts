@@ -532,6 +532,50 @@ describe("SoloGame clicks", () => {
     expect(solo.orderForClick(at(30, 6), 30, "warship", 2)).toEqual({ refused: "port" });
   });
 
+  it("lands by boat on a coast that borders the player by land, only when asked (R-ATTACK-09)", () => {
+    // One land mass shaped like a U: a bay opens to the north, the arms join along the south.
+    const width = 20;
+    const height = 14;
+    const kinds = new Uint8Array(width * height).fill(TileKind.Water);
+    const at = (x: number, y: number): number => y * width + x;
+    for (let y = 2; y < 12; y++) {
+      for (let x = 2; x < 18; x++) {
+        if (!(x >= 8 && x < 12 && y < 9)) kinds[at(x, y)] = TileKind.Plains;
+      }
+    }
+    const solo = new SoloGame(
+      { ...options, bots: 1 },
+      {
+        id: "bay",
+        width,
+        height,
+        wrapsX: false,
+        kinds,
+        relief: new Uint8Array(kinds.length),
+        nations: [],
+        landmarks: [],
+      },
+    );
+    let update = solo.step([{ type: "spawn", tile: at(4, 5) }]);
+    while (update.phase === "spawn") update = solo.step([]);
+    const { territory } = solo.game;
+    for (let y = 2; y < 12; y++) {
+      for (let x = 2; x < 18; x++) {
+        if (kinds[at(x, y)] === TileKind.Water) continue;
+        territory.setOwner(at(x, y), x < 10 ? HUMAN_ID : 2);
+      }
+    }
+    const shore = at(12, 5);
+    // The arms touch along the south, so a plain click goes by land...
+    expect(solo.orderForClick(shore, 30, "attack", 0)).toMatchObject({
+      order: { type: "attack", target: shore },
+    });
+    // ...and the boat mode sails across the bay instead.
+    expect(solo.orderForClick(shore, 30, "boat", 0)).toMatchObject({
+      order: { type: "embark", target: shore },
+    });
+  });
+
   it("sends gifts, shows who is at war, and keeps the game's left-out options in its record (R-DIPLO-06, R-MODE-03)", () => {
     const solo = newGame({ ...options, bots: 1, disabled: 8 });
     const land = firstLand(options.map);

@@ -130,12 +130,18 @@ export function orderForClick(
   if (!terrain.isOwnable(tile)) {
     // On the sea: the coast closest to the click, someone else's, is the target.
     const coast =
-      mode === "attack" ? landingsNear(game, you, tile, reach, () => true)[0] : undefined;
+      mode === "attack" || mode === "boat"
+        ? landingsNear(game, you, tile, reach, () => true)[0]
+        : undefined;
     return coast === undefined
       ? { refused: "terrain" }
       : orderForClick(game, you, coast, ratio, mode, 0);
   }
-  if (game.phase === "play" && isAllied(game, you, territory.ownerOf(tile)) && mode === "attack") {
+  if (
+    game.phase === "play" &&
+    isAllied(game, you, territory.ownerOf(tile)) &&
+    (mode === "attack" || mode === "boat")
+  ) {
     return { refused: sameTeam(game, you, territory.ownerOf(tile)) ? "teammate" : "ally" };
   }
   if (
@@ -168,11 +174,12 @@ export function orderForClick(
 
   // By land when the player borders the target's owner on the target's own
   // land mass: an attack starts from that border, so it must reach the click.
+  // The boat mode skips it: the player picked the sea, border or not.
   const owner = territory.ownerOf(tile);
   const mass = terrain.landmassOf(tile);
   const around = new Int32Array(4);
   let touches = false;
-  for (let i = 0; i < territory.borderCount(you) && !touches; i++) {
+  for (let i = 0; i < territory.borderCount(you) && !touches && mode !== "boat"; i++) {
     const border = territory.borderTile(you, i);
     if (terrain.landmassOf(border) !== mass) continue;
     const count = terrain.topology.neighborsInto(border, around);

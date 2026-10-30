@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **Land by boat along a shared border.** When you touch a player by land, a click always attacked by land. You can now choose the boat: hold Shift and click their coast, or press and hold their land and pick "Land here by boat" in the player menu. The troops sail from your closest coast and land where you pointed.
+
 ## [0.9.4] - 2026-10-30
 
 ### Added

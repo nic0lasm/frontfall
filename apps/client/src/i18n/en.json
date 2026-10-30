@@ -273,6 +273,7 @@
   "diplo.wait": "Asked too recently",
   "diplo.renew": "Renew the alliance",
   "diplo.renewSent": "Renewal asked",
+  "diplo.land": "Land here by boat",
   "diplo.embargo": "Embargo their trade",
   "diplo.liftEmbargo": "Lift the embargo",
   "diplo.embargoing": "Under your embargo",

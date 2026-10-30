@@ -871,7 +871,7 @@ export class Hud {
         time: formatDuration(Math.ceil(standsIn / this.rules.ticksPerSecond)),
       });
     }
-    if (this.mode !== "attack") return this.say(MODE_BANNERS[this.mode]);
+    if (this.mode !== "attack" && this.mode !== "boat") return this.say(MODE_BANNERS[this.mode]);
     if (update.attacks.length > 0) {
       if (!this.hintDone) {
         this.hintDone = true;
