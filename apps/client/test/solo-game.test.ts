@@ -600,7 +600,14 @@ describe("SoloGame clicks", () => {
     human.gold = 1_000_000;
     expect(solo.orderForClick(land, 30, "silo")).toEqual({ refused: "disabled" });
     // Gifts go to allies only (R-DIPLO-06).
-    solo.game.alliances.push({ a: HUMAN_ID, b: 2, until: 1_000_000, renewA: false, renewB: false });
+    solo.game.alliances.push({
+      a: HUMAN_ID,
+      b: 2,
+      until: 1_000_000,
+      renewA: false,
+      renewB: false,
+      truce: false,
+    });
     update = solo.step([{ type: "gift", target: 2, troops: 0, gold: 400_000 }]);
     expect(solo.game.player(2)?.gold).toBeGreaterThanOrEqual(400_000);
     expect(update.events).toContainEqual({ type: "gift", a: HUMAN_ID, b: 2 });

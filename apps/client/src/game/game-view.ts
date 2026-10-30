@@ -286,6 +286,10 @@ export interface DiplomacyView {
   /** Players who may not be asked yet: a request ran out, or the player betrayed them. */
   waiting: number[];
   traitors: { id: number; ticksLeft: number }[];
+  /** Players in a truce with the player at this screen, bought by tribute (R-DIPLO-10). */
+  truces: { id: number; ticksLeft: number }[];
+  /** Gold the player at this screen would pay for a tribute (R-DIPLO-10). */
+  tributePrice: number;
   /** Players under the embargo of the player at this screen (R-DIPLO-05). */
   embargoes: number[];
   /** Players whose embargo is on the player at this screen. */
@@ -313,6 +317,7 @@ export interface DiplomacyEvent {
     | "allied"
     | "ended"
     | "betrayed"
+    | "tribute"
     | "embargo"
     | "lifted"
     | "captured"

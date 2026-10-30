@@ -124,14 +124,18 @@ Like the other lengths, the range grows with the side of the map. At 500 tiles o
 
 ## Diplomacy
 
-| Key                           | Value | Unit | Used by      | Notes                                                     |
-| ----------------------------- | ----: | ---- | ------------ | --------------------------------------------------------- |
-| `B-ALLIANCE-REQUEST-TIMEOUT`  |    20 | s    | `R-DIPLO-01` |                                                           |
-| `B-ALLIANCE-REQUEST-COOLDOWN` |    30 | s    | `R-DIPLO-01` | From a request running out to the next to the same player |
-| `B-ALLIANCE-DURATION`         |   300 | s    | `R-DIPLO-03` | Fixed, so that no pact freezes a free-for-all             |
-| `B-ALLIANCE-RENEWAL`          |    30 | s    | `R-DIPLO-03` | Last part of an alliance in which both may renew it       |
-| `B-TRAITOR-DURATION`          |    30 | s    | `R-DIPLO-04` |                                                           |
-| `B-TRAITOR-DEFENSE`           |    50 | %    | `R-DIPLO-04` | Of the usual price of a traitor's tile, after any fort    |
+| Key                           |  Value | Unit | Used by      | Notes                                                     |
+| ----------------------------- | -----: | ---- | ------------ | --------------------------------------------------------- |
+| `B-ALLIANCE-REQUEST-TIMEOUT`  |     20 | s    | `R-DIPLO-01` |                                                           |
+| `B-ALLIANCE-REQUEST-COOLDOWN` |     30 | s    | `R-DIPLO-01` | From a request running out to the next to the same player |
+| `B-ALLIANCE-DURATION`         |    300 | s    | `R-DIPLO-03` | Fixed, so that no pact freezes a free-for-all             |
+| `B-ALLIANCE-RENEWAL`          |     30 | s    | `R-DIPLO-03` | Last part of an alliance in which both may renew it       |
+| `B-TRIBUTE-DURATION`          |    120 | s    | `R-DIPLO-10` | Truce bought by tribute; to be tuned on the bench         |
+| `B-TRIBUTE-BASE`              | 100000 | gold | `R-DIPLO-10` | Price before the land of the payer; to be tuned           |
+| `B-TRIBUTE-PER-TILE`          |    100 | gold | `R-DIPLO-10` | Added to the price per tile of the payer; to be tuned     |
+| `B-TRIBUTE-LEAD`              |    125 | %    | `R-DIPLO-10` | Land of the receiver, as a share of the payer's, at least |
+| `B-TRAITOR-DURATION`          |     30 | s    | `R-DIPLO-04` |                                                           |
+| `B-TRAITOR-DEFENSE`           |     50 | %    | `R-DIPLO-04` | Of the usual price of a traitor's tile, after any fort    |
 
 ## Structures
 

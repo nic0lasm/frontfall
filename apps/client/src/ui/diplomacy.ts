@@ -1,11 +1,13 @@
-import { Disable, QUICK_MESSAGES } from "@frontfall/engine";
+import { DEFAULT_BALANCE, Disable, QUICK_MESSAGES } from "@frontfall/engine";
 import type { ReportReason } from "@frontfall/protocol";
 import type { GameRules } from "../game/messages.ts";
 import type { GameUpdate } from "../game/solo-game.ts";
 import { t, type MessageKey } from "../i18n/index.ts";
 import { colorOf } from "../palette.ts";
 import { h, swatch } from "./dom.ts";
-import { formatPercent } from "./format.ts";
+import { formatCount, formatPercent } from "./format.ts";
+
+const TRIBUTE_LEAD_PERCENT = DEFAULT_BALANCE.tributeLeadPercent;
 import { icon } from "./icons.ts";
 
 type FactsLine = (
@@ -21,6 +23,8 @@ export interface DiplomacyActions {
    */
   onAlly(player: number): boolean;
   onBetray(player: number): void;
+  /** Pays the price of a tribute for a truce (R-DIPLO-10). */
+  onTribute(player: number): void;
   /** Starts (`on` true) or lifts an embargo on the player's trade (R-DIPLO-05). */
   onEmbargo(player: number, on: boolean): void;
   /** Lands the attack ratio's share of the soldiers by boat on the tile, border or not (R-ATTACK-09). */
@@ -199,8 +203,10 @@ export class DiplomacyPanel {
     // Nations answer on their own terms (R-BOT-19): say them before the player asks.
     const nation = id >= this.rules.firstNation;
 
+    const truce = diplomacy.truces.find((x) => x.id === id);
     let status: string;
-    if (teammate) status = t("diplo.teammate");
+    if (truce) status = t("diplo.truceFor", { seconds: this.seconds(truce.ticksLeft) });
+    else if (teammate) status = t("diplo.teammate");
     else if (ally) status = t("diplo.allyFor", { seconds: this.seconds(ally.ticksLeft) });
     else if (asked) status = t("diplo.asksYou");
     else if (pending) status = t("diplo.asked");
@@ -225,8 +231,8 @@ export class DiplomacyPanel {
       enabled: boolean;
       className: string;
     }[] = [];
-    if (ally) {
-      if (ally.renewable) {
+    if (ally || truce) {
+      if (ally?.renewable) {
         buttons.push({
           key: ally.renewing ? "diplo.renewSent" : "diplo.renew",
           action: () => {
@@ -260,6 +266,20 @@ export class DiplomacyPanel {
             },
       );
     } else if (!teammate) {
+      // Only a clearly stronger player takes tribute (B-TRIBUTE-LEAD), and it costs gold.
+      const payer = update.players.find((p) => p.id === update.you);
+      buttons.push({
+        key: "diplo.tribute",
+        params: { gold: formatCount(diplomacy.tributePrice) },
+        action: () => {
+          this.actions.onTribute(id);
+        },
+        enabled:
+          playing &&
+          (payer?.gold ?? 0) >= diplomacy.tributePrice &&
+          player.tiles * 100 >= (payer?.tiles ?? 0) * TRIBUTE_LEAD_PERCENT,
+        className: "tribute",
+      });
       buttons.push({
         key: asked
           ? "diplo.accept"

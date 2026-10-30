@@ -1,5 +1,12 @@
 import type { Game, Order, Player } from "./game.ts";
-import { DiplomacyError, allyError, betrayError, embargoError, isAllied } from "./diplomacy.ts";
+import {
+  DiplomacyError,
+  allyError,
+  betrayError,
+  embargoError,
+  isAllied,
+  tributeError,
+} from "./diplomacy.ts";
 import { BuildError, isStructureKind, placementError } from "./structures.ts";
 import { soldiers, workError } from "./economy.ts";
 import { giftError } from "./gifts.ts";
@@ -65,6 +72,8 @@ export function orderError(game: Game, player: Player, order: Order): string | u
     }
     case "ally":
       return playerError(order.target) ?? allyError(game, player, order.target);
+    case "tribute":
+      return playerError(order.target) ?? tributeError(game, player, order.target);
     case "betray":
       return playerError(order.target) ?? betrayError(game, player, order.target);
     case "embargo":

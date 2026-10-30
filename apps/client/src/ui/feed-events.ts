@@ -30,6 +30,7 @@ const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
   allied: "diplo.eventAllied",
   ended: "diplo.eventEnded",
   betrayed: "diplo.eventBetrayed",
+  tribute: "diplo.eventTribute",
   embargo: "diplo.eventEmbargo",
   lifted: "diplo.eventLifted",
   captured: "diplo.eventCaptured",
@@ -231,6 +232,7 @@ export class FeedWatcher {
       case "allied":
         return "good";
       case "lifted":
+      case "tribute":
       case "gift":
         return target ? "good" : "info";
       case "stopped":

@@ -4,6 +4,8 @@ import {
   StructureKind,
   allianceOf,
   alliesOf,
+  truceMatesOf,
+  tributePrice,
   atWar,
   canRenew,
   cityLimit,
@@ -75,6 +77,11 @@ function diplomacy(game: Game, you: number): DiplomacyView {
       .players()
       .filter((player) => player.alive && tick < player.traitorUntil)
       .map((player) => ({ id: player.id, ticksLeft: player.traitorUntil - tick })),
+    truces: truceMatesOf(game, you).map((id) => ({
+      id,
+      ticksLeft: (allianceOf(game, you, id)?.until ?? tick) - tick,
+    })),
+    tributePrice: tributePrice(game, you),
     embargoes: game.embargoes.filter((e) => e.from === you).map((e) => e.to),
     embargoedBy: game.embargoes.filter((e) => e.to === you).map((e) => e.from),
     atWar: game

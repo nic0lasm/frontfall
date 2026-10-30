@@ -1,4 +1,4 @@
-import { DiplomacyError, isAllied, logEvent } from "./diplomacy.ts";
+import { DiplomacyError, inTruce, isAllied, logEvent } from "./diplomacy.ts";
 import { populationCap, soldiers } from "./economy.ts";
 import type { Game, Player } from "./game.ts";
 import { atWar } from "./warships.ts";
@@ -42,7 +42,7 @@ export function giftError(
   if (gold > player.gold) return GiftError.Gold;
   if (gold === 0 && giftedTroops(game, to, troops) === 0) return GiftError.Full;
   if (atWar(game, player.id, target)) return GiftError.War;
-  if (!isAllied(game, player.id, target)) return GiftError.Ally;
+  if (!isAllied(game, player.id, target) || inTruce(game, player.id, target)) return GiftError.Ally;
   return undefined;
 }
 

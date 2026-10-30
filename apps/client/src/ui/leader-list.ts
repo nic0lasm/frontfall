@@ -40,6 +40,7 @@ export class LeaderList {
     if (humanRank >= size) shown.push(ranked[humanRank] as PlayerView);
     const allies = new Set(diplomacy.allies.map((ally) => ally.id));
     const teammates = new Set(diplomacy.teammates);
+    const truces = new Set(diplomacy.truces.map((truce) => truce.id));
     const traitors = new Set(diplomacy.traitors.map((traitor) => traitor.id));
     const atWar = new Set(diplomacy.atWar);
     const embargoed = new Set([...diplomacy.embargoes, ...diplomacy.embargoedBy]);
@@ -61,8 +62,12 @@ export class LeaderList {
       }
       setText(row.land, share(player.tiles));
       const teammate = teammates.has(player.id);
-      row.ally.hidden = !teammate && !allies.has(player.id);
-      setText(row.ally, t(teammate ? "diplo.teammateBadge" : "diplo.allyBadge"));
+      const truce = truces.has(player.id);
+      row.ally.hidden = !teammate && !truce && !allies.has(player.id);
+      setText(
+        row.ally,
+        t(teammate ? "diplo.teammateBadge" : truce ? "diplo.truceBadge" : "diplo.allyBadge"),
+      );
       row.traitor.hidden = !traitors.has(player.id);
       // One word for what the player is to you: war, then an embargo, then how a nation feels.
       const status = row.button
@@ -70,7 +75,8 @@ export class LeaderList {
           ? "war"
           : embargoed.has(player.id)
             ? "embargo"
-            : (moods.get(player.id) ?? (teammate || allies.has(player.id) ? "" : "neutral"))
+            : (moods.get(player.id) ??
+              (teammate || truce || allies.has(player.id) ? "" : "neutral"))
         : "";
       row.status.hidden = status === "";
       row.status.dataset["status"] = status;

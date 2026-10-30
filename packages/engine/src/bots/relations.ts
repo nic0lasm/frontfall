@@ -256,6 +256,7 @@ export class NationMemory {
       case "build":
       case "demolish":
       case "embargo":
+      case "tribute":
       case "warship":
       case "patrol":
       case "work":

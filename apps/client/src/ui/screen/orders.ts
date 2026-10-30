@@ -41,7 +41,7 @@ export class Orders {
   }
 
   /** Whether the order went out. */
-  diplomatic(type: "ally" | "betray" | "embargo", target: number, on = true): boolean {
+  diplomatic(type: "ally" | "betray" | "embargo" | "tribute", target: number, on = true): boolean {
     const update = this.playing();
     if (!update) return false;
     this.ordered(update);

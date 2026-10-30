@@ -83,7 +83,10 @@ function validClientMessage(rng: Random): ClientMessage {
     case 10:
       return { type: "order", order: { type: "ally", target: 1 + int(rng, 0xffff) } };
     case 11:
-      return { type: "order", order: { type: "betray", target: 1 + int(rng, 0xffff) } };
+      return {
+        type: "order",
+        order: { type: rng() < 0.5 ? "betray" : "tribute", target: 1 + int(rng, 0xffff) },
+      };
     default:
       return {
         type: "order",
