@@ -215,7 +215,7 @@ jobs:
 
       # The page and the map list are cached for a minute by Cloudflare (a cache rule): after a
       # roll out, drop them so that nobody gets a page that names the previous build's files.
-      # Skipped while the token is not set.
+      # Skipped while the token is not set, and only a warning when Cloudflare refuses it.
       - name: Purge the cached page
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_PURGE_TOKEN }}
@@ -227,9 +227,13 @@ jobs:
           fi
           body=$(jq -nc --arg site "$SITE" \
             '{files: [$site, ($site + "index.html"), ($site + "maps/index.json")]}')
-          curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE}/purge_cache" \
+          # A refused purge (expired token, say) leaves a stale page for a while, not a broken
+          # deploy: warn, and let the smoke test run.
+          if ! curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE}/purge_cache" \
             -H "Authorization: Bearer ${CF_TOKEN}" -H "Content-Type: application/json" \
-            --data "$body" | jq -e '.success'
+            --data "$body" | jq -e '.success' > /dev/null; then
+            echo "::warning::The Cloudflare purge failed: the cached page may be stale until it expires"
+          fi
 
   smoke:
     name: Smoke test of the deployed site
