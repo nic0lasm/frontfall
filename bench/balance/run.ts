@@ -32,6 +32,8 @@ const { values } = parseArgs({
     nations: { type: "string" },
     teams: { type: "string" },
     casual: { type: "boolean", default: false },
+    // The casual player, one step better: an order every 3 s with 40 % of its troops.
+    intermediate: { type: "boolean", default: false },
     // The stronger scripted player, in place of the casual one.
     average: { type: "boolean", default: false },
     seeds: { type: "string", default: "1-8" },
@@ -86,7 +88,8 @@ const setups: BalanceSetup[] = seeds.map((seed) => ({
   bots,
   ...(values.nations ? { nations: difficulty(values.nations) } : {}),
   ...(values.teams ? { teams: Number(values.teams) } : {}),
-  ...(values.casual ? { casual: true } : {}),
+  ...(values.casual || values.intermediate ? { casual: true } : {}),
+  ...(values.intermediate ? { intermediate: true } : {}),
   ...(values.average ? { average: true } : {}),
   minutes: Number(values.minutes),
   ...(values.set.length ? { balance: balance } : {}),
@@ -138,7 +141,7 @@ function print(s: BalanceSummary): void {
   const round = (value: number, digits = 1): string => value.toFixed(digits);
   console.log(
     `\n${values.map}, bots ${values.bots}${values.nations ? `, nations ${values.nations}` : ""}` +
-      `${values.teams ? `, ${values.teams} teams` : ""}${values.average ? ", average player" : values.casual ? ", casual player" : ""}` +
+      `${values.teams ? `, ${values.teams} teams` : ""}${values.average ? ", average player" : values.intermediate ? ", intermediate player" : values.casual ? ", casual player" : ""}` +
       (values.set.length ? `, ${values.set.join(" ")}` : "") +
       (values.rule.length ? `, rules ${values.rule.join(" ")}` : ""),
   );

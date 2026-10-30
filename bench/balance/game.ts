@@ -18,7 +18,7 @@ import {
   type Turn,
 } from "@frontfall/engine";
 import { AveragePlayer } from "./average.ts";
-import { CasualPlayer } from "./casual.ts";
+import { CasualPlayer, INTERMEDIATE_PACE } from "./casual.ts";
 import { CombatLog, type CombatReport } from "./combat.ts";
 
 /** One headless game of the balance runs: who plays, where, for how long. */
@@ -32,6 +32,8 @@ export interface BalanceSetup {
   readonly teams?: number;
   /** Whether player 1 is the scripted casual player, starting near the middle of the map. */
   readonly casual?: boolean;
+  /** Whether the casual player is the intermediate one: an order every 3 s with 40 % of its troops. */
+  readonly intermediate?: boolean;
   /** Whether player 1 is the scripted average player instead, starting away from the nations. */
   readonly average?: boolean;
   /** Minutes of play after the spawn phase before the run stops undecided. */
@@ -195,6 +197,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
           game,
           1,
           topology.index(Math.floor(topology.width / 2), Math.floor(topology.height / 3)),
+          setup.intermediate ? INTERMEDIATE_PACE : undefined,
         )
       : undefined;
 

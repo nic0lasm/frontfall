@@ -15,6 +15,15 @@ const EVERY_SECONDS = 5;
 /** Share of its troops each order sends, in %: the interface's default ratio. */
 const RATIO_PERCENT = 30;
 
+/** How often and how hard a scripted player orders. */
+export interface CasualPace {
+  readonly everySeconds: number;
+  readonly ratioPercent: number;
+}
+
+/** A player getting the hang of the game: an order every 3 s with 40 % of its troops. */
+export const INTERMEDIATE_PACE: CasualPace = { everySeconds: 3, ratioPercent: 40 };
+
 /**
  * A stand-in for a casual human player, the one balance.md measures against:
  * an order every 5 s with 30 % of its troops, at free land first, then at
@@ -30,8 +39,12 @@ export class CasualPlayer {
     private readonly game: Game,
     readonly id: number,
     private readonly start: number,
+    private readonly pace: CasualPace = {
+      everySeconds: EVERY_SECONDS,
+      ratioPercent: RATIO_PERCENT,
+    },
   ) {
-    this.every = EVERY_SECONDS * game.balance.ticksPerSecond;
+    this.every = pace.everySeconds * game.balance.ticksPerSecond;
   }
 
   /** The orders of this tick, to put in the turn. */
@@ -43,7 +56,7 @@ export class CasualPlayer {
     const orders: Order[] = [];
     const city = this.city();
     if (city) orders.push(city);
-    const troops = divFloor(me.troops * RATIO_PERCENT, 100);
+    const troops = divFloor(me.troops * this.pace.ratioPercent, 100);
     if (troops >= game.balance.neutralCost) {
       const order = this.attack(troops);
       if (order) orders.push(order);
