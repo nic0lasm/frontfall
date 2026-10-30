@@ -397,8 +397,8 @@ describe("server under fuzzed connections", () => {
     expect(during.map((turn) => turn.tick)).toEqual(
       Array.from({ length: during.length }, (_, index) => firstTick + index),
     );
-    // The game kept its pace: about one turn per 100 ms, without long stalls.
-    expect(during.length).toBeGreaterThan((elapsed / 100) * 0.8);
+    // The game kept its pace: about one turn per 133 ms (a normal game runs 3 ticks in 4 beats), without long stalls.
+    expect(during.length).toBeGreaterThan((elapsed / 133) * 0.8);
     const gaps = during.slice(1).map((turn, index) => turn.at - (during[index]?.at ?? 0));
     expect(Math.max(...gaps)).toBeLessThan(500);
   }, 30_000);

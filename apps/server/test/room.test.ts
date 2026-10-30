@@ -14,6 +14,7 @@ const PUBLIC: RoomSettings = {
   teams: 0,
   disabled: 0,
   speed: 1,
+  pace: 1,
   rules: { collapsingFronts: true, capitals: false },
   minPlayers: 2,
   countdownMs: 10_000,

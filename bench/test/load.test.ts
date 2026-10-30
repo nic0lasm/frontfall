@@ -137,7 +137,7 @@ describe("server load", () => {
         expect(game.desyncs).toBe(0);
         // Counts are taken at one instant; a turn may still be in flight to some clients.
         expect(game.maxTurns - game.minTurns).toBeLessThanOrEqual(1);
-        expect(game.minTurns).toBeGreaterThanOrEqual(80);
+        expect(game.minTurns).toBeGreaterThanOrEqual(60);
         expect(game.ordersSeen).toBeGreaterThan(0);
         expect(game.ordersSeen).toBeGreaterThanOrEqual(game.ordersSent - game.players);
       }

@@ -7,6 +7,7 @@ import {
 } from "@frontfall/engine";
 import { accessibility, motionReduced, onMotionChange } from "./accessibility.ts";
 import { TICK_RATE } from "@frontfall/protocol";
+import { BASE_PACE } from "../game/pace.ts";
 import { LocalSession, SOLO_SNAPSHOT_REFUSED, type ServerLink } from "../game/local-session.ts";
 import { TurnPacer } from "../game/turn-pacer.ts";
 import type { MapInfo, MapLandmarkData } from "../game/maps.ts";
@@ -475,8 +476,8 @@ export class GameScreen {
         );
         if (mine > 0) this.marks.arrived(mine, performance.now());
       },
-      1000 / TICK_RATE / speed,
-      speed,
+      1000 / TICK_RATE / (speed * BASE_PACE),
+      speed * BASE_PACE,
     );
     if (link) {
       // A timer rather than frames: a hidden tab draws nothing but must keep playing.

@@ -17,11 +17,12 @@ Durations are given in seconds of play and converted to ticks with `B-TICK-RATE`
 
 ## Time
 
-| Key              | Value | Unit         | Used by      | Notes                                              |
-| ---------------- | ----: | ------------ | ------------ | -------------------------------------------------- |
-| `B-TICK-RATE`    |    10 | ticks/second | `R-FAIR-03`  | Fixed by the protocol (`TICK_RATE`)                |
-| `B-SPAWN-PHASE`  |    20 | s            | `R-SPAWN-01` | Long enough to read the map, short enough to start |
-| `B-MAX-DURATION` |  3600 | s            | `R-WIN-02`   | One hour                                           |
+| Key              | Value | Unit         | Used by      | Notes                                                |
+| ---------------- | ----: | ------------ | ------------ | ---------------------------------------------------- |
+| `B-TICK-RATE`    |    10 | ticks/second | `R-FAIR-03`  | Fixed by the protocol (`TICK_RATE`)                  |
+| `B-BASE-PACE`    |  0.75 | × the beats  | `R-MODE-07`  | Ticks per beat of the clock at speed 1; only cadence |
+| `B-SPAWN-PHASE`  |    20 | s            | `R-SPAWN-01` | Long enough to read the map, short enough to start   |
+| `B-MAX-DURATION` |  3600 | s            | `R-WIN-02`   | One hour                                             |
 
 ## Spawn
 

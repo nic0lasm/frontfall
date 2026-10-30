@@ -21,6 +21,14 @@ import {
 import { newToken } from "./ids.ts";
 import { TurnLog } from "./turn-log.ts";
 
+/**
+ * How much of a beat's worth of ticks a game at speed 1 runs: a normal game
+ * plays a quarter slower than the simulation's nominal rate. Only the cadence
+ * changes, never what a tick does (R-MODE-07). The client has the same value
+ * in `apps/client/src/game/pace.ts`.
+ */
+const BASE_PACE = 0.75;
+
 /** The connection of one player, as the room sees it. */
 export interface Peer {
   send(frame: Frame): void;
@@ -53,6 +61,8 @@ export interface RoomSettings {
   disabled: number;
   /** Turns closed at each tick of the server (R-MODE-07); 1 in a public game. */
   speed: GameSpeed;
+  /** Turns at speed 1, as a share of one a tick; BASE_PACE unless a test needs one a tick. */
+  pace?: number;
   /** Special rules every client plays with (R-MODE-08); the defaults in a public game. */
   rules: GameRules;
   /** Players needed before the host can start, and before the countdown runs. */
@@ -545,7 +555,7 @@ export class Room {
         }
         return;
       case "running":
-        this.turnCredit += this.settings.speed;
+        this.turnCredit += this.settings.speed * (this.settings.pace ?? BASE_PACE);
         if (this.turnCredit >= 1) {
           const count = Math.floor(this.turnCredit);
           this.turnCredit -= count;
@@ -686,7 +696,7 @@ export class Room {
 
   /** Ticks a late hash is waited for: the same time at every speed. */
   private get hashWindow(): number {
-    return Math.ceil(HASH_WINDOW_TICKS * this.settings.speed);
+    return Math.ceil(HASH_WINDOW_TICKS * this.settings.speed * (this.settings.pace ?? BASE_PACE));
   }
 
   private compareLateHashes(): void {

@@ -3,6 +3,7 @@ import { transferables, type WorkerReply, type WorkerRequest } from "./messages.
 import { fetchMapData } from "./maps.ts";
 import { BeatClock } from "./beat-clock.ts";
 import { REPLAY_MAP_CHANGED, REPLAY_SPEEDS, sameReplayMap } from "./replay-rules.ts";
+import { BASE_PACE } from "./pace.ts";
 import { SoloGame } from "./solo-game.ts";
 
 interface WorkerScope {
@@ -180,7 +181,7 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
       return;
     }
     if (paused) return;
-    tickCredit += speed;
+    tickCredit += speed * BASE_PACE;
     for (; tickCredit >= 1; tickCredit--) tick();
   }, 1000 / ticksPerSecond);
   clock.start();
@@ -202,7 +203,7 @@ function gameSpeed(requested: number): number {
  * that runs none would show nothing sooner.
  */
 function hurry(): void {
-  if (!paused && !game?.options.record && tickCredit + speed >= 1) clock?.pull();
+  if (!paused && !game?.options.record && tickCredit + speed * BASE_PACE >= 1) clock?.pull();
 }
 
 scope.onmessage = (event) => {

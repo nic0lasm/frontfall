@@ -11,6 +11,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### Changed
 
 - **Irradiated land can be taken back.** Land under fallout is no longer closed: you can attack or land on it at once, at twice the usual price while the fallout lasts (90 s after a heavy missile, 30 s after a light one). The marked zone on the map shows how long that lasts.
+- **A calmer pace.** A normal game now plays a quarter slower: everything happens at three quarters of its former speed, in solo, in private lobbies and in public games, and the other speeds scale with it. Nothing else changes: the same moves cost the same, so only the clock is slower.
 
 ## [0.9.3] - 2026-10-30
 
