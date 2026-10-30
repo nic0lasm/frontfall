@@ -4,6 +4,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-30
+
 ### Added
 
 - **The Mosque of Cyrus.** A new building, next to the Micho Palace (key J): an air defense twice as effective. It tries twice to stop each missile that flies within its range instead of once, so it stops about nine in ten (against three in four for a plain air defense). It costs what your next two air defenses would, counts as two after, takes as long to build as an air defense, and is left out of a game that leaves air defenses out. Nations do not build it.
@@ -552,7 +554,8 @@ The first playable beta: a solo game in the browser against bots on a map of the
 - The server trusts the `X-Client-IP` header only from a proxy on a private address, and accepts WebSocket connections without an `Origin` header, as sent by bots and tools.
 - A client that cannot read a turn asks for a reload instead of playing on out of step, and one that notices a gap in its turns rejoins to fetch the missing ones.
 
-[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/nic0lasm/frontfall/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/nic0lasm/frontfall/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/nic0lasm/frontfall/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/nic0lasm/frontfall/compare/v0.9.0...v0.9.1
