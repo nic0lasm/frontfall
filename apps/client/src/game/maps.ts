@@ -110,6 +110,9 @@ export function suggestedBots(info: MapInfo, nations: boolean): number {
 /** The first published map, the World when it is there, is the default. */
 export const PREFERRED_MAP = "world";
 
+/** The map "Play now" opens a game on, whose files the menu fetches ahead (the server's choice, in apps/server/src/main.ts). */
+export const QUICK_MAP = "lyon";
+
 /** Bots are capped by the names available; a map's recommendation counts the human too. */
 const MAX_SUGGESTED_BOTS = 24;
 

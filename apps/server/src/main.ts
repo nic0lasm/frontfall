@@ -105,6 +105,8 @@ const server = createGameServer({
   auth: authSettings(),
   operatorAccounts,
   publicGame: {
+    // "Play now" opens on Lyon: small enough to fill with a few players and bots.
+    map: "lyon",
     ...optionalNumber("FRONTFALL_COUNTDOWN_SECONDS", (seconds) => ({
       // A quick game must count down: without it, a lone player would wait for nothing.
       countdownMs: Math.max(1, seconds) * 1000,

@@ -17,7 +17,7 @@ import {
   t,
   type MessageKey,
 } from "./i18n/index.ts";
-import { fetchMaps, warmMap, type MapInfo } from "./game/maps.ts";
+import { fetchMaps, QUICK_MAP, warmMap, type MapInfo } from "./game/maps.ts";
 import { prebakeGround } from "./render/prebaked-ground.ts";
 import { readReplayFile, replayFile, replayFileName } from "./game/replay-file.ts";
 import { BUILD } from "./net/build.ts";
@@ -120,6 +120,9 @@ function prefetchGame(): void {
     loadGameWithStyles().catch(() => undefined);
     const chosen = maps.find((info) => info.id === setup.map);
     if (chosen) warmGame(chosen);
+    // "Play now" opens a game on the quick map, wherever the menu's own choice stands.
+    const quick = maps.find((info) => info.id === QUICK_MAP);
+    if (quick && quick !== chosen) warmGame(quick);
   };
   if ("requestIdleCallback" in window) window.requestIdleCallback(fetch, { timeout: 3000 });
   else setTimeout(fetch, 1000);
