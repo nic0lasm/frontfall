@@ -8,6 +8,7 @@ import { h } from "./dom.ts";
 import { hintSeen, setHintSeen } from "./hint-state.ts";
 import { formatCount, formatDuration, formatPercent } from "./format.ts";
 import { icon } from "./icons.ts";
+import { pieceIcon } from "./painted-icons.ts";
 import { LeaderList } from "./leader-list.ts";
 import { PopulationBar } from "./population-bar.ts";
 import { BUILD_MODES, costOf, numberOf, offers } from "./build-modes.ts";
@@ -272,7 +273,7 @@ export class Hud {
             ...(digit === undefined ? {} : { "data-num": String(digit) }),
             "aria-keyshortcuts": digit === undefined ? key : `${key} ${String(digit)}`,
           },
-          h("span", { class: "build-icon", "aria-hidden": "true" }, icon(mode)),
+          h("span", { class: "build-icon", "aria-hidden": "true" }, pieceIcon(mode)),
           // The cost stays under the icon, in the dock as in the tray.
           ...(price ? [price] : []),
           // Name and key: a bubble over the button on hover or focus.
@@ -561,6 +562,11 @@ export class Hud {
   private render(update: GameUpdate): void {
     const human = this.you(update);
     if (human) {
+      // The owner's paint on the painted miniatures (styles.css: --own).
+      this.element.style.setProperty(
+        "--own",
+        colorOf(human.id, this.rules.firstNation, this.rules.teams),
+      );
       this.troops.textContent = formatCount(human.troops);
       this.troopsCap.textContent = t("hud.cap", { cap: formatCount(human.cap) });
       this.gold.textContent = formatCount(human.gold);
