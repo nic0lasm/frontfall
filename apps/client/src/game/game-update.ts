@@ -169,6 +169,7 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       from: missile.from,
       to: missile.to,
       target: territory.ownerOf(missile.to),
+      radius: blastRadius(game, missile.size),
       launchedAt: missile.launchedAt,
       arrivesAt: missile.arrivesAt,
     })),

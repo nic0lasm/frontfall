@@ -38,6 +38,9 @@ export interface UnitMark {
   readonly to?: { readonly x: number; readonly y: number };
   /** How far along its flight a missile is, 0 at launch and 1 on arrival. */
   readonly flown?: number;
+  /** A missile's blast radius in tiles, and the colour of whoever launched it. */
+  readonly radius?: number;
+  readonly owner?: string;
 }
 
 /** How a missile ended, on the map: where, with what, and for whom. Tiles, y counted from the north. */

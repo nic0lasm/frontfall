@@ -59,8 +59,6 @@ const BURST_CAP = 8;
 const CAPITAL_DEPTH = 8;
 const CAPITAL_PULSE = 1.8;
 
-/** Spacing of the dots of a trail on screen, in CSS pixels. */
-const TRAIL_PIXELS = 8;
 /** Most effects started by one pass over the ships, so that a jump in a replay is not a firework. */
 const BURST_BUDGET = 8;
 /** Most sparks started by one batch of changed tiles. */
@@ -78,9 +76,6 @@ interface Seen {
   x: number;
   y: number;
   color: string;
-  /** Where the last dot of the trail went. */
-  trailX: number;
-  trailY: number;
   pass: number;
 }
 
@@ -136,8 +131,6 @@ export class EffectTracker {
           x: mark.x,
           y: mark.y,
           color: mark.color,
-          trailX: mark.x,
-          trailY: mark.y,
           pass,
         };
         this.known.set(mark.id, added);
@@ -147,7 +140,6 @@ export class EffectTracker {
       seen.x = mark.x;
       seen.y = mark.y;
       seen.pass = pass;
-      this.trail(seen, now);
     }
     for (const [id, seen] of this.known) {
       if (seen.pass === pass) continue;
@@ -458,39 +450,6 @@ export class EffectTracker {
         shape: "dot",
       });
     }
-  }
-
-  /** The trail of a missile; a ship's wake is painted with its hull (ship-layer.ts). */
-  private trail(unit: Seen, now: number): void {
-    if (unit.kind !== "missile" && unit.kind !== "heavyMissile") return;
-    const spacing = Math.max(2, TRAIL_PIXELS * this.tilesPerPixel);
-    let dx = unit.x - unit.trailX;
-    // The short way across the seam of a wrapping map.
-    const { width, wrapsX } = this.options;
-    if (wrapsX && Math.abs(dx) > width / 2) dx -= Math.sign(dx) * width;
-    const dy = unit.y - unit.trailY;
-    if (Math.hypot(dx, dy) < spacing) return;
-    unit.trailX = unit.x;
-    unit.trailY = unit.y;
-    if (!this.visible(unit.x, unit.y)) return;
-    const x = unit.x + 0.5;
-    const y = unit.y + 0.5;
-    // A dotted arc that fades after the landing.
-    const big = unit.kind === "heavyMissile" ? 1.4 : 1;
-    this.emit({
-      x,
-      y,
-      dx: 0,
-      dy: 0,
-      birth: now,
-      life: 2.4,
-      size0: 1.1 * big,
-      size1: 0.6 * big,
-      minPixels: 3,
-      color: unit.color,
-      alpha: 0.75,
-      shape: "dot",
-    });
   }
 
   private ring(
