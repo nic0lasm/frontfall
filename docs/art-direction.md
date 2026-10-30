@@ -65,6 +65,12 @@ Rules:
 6. **Sizes.** 16 to 20 px at World zoom, 32 to 40 px up close, 28 px in menus. The Palace is drawn 20 % larger than other buildings.
 7. **No text on plates**, no numbers. Counts go in labels next to them.
 
+## Piece geometry
+
+The eight buildings (city, Micho Palace, capital, fort, port, silo, air defence, landmark) share one drawing, `apps/client/src/render/pieces-geo.ts`: flat parts with a material role (stone, metal, wood, gold, owner colour) and a level of detail. Level 0 is the silhouette alone and is kept at every size; level 1 (windows, crenels, flags) appears from about 30 px; level 2 only close up. Nothing in level 0 is thinner than 2.5 units of the 100-unit piece, so it survives at 24 px.
+
+The three that used to merge at 20 px are drawn apart on purpose: the city is the only lopsided piece, a skyline climbing to one slender spire; the fort is low and wide with no roof; the Palace is symmetric under a round dome with a gilded spire. A test rasterises the silhouettes at 16, 20 and 24 px and fails if any two pieces overlap too much.
+
 ## Interface
 
 - Panels keep the `night` palette from the brand guide, with a vertical gradient, a 1 px inner highlight on the top edge and a soft shadow, so they sit above the map like raised pieces.
