@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EffectsLayer } from "../src/render/effects-layer.ts";
 import { EffectTracker, type Particle } from "../src/render/effects-track.ts";
 import type { UnitMark } from "../src/render/renderer.ts";
@@ -267,6 +267,35 @@ describe("EffectTracker, capitals", () => {
   });
 });
 
+const EXPLOSION_PARTS = [
+  THREE.Mesh,
+  THREE.ShaderMaterial,
+  THREE.BufferGeometry,
+  THREE.BufferAttribute,
+  THREE.Scene,
+  THREE.OrthographicCamera,
+  THREE.WebGLRenderTarget,
+  THREE.Color,
+] as const;
+
+/** A renderer that only counts what the explosions ask of it: no WebGL in these tests. */
+function stubRenderer(ratio = 1): THREE.WebGLRenderer & { drawn: THREE.Scene[] } {
+  const drawn: THREE.Scene[] = [];
+  return {
+    drawn,
+    getPixelRatio: () => ratio,
+    getRenderTarget: () => null,
+    getClearAlpha: () => 1,
+    getClearColor: (color: THREE.Color) => color,
+    setClearColor: () => undefined,
+    setRenderTarget: () => undefined,
+    clear: () => undefined,
+    render: (scene: THREE.Scene) => {
+      drawn.push(scene);
+    },
+  } as unknown as THREE.WebGLRenderer & { drawn: THREE.Scene[] };
+}
+
 describe("EffectsLayer", () => {
   const create = (): EffectsLayer =>
     new EffectsLayer({
@@ -281,6 +310,9 @@ describe("EffectsLayer", () => {
       scene: new THREE.Scene(),
       anchor: new THREE.Vector3(),
       moving: true,
+      explosions: EXPLOSION_PARTS,
+      renderer: stubRenderer(),
+      saver: false,
     });
   const particle: Particle = {
     x: 10.5,
@@ -328,5 +360,77 @@ describe("EffectsLayer", () => {
     layer.update(0, 0, VIEW, 1);
     expect(layer.mesh.geometry.instanceCount).toBe(768);
     layer.dispose();
+  });
+
+  it("starts a volumetric explosion on a strike, and the plain marks when motion is reduced", () => {
+    const layer = create();
+    const marks: Particle[] = [];
+    const spy = vi.spyOn(layer, "spawn").mockImplementation((p) => void marks.push(p));
+    layer.update(0, 50, VIEW, 0.1);
+    layer.missileStruck(50, 25, false, 1);
+    expect(layer.alive(2)).toBe(true);
+    expect(marks).toEqual([]);
+    layer.setMotion(false);
+    layer.missileStruck(50, 25, false, 1);
+    expect(marks.length).toBeGreaterThan(0);
+    spy.mockRestore();
+    layer.dispose();
+  });
+
+  it("plays four explosions at once, the fifth falls back to marks, and a free slot is reused", () => {
+    const layer = create();
+    const marks: Particle[] = [];
+    vi.spyOn(layer, "spawn").mockImplementation((p) => void marks.push(p));
+    layer.update(0, 50, VIEW, 0.1);
+    for (let i = 0; i < 4; i++) layer.missileStruck(40 + i, 25, false, 1);
+    expect(marks).toEqual([]);
+    layer.missileStruck(60, 25, false, 1);
+    expect(marks.length).toBeGreaterThan(0);
+    marks.length = 0;
+    layer.update(3.2, 50, VIEW, 0.1);
+    layer.missileStruck(60, 25, false, 3.2);
+    expect(marks).toEqual([]);
+    layer.dispose();
+  });
+
+  it("draws a wide blast through a half-resolution target and a small one straight onto the map", () => {
+    const small = stubRenderer(1);
+    const wide = stubRenderer(5);
+    const make = (renderer: THREE.WebGLRenderer): EffectsLayer =>
+      new EffectsLayer({
+        three: [
+          THREE.Mesh,
+          THREE.ShaderMaterial,
+          THREE.InstancedBufferGeometry,
+          THREE.InstancedBufferAttribute,
+          THREE.BufferAttribute,
+        ],
+        map: { width: 100, height: 50, wrapsX: true, owners: new Uint16Array(5000) },
+        scene: new THREE.Scene(),
+        anchor: new THREE.Vector3(),
+        moving: true,
+        explosions: EXPLOSION_PARTS,
+        renderer,
+        saver: false,
+      });
+    const a = make(small);
+    a.missileStruck(50, 25, false, 0);
+    a.update(0.3, 50, VIEW, 0.1);
+    expect(small.drawn).toHaveLength(0);
+    expect(a.gpuBytes()).toBe(768 * 14 * 4);
+    a.dispose();
+    const b = make(wide);
+    b.missileStruck(50, 25, false, 0);
+    b.update(0.3, 50, VIEW, 0.1);
+    expect(wide.drawn).toHaveLength(1);
+    // The blast is in the scene the target is drawn from, and shown there.
+    expect(wide.drawn[0]?.children.some((child) => child.visible)).toBe(true);
+    // 26 css pixels at a ratio of 5 is 130 device pixels of radius, 332 texels a side at half resolution.
+    expect(b.gpuBytes()).toBe(768 * 14 * 4 + 332 * 332 * 4);
+    b.update(0.4, 50, VIEW, 0.1);
+    expect(b.gpuBytes()).toBe(768 * 14 * 4 + 332 * 332 * 4);
+    b.update(2.5, 50, VIEW, 0.1);
+    expect(wide.drawn).toHaveLength(2);
+    b.dispose();
   });
 });
