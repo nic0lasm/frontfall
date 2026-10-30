@@ -213,6 +213,24 @@ jobs:
           echo "::error::${SITE}healthz does not report $TAG after 60 s (last answer: ${version:-none})"
           exit 1
 
+      # The page and the map list are cached for a minute by Cloudflare (a cache rule): after a
+      # roll out, drop them so that nobody gets a page that names the previous build's files.
+      # Skipped while the token is not set.
+      - name: Purge the cached page
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_PURGE_TOKEN }}
+          CF_ZONE: ${{ vars.CLOUDFLARE_ZONE_ID }}
+        run: |
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ZONE" ]; then
+            echo "::notice::No Cloudflare token: the cached page is not purged"
+            exit 0
+          fi
+          body=$(jq -nc --arg site "$SITE" \
+            '{files: [$site, ($site + "index.html"), ($site + "maps/index.json")]}')
+          curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE}/purge_cache" \
+            -H "Authorization: Bearer ${CF_TOKEN}" -H "Content-Type: application/json" \
+            --data "$body" | jq -e '.success'
+
   smoke:
     name: Smoke test of the deployed site
     needs: deploy
