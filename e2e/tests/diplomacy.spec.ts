@@ -221,6 +221,10 @@ test("closes the player menu with Esc before pausing", async ({ page }) => {
 });
 
 test.describe("on a touch screen", () => {
+  // The bot's land is found on a screenshot of a software-rendered map: on a loaded runner the
+  // camera has not always reached it, or has moved on, so the press misses. The test is run again
+  // a few times, and still has to pass once with every check.
+  test.describe.configure({ retries: 3 });
   // Synthetic pointer events need no touch support from the browser.
   test.use({ viewport: { width: 400, height: 760 } });
 
