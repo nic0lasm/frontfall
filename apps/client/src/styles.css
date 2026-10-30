@@ -510,7 +510,7 @@ button.secondary:disabled {
 }
 
 .map-group-label {
-  color: var(--ff-slate-300);
+  color: var(--ff-secondary);
   font-size: 13px;
 }
 
@@ -1539,4 +1539,160 @@ input::placeholder {
   margin: 0;
   color: var(--ff-slate-300);
   font-size: 13px;
+}
+
+/* Table de campagne (docs/art-direction.md): night leather panels with a brass rule and a stitched
+   seam, keys that stand 3 px proud and sink when pressed, a brass label colour. */
+
+:root {
+  --ff-brass: #c9a55e;
+  --ff-brass-dark: #8a6d3b;
+  --ff-brass-light: #f0d9a0;
+  --ff-label: #d3c08f;
+  --ff-value: #f6f0de;
+  --ff-secondary: #a9bccd;
+  --ff-key: #f0e4c4;
+  --ff-key-ink: #1c1408;
+  --ff-well: #05090e;
+  --ff-raised: linear-gradient(180deg, #1b2e42 0%, #101d2b 55%, #0c1722 100%);
+  --ff-lift:
+    inset 0 0 0 1px rgb(201 165 94 / 55%), inset 0 0 0 3px #0a1219,
+    inset 0 0 0 4px rgb(201 165 94 / 18%), inset 0 8px 14px -6px rgb(255 255 255 / 7%),
+    0 12px 26px rgb(0 0 0 / 55%), 0 2px 0 rgb(0 0 0 / 60%);
+  --ff-key-face: linear-gradient(180deg, #2c445b, #1a2b3c);
+  --ff-key-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 18%), inset 0 0 0 1px rgb(201 165 94 / 35%),
+    0 3px 0 var(--ff-well), 0 6px 12px rgb(0 0 0 / 40%);
+  --ff-key-down:
+    inset 0 1px 0 rgb(255 255 255 / 12%), inset 0 0 0 1px rgb(201 165 94 / 35%),
+    0 1px 0 var(--ff-well);
+
+  /* The painted miniatures (ui/painted-icons.ts): three tones, the owner's paint, a flame. */
+  --own: #56b4e9;
+  --t-l: #f4e8c8;
+  --t-m: #c8a862;
+  --t-d: #7b5f30;
+  --t-k: #18222d;
+  --t-f: #ffb347;
+  --t-w: #8fd0ee;
+}
+
+.pl {
+  fill: var(--t-l);
+}
+
+.pm {
+  fill: var(--t-m);
+}
+
+.pd {
+  fill: var(--t-d);
+}
+
+.pk {
+  fill: var(--t-k);
+}
+
+.po {
+  fill: var(--own);
+}
+
+.pf {
+  fill: var(--t-f);
+}
+
+.pw {
+  stroke: var(--t-w);
+}
+
+.psd {
+  stroke: var(--t-d);
+}
+
+.psl {
+  stroke: var(--t-l);
+}
+
+.panel,
+.banner,
+.menu-form,
+.menu-online,
+.lobby-panel,
+.menu-panel,
+.help,
+.notice {
+  border-color: #070d14;
+  color: var(--ff-text);
+}
+
+/* The stitched seam inside a panel of the game screen. */
+.hud > .panel:not(.feed-item, .player-tip)::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px dashed rgb(201 165 94 / 20%);
+  border-radius: 9px;
+  pointer-events: none;
+}
+
+button.primary,
+button.secondary {
+  border-color: var(--ff-well);
+  border-radius: 12px;
+  transition:
+    transform 80ms,
+    box-shadow 80ms;
+}
+
+button.secondary {
+  background: var(--ff-key-face);
+  color: var(--ff-value);
+  box-shadow: var(--ff-key-shadow);
+}
+
+button.secondary:hover {
+  border-color: var(--ff-well);
+  filter: brightness(1.12);
+}
+
+button.primary {
+  border-color: #5c1d08;
+  background: linear-gradient(180deg, #ff8c58, #e4501d);
+  color: var(--ff-night-800);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 55%),
+    inset 0 -2px 0 rgb(0 0 0 / 12%),
+    0 3px 0 #7a290c,
+    0 8px 16px rgb(242 92 42 / 35%);
+}
+
+button.primary:hover {
+  border-color: #5c1d08;
+  background: linear-gradient(180deg, #ff9a6a, #ee5a26);
+}
+
+button.secondary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: var(--ff-key-down);
+}
+
+button.primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 40%),
+    0 1px 0 #7a290c;
+}
+
+input:not([type="range"], [type="checkbox"], [type="radio"]),
+select {
+  border-color: var(--ff-well);
+  background: #08111a;
+  color: var(--ff-value);
+  box-shadow:
+    inset 0 2px 5px #000,
+    0 1px 0 rgb(201 165 94 / 30%);
+}
+
+:root[data-high-contrast] {
+  --ff-secondary: #d3e0ec;
 }

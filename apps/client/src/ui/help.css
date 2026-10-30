@@ -172,3 +172,19 @@
   grid-row: 1 / 3;
   align-self: center;
 }
+
+/* Table de campagne: brass headings and rules, the keys in cream. */
+.help h3 {
+  color: var(--ff-label);
+}
+
+.help kbd {
+  border-color: transparent;
+  background: var(--ff-key);
+  color: var(--ff-key-ink);
+  box-shadow: 0 1px 0 #6b5127;
+}
+
+.help-build {
+  border-top-color: rgb(201 165 94 / 25%);
+}

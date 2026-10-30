@@ -1,0 +1,273 @@
+/* Table de campagne, in game (docs/art-direction.md). Loaded after game.css: it only dresses what
+   the layout (docs/hud-layout.md) already places, so nothing here moves or resizes a control. */
+
+/* Brass labels, cream figures, blue-grey secondary text. */
+.stat-label,
+.leaderboard h2,
+.minimap-title,
+.player-menu-head h2 {
+  color: var(--ff-label);
+}
+
+.stat-value {
+  color: var(--ff-value);
+}
+
+.stat-cap,
+.goal-text,
+.goal-clock,
+.leader-land,
+.pop-figures,
+.work-row label,
+.work-row .range-value,
+.build-desc {
+  color: var(--ff-secondary);
+}
+
+.ratio label,
+.ratio .range-value {
+  color: var(--ff-value);
+}
+
+.work-row label {
+  color: var(--ff-label);
+}
+
+.leader.you {
+  background: rgb(201 165 94 / 14%);
+  box-shadow: inset 0 0 0 1px rgb(201 165 94 / 35%);
+}
+
+.goal-bar,
+.pop-track {
+  background: var(--ff-well);
+  box-shadow: inset 0 1px 2px #000;
+}
+
+.goal-you {
+  background: linear-gradient(90deg, #c24a1b, var(--ff-ember-bright));
+}
+
+.hud > .guide {
+  border-color: #070d14;
+}
+
+.banner,
+.feed-item.panel,
+.click-note {
+  border-radius: 12px;
+}
+
+.click-note {
+  border-color: #070d14;
+  border-left: 4px solid var(--ff-danger);
+  background: var(--ff-raised);
+  box-shadow: var(--ff-lift);
+}
+
+/* Round brass keys for the tools. */
+.icon-button {
+  border: 2px solid var(--ff-brass-dark);
+  border-radius: 50%;
+  background: radial-gradient(120% 120% at 30% 20%, #34506b, #142333 70%);
+  color: var(--ff-value);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 25%),
+    0 3px 0 var(--ff-well),
+    0 8px 14px rgb(0 0 0 / 50%);
+  transition:
+    transform 80ms,
+    box-shadow 80ms;
+}
+
+.icon-button:hover {
+  border-color: var(--ff-brass);
+}
+
+.icon-button:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 12%),
+    0 1px 0 var(--ff-well);
+}
+
+.speed-button::after,
+.build-key,
+.build-info kbd {
+  border-color: transparent;
+  background: var(--ff-key);
+  color: var(--ff-key-ink);
+  box-shadow: 0 1px 0 #6b5127;
+}
+
+/* The building keys: enamel tiles, the category in the enamel pip on the top rim. */
+.build-button {
+  border: 1px solid var(--ff-well);
+  border-radius: 11px;
+  background: linear-gradient(180deg, #26405a, #14243a 70%, #0e1b2a);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 20%),
+    inset 0 0 0 1px rgb(201 165 94 / 30%),
+    0 3px 0 var(--ff-well);
+  transition:
+    transform 80ms,
+    box-shadow 80ms;
+}
+
+.build-button:hover,
+.build-button:focus-visible {
+  border-color: var(--ff-well);
+  transform: translateY(-1px);
+}
+
+.build-button:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 12%),
+    0 1px 0 var(--ff-well);
+}
+
+.build-button::before {
+  box-shadow: 0 0 6px rgb(var(--tint) / 80%);
+}
+
+.build-silo::before,
+.build-warship::before,
+.build-missile::before,
+.build-heavyMissile::before,
+.build-demolish::before {
+  box-shadow: none;
+}
+
+.build-button .build-icon {
+  color: inherit;
+  filter: none;
+}
+
+.build-button > .build-cost {
+  color: var(--ff-warning);
+}
+
+.build-button.unaffordable {
+  background: linear-gradient(180deg, #26405a, #14243a 70%, #0e1b2a);
+  filter: saturate(0.45);
+  opacity: 0.78;
+}
+
+.build-button.unaffordable > .build-cost {
+  color: #ff8e9a;
+}
+
+/* The chosen one is pressed in and ringed in cream. */
+.build-button[aria-pressed="true"] {
+  border-color: var(--ff-well);
+  background: linear-gradient(180deg, #0b1520, #1b2e42);
+  box-shadow:
+    inset 0 3px 6px #000,
+    inset 0 0 0 2px var(--ff-brass-light),
+    0 0 16px rgb(240 217 160 / 55%),
+    0 1px 0 var(--ff-well);
+  transform: translateY(2px);
+}
+
+.build-info,
+.player-tip,
+.build-tip {
+  border-color: rgb(201 165 94 / 60%);
+  background: #0c1722;
+}
+
+.build-info .build-key {
+  font-size: 11px;
+}
+
+/* The sliders: a grooved rail filled to the value and a brass fader knob (ui/range-click.ts sets --fill). */
+.ratio input[type="range"] {
+  --thumb-size: 22px;
+  --thumb-color: var(--ff-ember);
+
+  appearance: none;
+  background: transparent;
+}
+
+.work-row input[type="range"] {
+  --thumb-color: var(--ff-warning);
+}
+
+@media (pointer: coarse) {
+  .ratio input[type="range"] {
+    --thumb-size: 28px;
+  }
+}
+
+.ratio input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--thumb-color) calc(var(--thumb-size) / 2 + (100% - var(--thumb-size)) * var(--fill, 0)),
+    var(--ff-well) 0
+  );
+  box-shadow:
+    inset 0 1px 3px #000,
+    0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.ratio input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--thumb-color) calc(var(--thumb-size) / 2 + (100% - var(--thumb-size)) * var(--fill, 0)),
+    var(--ff-well) 0
+  );
+  box-shadow:
+    inset 0 1px 3px #000,
+    0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.ratio input[type="range"]::-webkit-slider-thumb {
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  margin-top: calc(4px - var(--thumb-size) / 2);
+  border: 0;
+  border-radius: 50%;
+  appearance: none;
+  background: radial-gradient(circle at 35% 30%, #fff3cf, #d0a85c 45%, #7d5f2c);
+  box-shadow:
+    0 2px 3px rgb(0 0 0 / 60%),
+    inset 0 -2px 3px rgb(0 0 0 / 30%);
+}
+
+.ratio input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3cf, #d0a85c 45%, #7d5f2c);
+  box-shadow:
+    0 2px 3px rgb(0 0 0 / 60%),
+    inset 0 -2px 3px rgb(0 0 0 / 30%);
+}
+
+.ratio .icon {
+  color: var(--ff-label);
+}
+
+/* The small steps and fades are for those who allow motion. */
+@media (prefers-reduced-motion: reduce) {
+  .build-button,
+  .icon-button {
+    transition: none;
+  }
+}
+
+/* A phone with the tray open: the guide has moved under the figures, and a refused click's reason
+   may pass over it, since the player is looking at the buildings and the map, not at the guide. */
+@media (width < 720px), (height < 560px) {
+  .game:has(.build.open) .click-note {
+    z-index: 4;
+    background: var(--ff-raised);
+  }
+}

@@ -84,8 +84,10 @@ The three that used to merge at 20 px are drawn apart on purpose: the city is th
 
 ## Interface
 
-- Panels keep the `night` palette from the brand guide, with a vertical gradient, a 1 px inner highlight on the top edge and a soft shadow, so they sit above the map like raised pieces.
-- Corner radius 14 px for panels, 10 px for buttons and chips, never mixed inside one panel.
+- **Table de campagne.** The interface is the table the map lies on: night leather panels with a brass rule, a second rule inside and a dotted seam (`--ff-lift`, `--ff-raised` in `styles.css`), brass for labels (`--ff-label`), cream for figures (`--ff-value`), blue-grey for secondary text. Panels sit above the map like raised pieces.
+- **Keys.** Every button is a key that stands 3 px proud (a solid shadow, no blur) and sinks 2 px when pressed; the main action is ember. Tools are round with a brass ring. The chosen building is the key held down: pressed in, ringed in cream. Sliders have a grooved rail filled to the value and a brass knob. Motion is limited to 80 ms steps and is switched off with reduced motion.
+- **Painted miniatures.** The eleven pieces of the build bar and the help (`ui/painted-icons.ts`) are small oblique views in three tones plus the owner's paint (`--own`, set on the game screen), so a piece on the bar wears the player's colour like the piece on the map. The tones are custom properties (`--t-l`, `--t-m`, `--t-d`) so a context can repaint them. The one-colour glyphs of `icons.ts` remain for tools, menus and achievement badges.
+- Corner radius 14 px for panels, 12 px for keys, never mixed inside one panel.
 - Numbers use tabular figures; labels are small uppercase with letter-spacing.
 - Ember is reserved for the primary action, the timer bar and the Beta badge. Prices use the warning yellow.
 - Laptop: stats top left, leaderboard top right, build list on the right edge, attack slider at the bottom centre, round buttons bottom right. Phone: stats across the top, build row under it as five icon buttons, leaderboard folded into a one-line chip, attack slider and buttons in a bottom bar.
