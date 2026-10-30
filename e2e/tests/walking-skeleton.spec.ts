@@ -114,11 +114,13 @@ test("two players meet in a private game without leaving the base path", async (
   // The guest picks a start, and their map closes in on it, drawn in their
   // colour: amber, the second of the palette, as for any player after the first.
   await guest.locator("#map").click({ position: { x: 300, y: 300 } });
-  // The ring of the order waits for its turn, then lets go well before it gives up.
-  await expect(guest.locator(".click-mark.pending")).toHaveCount(0, { timeout: 2_000 });
+  // The order comes back in a turn after the pacer's delay, which on a loaded
+  // runner is a few seconds at the start of a game: wait for the land, then
+  // the ring of the order has let go, well before it gives up.
   await expect(guest.locator(".stats .stat-value").nth(2)).not.toHaveText("0%", {
-    timeout: 10_000,
+    timeout: 15_000,
   });
+  await expect(guest.locator(".click-mark.pending")).toHaveCount(0, { timeout: 1_000 });
   // WebKit draws the start in amber too, but its screenshots do not count as
   // such: the colour is checked in the other browsers.
   if (browserName !== "webkit") {
