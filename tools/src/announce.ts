@@ -93,7 +93,7 @@ export class Announcer {
       this.pending.set(`end:${id}`, post);
       this.running.delete(id);
     }
-    // ponytail: a game that ends during a restart is never announced as ended;
+    // A game that ends during a restart is never announced as ended;
     // the next run knows only the games it kept (FRONTFALL_DATA).
     if (run !== undefined && run !== this.run) {
       this.running.clear();
