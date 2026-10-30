@@ -1,7 +1,13 @@
 import { accessibilityPanel } from "./accessibility.ts";
 import { CATALOGUE } from "../achievements/catalog.ts";
 import { REPLAY_EXTENSION } from "../game/replay-file.ts";
-import { MAP_GROUPS, generatedLand, suggestedBots, type MapInfo } from "../game/maps.ts";
+import {
+  MAP_GROUPS,
+  generatedThumbnail,
+  suggestedBots,
+  thumbnailScale,
+  type MapInfo,
+} from "../game/maps.ts";
 import { MAX_BOTS, type Difficulty } from "../game/solo-game.ts";
 import {
   LANGUAGES,
@@ -636,31 +642,54 @@ export function publicGames(body: unknown): PublicGame[] {
   });
 }
 
+declare const __FRONTFALL_THUMBNAILS__: Record<string, PrebuiltThumbnail> | undefined;
+
+interface PrebuiltThumbnail {
+  readonly width: number;
+  readonly height: number;
+  /** One bit per cell, base64: see generatedThumbnails in vite.config.ts. */
+  readonly bits: string;
+}
+
+/** The pictures of the generated maps that the build drew; none in tests and in development. */
+const PREBUILT_THUMBNAILS: Record<string, PrebuiltThumbnail | undefined> =
+  typeof __FRONTFALL_THUMBNAILS__ === "undefined" ? {} : __FRONTFALL_THUMBNAILS__;
+
+function unpackCells(bits: string, count: number): Uint8Array {
+  const bytes = Uint8Array.from(atob(bits), (char) => char.charCodeAt(0));
+  const cells = new Uint8Array(count);
+  for (let i = 0; i < count; i++) cells[i] = ((bytes[i >> 3] ?? 0) >> (i & 7)) & 1;
+  return cells;
+}
+
 /** Small picture of a map: the published thumbnail, or drawn from a generated terrain. */
 function thumbnail(info: MapInfo): HTMLElement {
   if (info.thumbnail) {
     return h("img", { class: "map-thumb", src: info.thumbnail, alt: "", loading: "lazy" });
   }
-  const scale = Math.max(1, Math.ceil(info.width / 160));
-  const width = Math.floor(info.width / scale);
-  const height = Math.floor(info.height / scale);
+  const prebuilt = PREBUILT_THUMBNAILS[info.id];
+  const scale = thumbnailScale(info.width);
+  const width = prebuilt?.width ?? Math.floor(info.width / scale);
+  const height = prebuilt?.height ?? Math.floor(info.height / scale);
   const canvas = h("canvas", { class: "map-thumb", width, height, "aria-hidden": "true" });
   const context = canvas.getContext("2d");
   if (!context) return canvas;
-  // Growing the land takes a while: the menu shows first and each picture follows in its own task.
-  paintAfterMenu(() => {
-    const { land } = generatedLand(info.id);
+  const draw = (cells: Uint8Array): void => {
     const image = context.createImageData(width, height);
     const landColor = hexToRgb(MAP_COLORS.landHigh);
     const ocean = hexToRgb(MAP_COLORS.ocean);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const isLand = land[y * scale * info.width + x * scale] === 1;
-        image.data.set([...(isLand ? landColor : ocean), 255], (y * width + x) * 4);
-      }
+    for (let i = 0; i < width * height; i++) {
+      image.data.set([...(cells[i] === 1 ? landColor : ocean), 255], i * 4);
     }
     context.putImageData(image, 0, 0);
-  });
+  };
+  // The build grew the land already; without it (tests, the dev server) it takes a while:
+  // the menu shows first and each picture follows in its own task.
+  if (prebuilt) draw(unpackCells(prebuilt.bits, width * height));
+  else
+    paintAfterMenu(() => {
+      draw(generatedThumbnail(info.id).cells);
+    });
   return canvas;
 }
 

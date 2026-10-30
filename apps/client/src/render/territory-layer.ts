@@ -7,6 +7,7 @@ import {
   bakeTerrainColors,
   type Latitudes,
 } from "./terrain-colors.ts";
+import { takeBakedGround } from "./prebaked-ground.ts";
 
 export interface TerritoryLayerOptions {
   readonly width: number;
@@ -21,6 +22,8 @@ export interface TerritoryLayerOptions {
   readonly relief?: Uint8Array | undefined;
   /** Latitudes of the map's south and north edges, which set its climates. */
   readonly latitudes?: Latitudes | undefined;
+  /** Which published map this is, and its terrain's checksum: its ground may have been baked ahead. */
+  readonly groundSource?: { readonly id: string; readonly sha256: string } | undefined;
   /** Highest owner id the palette must hold. */
   readonly maxOwner: number;
   /**
@@ -865,17 +868,20 @@ export class TerritoryLayer {
     );
     this.ownerTexture.internalFormat = "R16UI";
 
-    const heights = new Uint8Array(width * height);
+    const source = options.groundSource;
+    const ahead = source && takeBakedGround(source.id, source.sha256);
+    const heights = ahead?.heights ?? new Uint8Array(width * height);
     this.groundTexture = new THREE.DataTexture(
-      bakeTerrainColors({
-        width,
-        height,
-        kinds: terrain,
-        relief: options.relief ?? new Uint8Array(width * height),
-        wrapsX,
-        latitudes: options.latitudes,
-        heightOut: heights,
-      }),
+      ahead?.colors ??
+        bakeTerrainColors({
+          width,
+          height,
+          kinds: terrain,
+          relief: options.relief ?? new Uint8Array(width * height),
+          wrapsX,
+          latitudes: options.latitudes,
+          heightOut: heights,
+        }),
       width,
       height,
     );

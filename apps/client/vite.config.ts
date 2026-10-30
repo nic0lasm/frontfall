@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import { minifyShader } from "../../tools/shader-minify.mjs";
 import { simulationBuild } from "../../tools/simulation-build.mjs";
+import { GENERATED_MAPS, generatedThumbnail } from "./src/game/maps.ts";
 
 // The release is the version of the repository's root package.json, for the client and the server alike.
 const { version } = JSON.parse(
@@ -61,6 +62,13 @@ function preloadMenuInputs(): Plugin {
             },
             injectTo: "head" as const,
           })),
+          // Not for the menu: the simulation worker is the game's last piece to arrive, so
+          // the browser fetches it at low priority once the page is loaded.
+          ...hashed(/^assets\/sim\.worker-[^/]+\.js$/).map((file) => ({
+            tag: "link",
+            attrs: { rel: "prefetch", href: `./${file}` },
+            injectTo: "head" as const,
+          })),
           {
             tag: "link",
             attrs: { rel: "preload", as: "fetch", crossorigin: "", href: "./maps/index.json" },
@@ -72,6 +80,23 @@ function preloadMenuInputs(): Plugin {
   };
 }
 
+/**
+ * The pictures of the generated maps in the menu. Growing their land costs a few hundred
+ * milliseconds of the page's own thread; the same land every time, so the build does it once.
+ */
+function generatedThumbnails(): Record<string, { width: number; height: number; bits: string }> {
+  return Object.fromEntries(
+    GENERATED_MAPS.map((info) => {
+      const { width, height, cells } = generatedThumbnail(info.id);
+      const bytes = Buffer.alloc(Math.ceil(cells.length / 8));
+      cells.forEach((cell, i) => {
+        if (cell === 1) bytes[i >> 3] = (bytes[i >> 3] ?? 0) | (1 << (i & 7));
+      });
+      return [info.id, { width, height, bits: bytes.toString("base64") }];
+    }),
+  );
+}
+
 export default defineConfig({
   plugins: [minifyShaders(), preloadMenuInputs()],
   // Relative URLs: the same build works at / and behind a path prefix such as /frontfall/.
@@ -80,6 +105,7 @@ export default defineConfig({
     // Simulation build of the sources, not the commit; see src/net/build.ts.
     __FRONTFALL_SIMULATION__: JSON.stringify(simulationBuild()),
     // Release of the game, from the root package.json; see src/release.ts.
+    __FRONTFALL_THUMBNAILS__: JSON.stringify(generatedThumbnails()),
     __FRONTFALL_RELEASE__: JSON.stringify(version),
   },
   build: {

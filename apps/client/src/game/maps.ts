@@ -244,6 +244,34 @@ export function generatedLand(id: string): { map: GeneratedMap; land: Uint8Array
   return { map, land };
 }
 
+/** A generated map's menu picture: one land flag per cell, row after row. */
+export interface GeneratedThumbnail {
+  readonly width: number;
+  readonly height: number;
+  readonly cells: Uint8Array;
+}
+
+/** Largest width of a menu picture; the land is sampled every `scale` tiles. */
+const THUMBNAIL_WIDTH = 160;
+
+export function thumbnailScale(width: number): number {
+  return Math.max(1, Math.ceil(width / THUMBNAIL_WIDTH));
+}
+
+/** The picture of a generated map, grown from its seed: the build does it so that no player has to. */
+export function generatedThumbnail(id: string): GeneratedThumbnail {
+  const { map, land } = generatedLand(id);
+  const scale = thumbnailScale(map.width);
+  const width = Math.floor(map.width / scale);
+  const height = Math.floor(map.height / scale);
+  const cells = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++)
+      cells[y * width + x] = land[y * scale * map.width + x * scale] ?? 0;
+  }
+  return { width, height, cells };
+}
+
 export function generateMap(id: string): MapData {
   const { map, land } = generatedLand(id);
   const grid = new WorldGrid(map.width, map.height, { wrapsX: map.wrapsX });

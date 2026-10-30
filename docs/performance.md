@@ -355,6 +355,21 @@ fetches them once it is idle, or on Play if it was not yet. The first visit went
 fetches them as the lobby opens, and holds the turns that come in before the
 screen exists.
 
+Opening the menu and starting a game cost the page's own thread two things that no
+longer reach it (2026-10-30). The pictures of the three generated maps, whose land
+takes about 0.4 s to grow, are drawn by the build and shipped as bitmaps of one bit
+a tile (`__FRONTFALL_THUMBNAILS__`, vite.config.ts; the pages of tests and of the
+dev server still grow them after the menu has painted). The WebGL check of the menu
+waits for the browser to be idle, since creating a context is the slowest line of
+the startup on a weak GPU; Play and the online entries check by themselves. While
+the menu is idle, the page fetches the chosen map and bakes its ground in a worker
+(`render/terrain.worker.ts`, `prebaked-ground.ts`), the second of the page's thread
+that a game used to start with; the territory layer takes the baked ground when it
+is ready and bakes it itself when it is not. The simulation worker's file is
+prefetched at low priority. Headless Chromium on software GL, throttled to 25 Mbit/s,
+40 ms and a CPU 2x slower: menu 1.3 s to 0.5 s, Play to the first game screen
+5.6 s to 2.3 s once the menu has been idle for a few seconds.
+
 Each language's texts are a file of their own since 2026-10-27: a page
 downloads the catalogue of the language it shows, and another one only when
 the player picks it in the menu. The first visit went from 274.8 kB to

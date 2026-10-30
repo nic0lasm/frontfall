@@ -265,6 +265,7 @@ export class MapScene {
           wrapsX: map.wrapsX,
           relief: map.relief,
           latitudes: map.latitudes,
+          groundSource: map.source && { id: map.id, sha256: map.source.sha256 },
           flat: this.flat,
           phone: isPhone(readDevice()),
           owners: this.owners,

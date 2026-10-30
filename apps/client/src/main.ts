@@ -18,6 +18,7 @@ import {
   type MessageKey,
 } from "./i18n/index.ts";
 import { fetchMaps, warmMap, type MapInfo } from "./game/maps.ts";
+import { prebakeGround } from "./render/prebaked-ground.ts";
 import { readReplayFile, replayFile, replayFileName } from "./game/replay-file.ts";
 import { BUILD } from "./net/build.ts";
 import { awaySeat, forgetSeat, saveSeat, seatHeldFor, seatIn, touchSeat } from "./net/seat.ts";
@@ -102,12 +103,23 @@ async function loadGameWithStyles(): Promise<GameModule> {
 }
 
 /**
+ * Gets a map ready for a game that is about to start: its files, which the simulation worker
+ * would otherwise wait for, and its ground, baked in a worker.
+ */
+function warmGame(info: MapInfo): void {
+  void warmMap(info);
+  void prebakeGround(info);
+}
+
+/**
  * Fetches the game's code once the menu is up and the browser has nothing else to do, so
  * that Play finds it in the cache; the menu itself never waits for it.
  */
 function prefetchGame(): void {
   const fetch = (): void => {
     loadGameWithStyles().catch(() => undefined);
+    const chosen = maps.find((info) => info.id === setup.map);
+    if (chosen) warmGame(chosen);
   };
   if ("requestIdleCallback" in window) window.requestIdleCallback(fetch, { timeout: 3000 });
   else setTimeout(fetch, 1000);
@@ -229,6 +241,7 @@ function play(chosen: GameSetup): void {
   }
   const map = maps.find((candidate) => candidate.id === setup.map);
   if (!map) return;
+  warmGame(map);
   // Your colour is yours alone: online, every page shows the colours the game gives.
   void Promise.all([localProfile(), loadGameWithStyles()]).then(([profile, code]) => {
     preferColor(HUMAN_ID, profile.read().color);
@@ -813,7 +826,7 @@ function goOnline(entry: OnlineEntry, chosen: GameSetup = setup, snapshot?: Stor
         visibility = state.visibility;
         // The map downloads while the players gather, so the start finds it ready.
         const chosenMap = maps.find((candidate) => candidate.id === state.map);
-        if (chosenMap) void warmMap(chosenMap);
+        if (chosenMap) warmGame(chosenMap);
         // Any game is joined again from its link, after a reload too.
         history.replaceState(null, "", `?${new URLSearchParams({ game: state.game }).toString()}`);
         if (fromMenu && state.host === state.you) {
@@ -1073,7 +1086,6 @@ const ready = Promise.all([
 ]);
 void ready.then(() => {
   applyTranslations(document);
-  warnIfUnsupported();
   // An invitation link joins its game; ?online, the next public one.
   if (invited) {
     const token = seatIn(invited);
@@ -1091,4 +1103,9 @@ void ready.then(() => {
       name: t("online.defaultName", { name: setup.playerName || t("menu.namePlaceholder") }),
     });
   } else showMenuOrResume();
+  // Creating a WebGL context takes a while on some devices: the check waits for the menu to be
+  // up and the browser idle. Play and the online entries make their own check before starting.
+  if ("requestIdleCallback" in window)
+    window.requestIdleCallback(warnIfUnsupported, { timeout: 2000 });
+  else setTimeout(warnIfUnsupported, 1000);
 });

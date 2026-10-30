@@ -225,6 +225,7 @@ export class MapView implements Renderer {
       terrain: options.kinds,
       wrapsX: options.wrapsX,
       relief: options.relief,
+      groundSource: options.groundSource,
       latitudes: options.latitudes,
       flat: options.flat,
       maxOwner: options.maxOwner,
