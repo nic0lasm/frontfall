@@ -146,11 +146,13 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       // The water tile the ship has reached, its first one before it sails.
       tile: boat.path[Math.max(0, Math.min(boat.step, boat.path.length) - 1)] ?? boat.target,
       troops: boat.troops,
+      arriving: boat.step + game.balance.boatSpeed >= boat.path.length,
     })),
     tradeShips: game.tradeShips.map((ship) => ({
       id: ship.id,
       player: ship.player,
       tile: ship.path[Math.max(0, Math.min(ship.step, ship.path.length) - 1)] ?? ship.from,
+      arriving: ship.step + game.balance.boatSpeed >= ship.path.length,
     })),
     warships: game.warships.map((ship) => ({
       id: ship.id,

@@ -124,7 +124,8 @@ export class EffectTracker {
     this.budget = BURST_BUDGET;
     const pass = ++this.pass;
     for (const mark of marks) {
-      if (mark.id === undefined) continue;
+      // A ship docking, landing or sinking has already vanished as far as the effects go.
+      if (mark.id === undefined || mark.state) continue;
       const kind = mark.kind ?? "transport";
       const seen = this.known.get(mark.id);
       if (!seen) {

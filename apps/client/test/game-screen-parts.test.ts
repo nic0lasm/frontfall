@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameUpdate } from "../src/game/solo-game.ts";
 import { gameKey, typingIn, type KeyState } from "../src/ui/screen/game-keys.ts";
 import { Orders } from "../src/ui/screen/orders.ts";
-import { MISSILE_COLOR, sailing, shipMarks, shipTiles } from "../src/ui/screen/ship-motion.ts";
+import { MISSILE_COLOR, sailing, ShipMotion } from "../src/ui/screen/ship-motion.ts";
 
 const idle: KeyState = {
   overlay: false,
@@ -107,35 +107,83 @@ const sea = {
 } as unknown as GameUpdate;
 
 describe("ship motion", () => {
+  const map = { width: 10, wrapsX: true };
+  const color = (p: number) => `c${String(p)}`;
+  const at = (tick: number, tile: number, extra = {}): GameUpdate =>
+    ({
+      tick,
+      boats: [{ id: 1, player: 2, tile, ...extra }],
+      tradeShips: [],
+      warships: [],
+      missiles: [],
+    }) as unknown as GameUpdate;
+
   it("keeps transports, trade ships and missiles with the same number apart", () => {
-    expect(shipTiles(sea).size).toBe(3);
-    expect(shipTiles(undefined).size).toBe(0);
+    const motion = new ShipMotion();
+    motion.tick({ ...sea, tick: 1 }, map, 10, 0);
+    expect(motion.marks(1, 0, color)).toHaveLength(3);
     expect(sailing(sea)).toBe(true);
     expect(sailing(undefined)).toBe(false);
   });
 
   it("glides each ship from its last tile, the short way across the seam", () => {
-    const previous = shipTiles({
-      ...sea,
-      boats: [{ id: 1, player: 2, tile: 19 }],
-    } as unknown as GameUpdate);
-    const marks = shipMarks(
-      sea,
-      previous,
-      0.5,
-      { width: 10, wrapsX: true },
-      (p) => `c${String(p)}`,
-    );
+    const motion = new ShipMotion();
+    motion.tick({ ...sea, tick: 1, boats: [{ id: 1, player: 2, tile: 19 }] } as never, map, 10, 0);
+    motion.tick({ ...sea, tick: 2 }, map, 10, 100);
+    const marks = motion.marks(0.5, 100, color);
     // From x 9 to x 2 on a map 10 wide: east across the seam, not 7 tiles west.
-    expect(marks[0]).toEqual({ id: 1, x: 10.5, y: 1, color: "c2" });
-    expect(marks[1]).toEqual({ id: -1, x: 0, y: 2, color: "c3", kind: "trade" });
-    expect(marks[2]).toEqual({
+    expect(marks[0]).toMatchObject({ id: 1, x: 10.5, y: 1, color: "c2" });
+    expect(marks[1]).toMatchObject({ id: -1, x: 0, y: 2, color: "c3", kind: "trade" });
+    expect(marks[2]).toMatchObject({
       id: 2 ** 41 + 1,
       x: 5,
       y: 0,
       color: MISSILE_COLOR,
       kind: "heavyMissile",
     });
+  });
+
+  it("points a ship along its course and turns it smoothly the short way", () => {
+    const motion = new ShipMotion();
+    motion.tick(at(1, 15), { width: 10, wrapsX: false }, 10, 0);
+    motion.tick(at(2, 16), { width: 10, wrapsX: false }, 10, 100);
+    const east = motion.marks(1, 100, color)[0];
+    expect(east?.heading).toBeCloseTo(0);
+    expect(east?.speed).toBeCloseTo(10);
+    // Turning to the south: half the way toward a quarter turn, not a snap.
+    motion.tick(at(3, 26), { width: 10, wrapsX: false }, 10, 200);
+    const start = motion.marks(0, 200, color)[0];
+    const end = motion.marks(1, 200, color)[0];
+    expect(start?.heading).toBeCloseTo(0);
+    expect(end?.heading).toBeCloseTo(Math.PI / 4);
+  });
+
+  it("lets a ship that reached its last tile land, and others go under", () => {
+    const motion = new ShipMotion();
+    motion.tick(at(1, 15, { arriving: false }), map, 10, 0);
+    motion.tick(at(2, 16, { arriving: true }), map, 10, 100);
+    motion.tick({ ...at(3, 16), boats: [] }, map, 10, 200);
+    const [landing] = motion.marks(1, 800, color);
+    expect(landing).toMatchObject({ id: 1, state: "landing", speed: 0 });
+    expect(landing?.progress).toBeCloseTo(600 / 1400);
+    expect(motion.busy(800)).toBe(true);
+    expect(motion.busy(200 + 1400)).toBe(false);
+    expect(motion.marks(1, 2000, color)).toEqual([]);
+
+    const sunk = new ShipMotion();
+    sunk.tick(at(1, 15), map, 10, 0);
+    sunk.tick({ ...at(2, 16), boats: [] }, map, 10, 100);
+    expect(sunk.marks(1, 100, color)[0]).toMatchObject({ state: "sinking", progress: 0 });
+  });
+
+  it("does not sink ships on a jump in time, and never shows a missile as a wreck", () => {
+    const motion = new ShipMotion();
+    motion.tick(at(1, 15), map, 10, 0);
+    motion.tick({ ...at(500, 16), boats: [] }, map, 10, 100);
+    expect(motion.marks(1, 100, color)).toEqual([]);
+    motion.tick({ ...sea, tick: 501 }, map, 10, 200);
+    motion.tick({ ...sea, tick: 502, missiles: [] }, map, 10, 300);
+    expect(motion.marks(1, 300, color).some((m) => m.kind === "heavyMissile")).toBe(false);
   });
 });
 

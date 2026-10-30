@@ -361,6 +361,8 @@ export interface TradeShipView {
   id: number;
   player: number;
   tile: number;
+  /** It docks on the next tick; one that leaves without this was sunk. */
+  arriving?: boolean;
 }
 
 /** A transport ship at sea, where it is this tick. */
@@ -369,4 +371,6 @@ export interface BoatView {
   player: number;
   tile: number;
   troops: number;
+  /** It lands on the next tick; one that leaves without this was sunk. */
+  arriving?: boolean;
 }

@@ -90,6 +90,7 @@ Motion explains what is happening; it never decorates.
 - Territory edges ease over about 150 ms when land is taken.
 - A front under attack pulses its ridge at 1 Hz; a quiet front stays still.
 - Ships and missiles move along their route with a short fading trail. Missiles leave a dotted arc that fades after landing.
+- Every ship carries a smoothed heading and a speed, and one that leaves the sea lingers a moment as docking, landing or sinking (`ShipMotion` in `ui/screen/ship-motion.ts`), so that the hull layer can turn it, wake it and sink it; the plates ignore these for now.
 - New buildings drop onto their tile in 120 ms with a small bounce, and the plate shadow shortens as it lands.
 - Everything honours the reduced-motion setting: pulses and bounces become static states, trails stay.
 

@@ -326,6 +326,8 @@ export class MapView implements Renderer {
     let missiles = 0;
     let heavy = 0;
     for (const ship of ships) {
+      // A ship leaving the sea is not drawn as a plate: it is for the layer that draws hulls.
+      if (ship.state) continue;
       if (ship.kind === "missile") {
         if (missiles < MISSILE_CAPACITY) this.missiles.set(missiles++, ship.x, ship.y, ship.color);
       } else if (ship.kind === "heavyMissile") {

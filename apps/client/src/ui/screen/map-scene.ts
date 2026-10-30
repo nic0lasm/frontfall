@@ -28,7 +28,7 @@ import {
 import { usage } from "../../usage.ts";
 import { accessibility, motionReduced } from "../accessibility.ts";
 import { safeStorage } from "../setup.ts";
-import { sailing, shipMarks, shipTiles } from "./ship-motion.ts";
+import { sailing, ShipMotion } from "./ship-motion.ts";
 
 /** Matches the fade of the territory layer, with a frame to spare. */
 const FADE_MS = 130;
@@ -77,7 +77,7 @@ export class MapScene {
   /** Stops reporting the context of the current renderer as lost, ahead of freeing it. */
   private unwatchContext: (() => void) | undefined;
   private latest: GameUpdate | undefined;
-  private previousShips = new Map<number, number>();
+  private readonly motion = new ShipMotion();
   private updatedAt = 0;
   /** Something to draw that the camera alone does not show. */
   private dirty = true;
@@ -342,8 +342,13 @@ export class MapScene {
 
   /** Takes in what a tick changed on the map. */
   update(update: GameUpdate): void {
-    this.previousShips = shipTiles(this.latest);
     this.updatedAt = performance.now();
+    this.motion.tick(
+      update,
+      { width: this.mapSize.width, wrapsX: this.wrapsX },
+      this.shown?.ticksPerSecond ?? 10,
+      this.updatedAt,
+    );
     if (update.owners) {
       this.owners.set(update.owners);
       this.minimap?.noteAll();
@@ -408,7 +413,7 @@ export class MapScene {
     this.minimap?.tick(now);
     const view = this.cam.view();
     const moved = !sameView(view, this.drawnView);
-    const moving = sailing(this.latest);
+    const moving = sailing(this.latest) || this.motion.busy(now);
     const fading = now < this.fadingUntil;
     const frontsOff = this.frontsOffAt > 0 && now >= this.frontsOffAt;
     if (frontsOff) this.frontsOffAt = 0;
@@ -439,13 +444,7 @@ export class MapScene {
     const { firstNation, teams, ticksPerSecond } = this.shown;
     const progress = Math.min(1, (now - this.updatedAt) / (1000 / ticksPerSecond));
     view.setShips(
-      shipMarks(
-        latest,
-        this.previousShips,
-        progress,
-        { width: this.mapSize.width, wrapsX: this.wrapsX },
-        (player) => colorOf(player, firstNation, teams),
-      ),
+      this.motion.marks(progress, now, (player) => colorOf(player, firstNation, teams)),
     );
   }
 

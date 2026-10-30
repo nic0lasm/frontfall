@@ -19,6 +19,20 @@ export interface UnitMark {
    * drawn larger (R-UNIT-04), or a missile in flight (R-UNIT-05).
    */
   readonly kind?: "trade" | "warship" | "missile" | "heavyMissile";
+  /**
+   * The way the unit points, in radians: 0 faces east and a quarter turn is
+   * south (y counts from the north), smoothed over the last ticks.
+   */
+  readonly heading?: number;
+  /** Tiles per second along its heading; 0 once it stops. */
+  readonly speed?: number;
+  /**
+   * Set on a ship that left the sea a moment ago, for the time it lingers:
+   * docking at a port, landing troops, or going under. Left out while it sails.
+   */
+  readonly state?: "docking" | "landing" | "sinking";
+  /** How far along that state the ship is, from 0 to 1. */
+  readonly progress?: number;
 }
 
 /** A structure to draw on its tile, y counted from the north. */
