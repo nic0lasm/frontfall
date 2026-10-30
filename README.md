@@ -26,7 +26,7 @@
 
 The current build runs at **[nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/)**, no account and no install. Every push to `main` is deployed there within minutes.
 
-Play solo against bots, or online with friends through an invitation link or in a public game. Eleven maps: World, Europe, the Americas, Africa and Asia drawn from Natural Earth, and six quick maps, Island, Strait, Ring, Continents, Pangaea and Skirmish. Ships carry troops across the sea, through the Panama and Suez canals. Build cities, forts, ports, missile silos and air defenses, trade by sea, send warships to patrol, ally, betray, send gifts and quick messages, or play in teams. A private game can leave out any structure, and the end screen saves the game to watch it again. The interface is in English and French.
+Play solo against bots, or online with friends through an invitation link or in a public game. Thirteen maps: World, Europe, the Americas, Africa and Asia drawn from Natural Earth, the cities of Paris and Lyon, and six quick maps, Island, Strait, Ring, Continents, Pangaea and Skirmish. Ships carry troops across the sea, through the Panama and Suez canals. Build cities, forts, ports, missile silos and air defenses, trade by sea, send warships to patrol, ally, betray, send gifts and quick messages, or play in teams. A private game can leave out any structure, and the end screen saves the game to watch it again. The interface is in English and French.
 
 <p align="center">
   <img src="docs/assets/screenshot-world.png" alt="A game on the World map: a dozen empires spread across the continents, with their names and troops, the leaderboard and the attack slider" width="100%">
