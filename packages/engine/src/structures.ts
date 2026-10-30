@@ -12,10 +12,12 @@ export const StructureKind = {
   AirDefense: 4,
   /** Counts as two cities in every way (R-BUILD-08). */
   Palace: 5,
+  /** An air defense that gets two tries at every missile (R-BUILD-09). */
+  Mosque: 6,
 } as const;
 export type StructureKind = (typeof StructureKind)[keyof typeof StructureKind];
 
-const HIGHEST_KIND: number = StructureKind.Palace;
+const HIGHEST_KIND: number = StructureKind.Mosque;
 
 /** A structure on one land tile. It works from `readyAt` on, and changes hands with its tile. */
 export interface Structure {
@@ -64,10 +66,21 @@ export function structureCount(game: Game, player: number, kind: StructureKind):
 
 /**
  * The `Disable` bit that leaves a kind out of a private game (R-MODE-03): its
- * own code's bit, but a palace goes with the cities (R-BUILD-08).
+ * own code's bit, but a palace goes with the cities (R-BUILD-08) and a mosque
+ * with the air defenses (R-BUILD-09).
  */
 export function disableBit(kind: StructureKind): number {
-  return kind === StructureKind.Palace ? Disable.City : 1 << kind;
+  if (kind === StructureKind.Palace) return Disable.City;
+  if (kind === StructureKind.Mosque) return Disable.AirDefense;
+  return 1 << kind;
+}
+
+/** Air defenses a player owns, those still being built included, a mosque counting as two (R-BUILD-09). */
+export function airDefenseShare(game: Game, player: number): number {
+  return (
+    structureCount(game, player, StructureKind.AirDefense) +
+    2 * structureCount(game, player, StructureKind.Mosque)
+  );
 }
 
 /** Cities a player owns, those still being built included, a palace counting as two (R-BUILD-08). */
@@ -82,7 +95,7 @@ export function cityShare(game: Game, player: number): number {
  * Gold the next structure of a kind costs a player: its base cost, times
  * B-COST-GROWTH for each one of that kind they already own (R-BUILD). Cities
  * and palaces grow together, a palace counting as two cities and costing
- * what the next two would (R-BUILD-08).
+ * what the next two would (R-BUILD-08); air defenses and mosques likewise (R-BUILD-09).
  */
 export function structureCost(game: Game, player: number, kind: StructureKind): number {
   const cost = fullCost(game, player, kind);
@@ -95,6 +108,11 @@ function fullCost(game: Game, player: number, kind: StructureKind): number {
     const owned = cityShare(game, player);
     const next = grownCost(game, game.balance.cityCost, owned);
     if (kind === StructureKind.City) return next;
+    return Math.min(Number.MAX_SAFE_INTEGER, next + grownCost(game, next, 1));
+  }
+  if (kind === StructureKind.AirDefense || kind === StructureKind.Mosque) {
+    const next = grownCost(game, game.balance.airDefenseCost, airDefenseShare(game, player));
+    if (kind === StructureKind.AirDefense) return next;
     return Math.min(Number.MAX_SAFE_INTEGER, next + grownCost(game, next, 1));
   }
   return grownCost(game, baseCost(game, kind), structureCount(game, player, kind));
@@ -111,7 +129,13 @@ function grownCost(game: Game, base: number, owned: number): number {
 
 function baseCost(
   game: Game,
-  kind: Exclude<StructureKind, typeof StructureKind.City | typeof StructureKind.Palace>,
+  kind: Exclude<
+    StructureKind,
+    | typeof StructureKind.City
+    | typeof StructureKind.Palace
+    | typeof StructureKind.AirDefense
+    | typeof StructureKind.Mosque
+  >,
 ): number {
   const balance = game.balance;
   switch (kind) {
@@ -121,14 +145,14 @@ function baseCost(
       return balance.portCost;
     case StructureKind.Silo:
       return balance.siloCost;
-    case StructureKind.AirDefense:
-      return balance.airDefenseCost;
   }
 }
 
-/** B-BUILD-TIME, or B-BUILD-TIME-LONG for a silo or an air defense. */
+/** B-BUILD-TIME, or B-BUILD-TIME-LONG for a silo, an air defense or a mosque. */
 export function buildTime(game: Game, kind: StructureKind): number {
-  return kind === StructureKind.Silo || kind === StructureKind.AirDefense
+  return kind === StructureKind.Silo ||
+    kind === StructureKind.AirDefense ||
+    kind === StructureKind.Mosque
     ? game.balance.longBuildTicks
     : game.balance.buildTicks;
 }

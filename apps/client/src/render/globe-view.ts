@@ -103,6 +103,11 @@ export class GlobeView implements Renderer {
         fill: markers(5.5, 8, 3, STRUCTURE_CAPACITY),
         size: 5.5,
       },
+      mosque: {
+        outline: markers(7, 10, 2, STRUCTURE_CAPACITY),
+        fill: markers(5.5, 10, 3, STRUCTURE_CAPACITY),
+        size: 5.5,
+      },
       fort: { outline: markers(6, 3, 2), fill: markers(4.5, 3, 3), size: 4.5 },
       port: { outline: markers(5.5, 6, 2), fill: markers(4, 6, 3), size: 4 },
       silo: { outline: markers(6, 5, 2), fill: markers(4.5, 5, 3), size: 4.5 },
@@ -176,6 +181,7 @@ export class GlobeView implements Renderer {
     for (const type of [
       "city",
       "palace",
+      "mosque",
       "fort",
       "port",
       "silo",

@@ -454,6 +454,9 @@ describe("SoloGame clicks", () => {
     });
     expect(solo.previewClick(land, "city")).toEqual({ tile: land });
     expect(solo.previewClick(land, "airDefense").radius).toBeGreaterThan(0);
+    expect(solo.previewClick(land, "mosque").radius).toBe(
+      solo.previewClick(land, "airDefense").radius,
+    );
     expect(solo.game.structures).toHaveLength(queued);
     // A port snaps to the coast beside the click, and a click far inland says why not.
     const coast = [...terrain.kinds.keys()].find((tile) => terrain.isOceanCoast(tile)) ?? -1;

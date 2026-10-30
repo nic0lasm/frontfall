@@ -12,6 +12,7 @@ describe("pieces", () => {
         "heavyMissile",
         "landmark",
         "missile",
+        "mosque",
         "palace",
         "port",
         "silo",

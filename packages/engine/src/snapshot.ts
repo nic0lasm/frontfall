@@ -264,7 +264,7 @@ function readState(game: Game, tick: number, from: SnapshotReader): void {
     game.structures.push({
       id: id(),
       player: player(),
-      kind: from.below(6, "structure kind") as StructureKind,
+      kind: from.below(7, "structure kind") as StructureKind,
       tile: tile(),
       readyAt: id(),
       reloadAt: id(),

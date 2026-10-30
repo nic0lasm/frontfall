@@ -59,7 +59,11 @@ export function previewForClick(
 ): ClickPreview {
   const result = orderForClick(game, you, tile, 100, mode, reach);
   const radius =
-    mode === "fort" ? fortRadius(game) : mode === "airDefense" ? airDefenseRadius(game) : undefined;
+    mode === "fort"
+      ? fortRadius(game)
+      : mode === "airDefense" || mode === "mosque"
+        ? airDefenseRadius(game)
+        : undefined;
   const range = radius === undefined ? {} : { radius };
   if ("refused" in result) return { tile, refused: result.refused, ...range };
   return {
@@ -76,6 +80,7 @@ const STRUCTURE_KINDS: Readonly<Record<StructureType, StructureKind>> = {
   port: StructureKind.Port,
   silo: StructureKind.Silo,
   airDefense: StructureKind.AirDefense,
+  mosque: StructureKind.Mosque,
 };
 
 /** Engine refusals of a build order, as the interface explains them: one for each BuildError. */
@@ -138,7 +143,8 @@ export function orderForClick(
     mode === "palace" ||
     mode === "fort" ||
     mode === "silo" ||
-    mode === "airDefense"
+    mode === "airDefense" ||
+    mode === "mosque"
   ) {
     const order: Order = { type: "build", structure: STRUCTURE_KINDS[mode], tile };
     const error = orderError(game, human, order);

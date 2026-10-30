@@ -81,8 +81,8 @@ function lopsidedness(kind: BuildingKind, size: number): number {
 }
 
 describe("pieces geometry", () => {
-  it("describes the eight buildings, each with parts kept at every level", () => {
-    expect(BUILDING_KINDS).toHaveLength(8);
+  it("describes the nine buildings, each with parts kept at every level", () => {
+    expect(BUILDING_KINDS).toHaveLength(9);
     for (const kind of BUILDING_KINDS) {
       expect(partsAt(kind, 0).length, kind).toBeGreaterThan(0);
       expect(partsAt(kind, 1).length, kind).toBeGreaterThan(partsAt(kind, 0).length - 1);
@@ -116,7 +116,7 @@ describe("pieces geometry", () => {
     }
   });
 
-  it.each(SIZES)("tells the eight silhouettes apart at %i px", (size) => {
+  it.each(SIZES)("tells the nine silhouettes apart at %i px", (size) => {
     const grids = BUILDING_KINDS.map((kind) => coverage(kind, size));
     for (let i = 0; i < grids.length; i++) {
       for (let j = i + 1; j < grids.length; j++) {

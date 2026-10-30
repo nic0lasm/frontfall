@@ -53,7 +53,7 @@ const MISSILE_CAPACITY = 256;
 /**
  * Smallest size of a piece on screen, in CSS pixels, however far the view is
  * zoomed out. A painted building needs 24 to 26 px at world zoom to be told
- * from the others (the Palace 28, the capital and landmarks larger); ships and
+ * from the others (the Palace and the Mosque 28, the capital and landmarks larger); ships and
  * missiles are token plates and stay small.
  */
 const PIECE_MIN_PIXELS = {
@@ -64,6 +64,7 @@ const PIECE_MIN_PIXELS = {
   heavyMissile: 18,
   structure: 26,
   palace: 28,
+  mosque: 28,
   capital: 34,
   landmark: 32,
 } as const;
@@ -307,7 +308,7 @@ export class MapView implements Renderer {
         return marker;
       };
       const minPixels =
-        kind === "palace" || kind === "capital" || kind === "landmark"
+        kind === "palace" || kind === "mosque" || kind === "capital" || kind === "landmark"
           ? PIECE_MIN_PIXELS[kind]
           : PIECE_MIN_PIXELS.structure;
       return pieces
@@ -322,6 +323,7 @@ export class MapView implements Renderer {
     this.structures = {
       city: layers("city", 4, 4),
       palace: layers("palace", 8, 5.5),
+      mosque: layers("mosque", 10, 5.5),
       fort: layers("fort", 3, 4.5),
       port: layers("port", 6, 4),
       silo: layers("silo", 5, 4.5),
@@ -539,6 +541,7 @@ export class MapView implements Renderer {
     for (const type of [
       "city",
       "palace",
+      "mosque",
       "fort",
       "port",
       "silo",

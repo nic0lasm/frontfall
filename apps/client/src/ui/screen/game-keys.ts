@@ -10,6 +10,7 @@ const BUILD_KEYS: Partial<Record<string, ClickMode>> = {
   KeyO: "port",
   KeyL: "silo",
   KeyK: "airDefense",
+  KeyJ: "mosque",
   KeyV: "warship",
   KeyM: "missile",
   KeyN: "heavyMissile",

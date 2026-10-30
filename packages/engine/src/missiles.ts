@@ -322,7 +322,7 @@ export function installMissiles(game: Game): void {
     const reach = radius * radius;
     for (const defense of game.structures) {
       if (
-        defense.kind !== StructureKind.AirDefense ||
+        (defense.kind !== StructureKind.AirDefense && defense.kind !== StructureKind.Mosque) ||
         // Burnt or taken earlier in this tick, before structures change hands.
         territory.ownerOf(defense.tile) !== defense.player ||
         !isReady(game, defense) ||
@@ -341,7 +341,17 @@ export function installMissiles(game: Game): void {
         defense.id,
         DrawUsage.Interception,
       );
-      if (draw % 100 < balance.airDefenseChancePercent) {
+      // R-BUILD-09: a mosque gets a second, independent try.
+      const tries = defense.kind === StructureKind.Mosque ? 2 : 1;
+      let stopped = false;
+      for (let attempt = 0; attempt < tries && !stopped; attempt++) {
+        const roll =
+          attempt === 0
+            ? draw
+            : derivedRandom(draw, game.tick, defense.id, DrawUsage.Interception + attempt);
+        stopped = roll % 100 < balance.airDefenseChancePercent;
+      }
+      if (stopped) {
         defense.reloadAt = game.tick + balance.airDefenseReloadTicks;
         logEvent(game, { tick: game.tick, type: "stopped", a: defense.player, b: missile.player });
         return defense;
