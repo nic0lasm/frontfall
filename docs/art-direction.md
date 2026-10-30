@@ -62,7 +62,7 @@ Rules:
 3. **Readable at 16 px**, the smallest size on screen. Anything that disappears at 16 px is removed from the glyph, not from the plate.
 4. **Token plate.** A rounded square (corner radius 6 of 24) with a top-to-bottom gradient of the owner colour (28 % lighter at the top, 38 % darker at the bottom), a soft highlight on the upper half and a short drop shadow. The glyph is white with details in a dark shade of the owner colour; accent parts (flag, flame) use one warm yellow.
 5. **Owner colour on the plate** so ownership reads at a glance; colour-blind players rely on the glyph and the label.
-6. **Sizes.** 16 to 20 px at World zoom, 32 to 40 px up close, 28 px in menus. The Palace is drawn 20 % larger than other buildings.
+6. **Sizes.** Ships and missiles: 13 to 18 px at World zoom, 32 to 40 px up close, 28 px in menus. Buildings are figurines, not plates (see Piece geometry), with their own sizes.
 7. **No text on plates**, no numbers. Counts go in labels next to them.
 
 ## Ships
@@ -81,6 +81,14 @@ Ships are not plates: each is a hull seen from above, painted procedurally in on
 The eight buildings (city, Micho Palace, capital, fort, port, silo, air defence, landmark) share one drawing, `apps/client/src/render/pieces-geo.ts`: flat parts with a material role (stone, metal, wood, gold, owner colour) and a level of detail. Level 0 is the silhouette alone and is kept at every size; level 1 (windows, crenels, flags) appears from about 30 px; level 2 only close up. Nothing in level 0 is thinner than 2.5 units of the 100-unit piece, so it survives at 24 px.
 
 The three that used to merge at 20 px are drawn apart on purpose: the city is the only lopsided piece, a skyline climbing to one slender spire; the fort is low and wide with no roof; the Palace is symmetric under a round dome with a gilded spire. A test rasterises the silhouettes at 16, 20 and 24 px and fails if any two pieces overlap too much.
+
+### Painted miniatures
+
+`pieces-paint.ts` paints the shared drawing as a figurine, once, when the game starts: a lit front, a shaded side and a lit top for each material, round parts shaded left to right, a thin dark outline (heavier at the coarse level, where a hairline would vanish), a pale rim on lit tops, and a soft shadow falling to the south-east. Each piece stands on a base in the owner's colour, dark at the rim and lighter on top with a pale lip. The atlas holds three levels of detail for the eight kinds (about 1.5 MB with its mipmaps, 128 px a cell). The owner's colour is not in the pixels: roofs, banners and bases are painted in grey and tinted by the shader, which also darkens a very light colour so a roof stands out from land of the same hue. Colour is always carried in three places (base, roof, banner) and the kind only by its silhouette, so a player who does not see the colour still tells the pieces apart.
+
+On the world map a building is at least 26 px wide (the Palace 28, the capital 34, a landmark 32), still readable on a phone at the same CSS size. It changes level of detail at about 30 and 70 px, and only once clearly past the threshold (10 %), so a zoom that rests on one does not flicker. A piece still being built is drawn greyer and fainter.
+
+**Groups.** At world zoom, the finished cities, forts and ports of one player that are closer than 1.35 times their size on screen are drawn as one piece with two satellites behind it and a dark coin with their number (2 to 99, then 99+, readable without colour). Capitals, Palaces, silos, air defences, landmarks and anything under construction are never grouped: they are tactical facts to see one by one. The groups are worked out again when the zoom changes by about 2 %, and a pair that was together stays together a little beyond the limit (12 %), so a group does not flicker either. The graphics profiles and reduced motion change nothing here: the figurines are still images and one instanced draw each.
 
 ## Interface
 

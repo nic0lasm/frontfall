@@ -1,10 +1,14 @@
 import * as THREE from "three";
+import { BUILDING_KINDS, settleLevel, type BuildingKind, type Level } from "./pieces-geo.ts";
+import { COLUMNS, ROWS as BUILDING_ROWS, SPAN, paintAtlas } from "./pieces-paint.ts";
 
 /**
- * The game pieces of the flat map (docs/art-direction.md, pictograms): a token
- * plate in the owner's colour with a white glyph, drawn once into a small atlas
- * when the game starts and sampled by one instanced quad per kind. Kept out of
- * the first visit: the page loads it while the menu is open.
+ * The game pieces of the flat map (docs/art-direction.md, pieces and
+ * pictograms), drawn once into a small atlas when the game starts and sampled
+ * by one instanced quad per kind. Buildings are painted miniatures on a base in
+ * the owner's colour (pieces-paint.ts); ships and missiles are still token
+ * plates with a white glyph. Kept out of the first visit: the page loads it
+ * while the menu is open.
  */
 
 /** A glyph on the 24-unit grid: solid shapes, then cut-outs, then the one warm accent. */
@@ -17,49 +21,10 @@ interface Glyph {
 }
 
 /**
- * One silhouette each, meant to read at 16 px: details are cut out of the
- * shape and at least two units wide, never hairlines.
+ * One silhouette each for the units, meant to read at 13 px: details are cut
+ * out of the shape and at least two units wide, never hairlines.
  */
 const GLYPHS = {
-  city: {
-    solid: "M3 20.5V12h5.5v8.5zM9.2 20.5V3.5h6.6v17zM16.8 20.5V8.5h4.4v12z",
-    cut: "M10.3 6.5h1.7v2.1h-1.7zM13 6.5h1.7v2.1H13zM10.3 10.7h1.7v2.1h-1.7zM13 10.7h1.7v2.1H13zM10.3 14.9h1.7V17h-1.7zM13 14.9h1.7V17H13zM18 11h2v2h-2zM18 15h2v2h-2zM4.7 14.5h2.1v2.2H4.7z",
-  },
-  palace: {
-    solid:
-      "M6 20.5v-7h1.6C8 9.5 9.7 7 12 5.8c2.3 1.2 4 3.7 4.4 7.7H18v7zM3 20.5V11l1.5-3L6 11v9.5zM18 20.5V11l1.5-3L21 11v9.5zM11.4 1.8h1.2v4h-1.2z",
-    cut: "M10.6 20.5v-3.6a1.4 1.4 0 0 1 2.8 0v3.6zM8.1 14.6h1.7v2.6H8.1zM14.2 14.6h1.7v2.6h-1.7zM4.2 13h1.2v2.4H4.2zM18.6 13h1.2v2.4h-1.2z",
-    accent: "M12.6 1.8l4.2 1.4-4.2 1.4z",
-  },
-  /** R-CAP-01: a crown, larger on the map than any building. */
-  capital: {
-    solid: "M3 17.2 2.2 6.8l5.3 4.4L12 3.6l4.5 7.6 5.3-4.4-.8 10.4zM3 18.6h18v2.6H3z",
-    cut: "M10.7 12.6a1.3 1.3 0 1 1 2.6 0 1.3 1.3 0 0 1-2.6 0z",
-    accent: "M12 .8l1.3 1.6L12 4 10.7 2.4z",
-  },
-  /** R-LAND-01: a monument's front, a pediment on three columns, for the landmarks of a city map. */
-  landmark: {
-    solid:
-      "M12 2.8 21.5 8.6h-19zM3.5 9.8h17v1.9h-17zM5 12.8h2.6v5.4H5zM10.7 12.8h2.6v5.4h-2.6zM16.4 12.8H19v5.4h-2.6zM2.5 19.2h19v2.1h-19z",
-    accent: "M12 4.6a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2z",
-  },
-  fort: {
-    solid: "M3.5 20.5V5h4.2v3h2.4V5h3.8v3h2.4V5h4.2v15.5z",
-    cut: "M9.9 20.5v-4.6a2.1 2.1 0 0 1 4.2 0v4.6zM11.2 9.8h1.6v2.8h-1.6z",
-  },
-  port: {
-    solid:
-      "M12 2.7a2.7 2.7 0 1 1 0 5.4 2.7 2.7 0 0 1 0-5.4zM10.9 7.5h2.2v10.1h-2.2zM7.5 9.2h9v2.1h-9zM3 11.5h3.4a5.6 5.6 0 0 0 11.2 0H21a9 9 0 0 1-18 0z",
-    cut: "M12 4.2a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z",
-  },
-  silo: {
-    solid: "M5.5 20.5V11L8 8.5h8l2.5 2.5v9.5zM12 1.8l3 6.7H9z",
-    cut: "M7.5 13h9v1.8h-9zM7.5 17h9v1.8h-9z",
-  },
-  airDefense: {
-    solid: "M12 2.5l8 3v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10v-6z",
-    cut: "M12 7l4.6 5.5h-3.1V17h-3v-4.5H7.4z",
-  },
   transport: {
     solid: "M3 16h18l-3.5 4.5h-11zM11.3 3h1.4v13h-1.4zM13.7 4.5 20.5 14.5h-6.8zM10.3 7 4 14.5h6.3z",
   },
@@ -88,13 +53,18 @@ const GLYPHS = {
   },
 } as const satisfies Record<string, Glyph>;
 
-export type PieceKind = keyof typeof GLYPHS;
+type UnitKind = keyof typeof GLYPHS;
+export type PieceKind = BuildingKind | UnitKind;
 
-/** Position of each kind in the atlas, in reading order. */
-export const PIECE_KINDS = Object.keys(GLYPHS) as readonly PieceKind[];
+const UNIT_KINDS = Object.keys(GLYPHS) as readonly UnitKind[];
+/** Every kind the map draws, buildings first. */
+export const PIECE_KINDS: readonly PieceKind[] = [...BUILDING_KINDS, ...UNIT_KINDS];
+
+const isBuilding = (kind: PieceKind): kind is BuildingKind =>
+  (BUILDING_KINDS as readonly string[]).includes(kind);
 
 const COLS = 4;
-const ROWS = Math.ceil(PIECE_KINDS.length / COLS);
+const ROWS = Math.ceil(UNIT_KINDS.length / COLS);
 /** Pixels per cell, and the empty margin that keeps neighbours from bleeding into each other's mipmaps. */
 const CELL = 96;
 const PAD = 6;
@@ -113,13 +83,13 @@ function plate(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   ctx.closePath();
 }
 
-type Pass = (ctx: CanvasRenderingContext2D, kind: PieceKind, x: number, y: number) => void;
+type Pass = (ctx: CanvasRenderingContext2D, kind: UnitKind, x: number, y: number) => void;
 
 /** Draws every cell with `pass` on a clear canvas and returns the pixels. */
 function paint(ctx: CanvasRenderingContext2D, pass: Pass): Uint8ClampedArray {
   const { width, height } = ctx.canvas;
   ctx.clearRect(0, 0, width, height);
-  PIECE_KINDS.forEach((kind, i) => {
+  UNIT_KINDS.forEach((kind, i) => {
     ctx.save();
     pass(ctx, kind, (i % COLS) * CELL + PAD, Math.floor(i / COLS) * CELL + PAD);
     ctx.restore();
@@ -128,7 +98,7 @@ function paint(ctx: CanvasRenderingContext2D, pass: Pass): Uint8ClampedArray {
 }
 
 /** Puts the 24-unit grid on the plate at (x, y), turned as the glyph asks. */
-function place(ctx: CanvasRenderingContext2D, kind: PieceKind, x: number, y: number): void {
+function place(ctx: CanvasRenderingContext2D, kind: UnitKind, x: number, y: number): void {
   const { turn } = GLYPHS[kind] as Glyph;
   ctx.translate(x, y);
   ctx.scale(SIDE / GRID, SIDE / GRID);
@@ -141,7 +111,7 @@ function place(ctx: CanvasRenderingContext2D, kind: PieceKind, x: number, y: num
 }
 
 /** Fills the glyph's solid paths, then cuts its details out so the plate shows through. */
-function glyph(ctx: CanvasRenderingContext2D, kind: PieceKind, x: number, y: number): void {
+function glyph(ctx: CanvasRenderingContext2D, kind: UnitKind, x: number, y: number): void {
   const { solid, cut } = GLYPHS[kind] as Glyph;
   place(ctx, kind, x, y);
   ctx.fill(new Path2D(solid));
@@ -156,7 +126,7 @@ function glyph(ctx: CanvasRenderingContext2D, kind: PieceKind, x: number, y: num
  * much light the plate catches (a gradient, a highlight and a dark rim), green
  * the white glyph, blue the warm accent and alpha the plate itself.
  */
-function drawAtlas(): THREE.DataTexture {
+function drawUnitAtlas(): THREE.DataTexture {
   const canvas = document.createElement("canvas");
   canvas.width = COLS * CELL;
   canvas.height = ROWS * CELL;
@@ -204,21 +174,46 @@ function drawAtlas(): THREE.DataTexture {
   return texture;
 }
 
-let atlas: THREE.DataTexture | undefined;
+let unitAtlas: THREE.DataTexture | undefined;
+
+interface FigurineAtlas {
+  readonly colour: THREE.DataTexture;
+  readonly owner: THREE.DataTexture;
+}
+
+let figurineAtlas: FigurineAtlas | undefined;
+
+function drawFigurineAtlas(): FigurineAtlas {
+  const { colour, owner, width, height } = paintAtlas();
+  const mips = (texture: THREE.DataTexture): THREE.DataTexture => {
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+  };
+  const one = new THREE.DataTexture(owner, width, height, THREE.RedFormat);
+  one.unpackAlignment = 1;
+  return { colour: mips(new THREE.DataTexture(colour, width, height)), owner: mips(one) };
+}
 
 const vertexShader = /* glsl */ `
   uniform float worldWidth;
   uniform float cameraX;
   uniform bool wrapsX;
   uniform float unitScale;
+  uniform float pieceSize;
+  uniform float shiftScale;
   attribute float fade;
+  attribute vec2 shift;
   out vec3 vColor;
   out vec2 vUv;
   out float vFade;
 
   void main() {
     vec4 center = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-    vec4 world = modelMatrix * instanceMatrix * vec4(position * unitScale, 1.0);
+    // The shift attribute moves a piece by fractions of its own size: the satellites of a group, and its count.
+    vec4 world = modelMatrix * instanceMatrix * vec4(position * unitScale + vec3(shift * pieceSize * shiftScale, 0.0), 1.0);
     // The copy of the world closest to the camera, judged by the centre of the piece.
     if (wrapsX) world.x += worldWidth * floor((cameraX - center.x) / worldWidth + 0.5);
     vColor = instanceColor;
@@ -228,7 +223,7 @@ const vertexShader = /* glsl */ `
   }
 `;
 
-const fragmentShader = /* glsl */ `
+const unitFragmentShader = /* glsl */ `
   uniform sampler2D atlas;
   uniform vec2 cell;
   in vec3 vColor;
@@ -248,19 +243,51 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
+/**
+ * The painted atlas holds display-space colours (what the painter saw), so the
+ * piece is put together in that space and converted once at the end: stone and
+ * metal as painted, the owner's parts as a grey times the owner's colour, and a
+ * darker tint for a light colour so a roof stands out from land of the same hue.
+ */
+const figurineFragmentShader = /* glsl */ `
+  uniform sampler2D atlas;
+  uniform sampler2D ownerAtlas;
+  uniform vec2 cell;
+  in vec3 vColor;
+  in vec2 vUv;
+  in float vFade;
+  layout(location = 0) out highp vec4 outColor;
+
+  void main() {
+    vec2 at = (cell + vec2(vUv.x, 1.0 - vUv.y)) / vec2(${String(COLUMNS)}.0, ${String(BUILDING_ROWS)}.0);
+    vec4 t = texture(atlas, at);
+    if (t.a < 0.004) discard;
+    float own = texture(ownerAtlas, at).r;
+    float light = dot(vColor, vec3(0.2126, 0.7152, 0.0722));
+    vec3 tint = pow(vColor, vec3(1.0 / 2.2)) * mix(1.0, 0.7, smoothstep(0.45, 0.7, light));
+    vec3 paint = (t.rgb + own * tint) / t.a;
+    // Greyer and fainter while it is being built.
+    paint = mix(vec3(dot(paint, vec3(0.3, 0.59, 0.11))), paint, 0.35 + 0.65 * vFade);
+    outColor = linearToOutputTexel(vec4(pow(paint, vec3(2.2)), t.a * (0.55 + 0.45 * vFade)));
+  }
+`;
+
 export interface PieceLayerOptions {
   readonly worldWidth: number;
   readonly worldHeight: number;
   readonly wrapsX?: boolean;
   /** Most pieces drawn at once; the buffers are sized for it up front. */
   readonly capacity: number;
-  /** Side of the plate in tiles. */
+  /** Side of the piece in tiles. */
   readonly size: number;
-  /** Which glyph the plate carries. */
+  /** What the piece is: a painted building, or a token plate with a glyph. */
   readonly kind: PieceKind;
   /** Drawn after layers with a lower order, over them. */
   readonly order: number;
 }
+
+/** Local height of the base's centre in the 100-unit piece (pieces-paint.ts): the tile is under it. */
+const GROUND_Y = -9;
 
 /**
  * Every piece of one kind in a single instanced draw call, the same contract
@@ -273,33 +300,74 @@ export class PieceLayer {
   private readonly color = new THREE.Color();
   private readonly cameraX = { value: 0 };
   private readonly unitScale = { value: 1 };
+  private readonly shiftScale = { value: 1 };
   private readonly fades: THREE.InstancedBufferAttribute;
+  private readonly shifts: THREE.InstancedBufferAttribute;
+  private readonly column: { value: THREE.Vector2 } | undefined;
+  private readonly row: number;
+  private level: Level = 0;
   private dirtyFrom = Infinity;
   private dirtyTo = -1;
 
   constructor(readonly options: PieceLayerOptions) {
-    atlas ??= drawAtlas();
-    const index = PIECE_KINDS.indexOf(options.kind);
-    const material = new THREE.ShaderMaterial({
-      glslVersion: THREE.GLSL3,
-      vertexShader,
-      fragmentShader,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      uniforms: {
-        worldWidth: { value: options.worldWidth },
-        cameraX: this.cameraX,
-        unitScale: this.unitScale,
-        wrapsX: { value: options.wrapsX ?? true },
-        atlas: { value: atlas },
-        cell: { value: new THREE.Vector2(index % COLS, Math.floor(index / COLS)) },
-      },
-    });
-    const geometry = new THREE.PlaneGeometry(options.size, options.size);
+    const { kind } = options;
+    const building = isBuilding(kind);
+    const shared = {
+      worldWidth: { value: options.worldWidth },
+      cameraX: this.cameraX,
+      unitScale: this.unitScale,
+      wrapsX: { value: options.wrapsX ?? true },
+      pieceSize: { value: options.size },
+      shiftScale: this.shiftScale,
+    };
+    let material: THREE.ShaderMaterial;
+    let geometry: THREE.PlaneGeometry;
+    if (building) {
+      figurineAtlas ??= drawFigurineAtlas();
+      this.row = BUILDING_KINDS.indexOf(kind);
+      this.column = { value: new THREE.Vector2(0, this.row) };
+      material = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        vertexShader,
+        fragmentShader: figurineFragmentShader,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        uniforms: {
+          ...shared,
+          atlas: { value: figurineAtlas.colour },
+          ownerAtlas: { value: figurineAtlas.owner },
+          cell: this.column,
+        },
+      });
+      // The quad shows 120 units of the 100-unit piece; the base sits on the tile, the figure rises north of it.
+      const side = (options.size * SPAN.width) / 100;
+      geometry = new THREE.PlaneGeometry(side, side);
+      geometry.translate(0, ((GROUND_Y - (SPAN.top + SPAN.height / 2)) / 100) * options.size, 0);
+    } else {
+      unitAtlas ??= drawUnitAtlas();
+      this.row = UNIT_KINDS.indexOf(kind);
+      material = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        vertexShader,
+        fragmentShader: unitFragmentShader,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        uniforms: {
+          ...shared,
+          atlas: { value: unitAtlas },
+          cell: { value: new THREE.Vector2(this.row % COLS, Math.floor(this.row / COLS)) },
+        },
+      });
+      geometry = new THREE.PlaneGeometry(options.size, options.size);
+    }
     this.fades = new THREE.InstancedBufferAttribute(new Float32Array(options.capacity), 1);
     this.fades.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute("fade", this.fades);
+    this.shifts = new THREE.InstancedBufferAttribute(new Float32Array(options.capacity * 2), 2);
+    this.shifts.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute("shift", this.shifts);
     this.mesh = new THREE.InstancedMesh(geometry, material, options.capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.setColorAt(0, this.color.set(0xffffff));
@@ -320,8 +388,19 @@ export class PieceLayer {
     this.mesh.count = value;
   }
 
-  /** Places piece `index` at tile coordinates (x, y), y counted from the north; unbuilt ones are drawn faded. */
-  set(index: number, x: number, y: number, color: THREE.ColorRepresentation, built = true): void {
+  /**
+   * Places piece `index` at tile coordinates (x, y), y counted from the north; unbuilt ones are drawn faded.
+   * `shiftX` and `shiftY` move it by fractions of its size, y up: the satellites of a group.
+   */
+  set(
+    index: number,
+    x: number,
+    y: number,
+    color: THREE.ColorRepresentation,
+    built = true,
+    shiftX = 0,
+    shiftY = 0,
+  ): void {
     if (!Number.isInteger(index) || index < 0 || index >= this.options.capacity) {
       throw new RangeError(`piece ${String(index)} is outside the capacity`);
     }
@@ -329,6 +408,7 @@ export class PieceLayer {
     this.mesh.setMatrixAt(index, this.matrix);
     this.mesh.setColorAt(index, this.color.set(color));
     this.fades.setX(index, built ? 1 : 0);
+    this.shifts.setXY(index, shiftX, shiftY);
     this.dirtyFrom = Math.min(this.dirtyFrom, index);
     this.dirtyTo = Math.max(this.dirtyTo, index);
   }
@@ -336,6 +416,17 @@ export class PieceLayer {
   /** Draws every piece this many times its footprint, around its centre. */
   setScale(scale: number): void {
     this.unitScale.value = scale;
+    this.shiftScale.value = scale;
+  }
+
+  /**
+   * Tells a painted building how large it is on screen, in CSS pixels, to pick
+   * its level of detail.
+   */
+  setPixels(pixels: number): void {
+    if (!this.column) return;
+    this.level = settleLevel(this.level, pixels);
+    this.column.value.x = this.level;
   }
 
   /** Follows the camera across the seam and uploads what changed since the last call. */
@@ -352,6 +443,182 @@ export class PieceLayer {
     }
     this.fades.addUpdateRange(this.dirtyFrom, count);
     this.fades.needsUpdate = true;
+    this.shifts.addUpdateRange(this.dirtyFrom * 2, count * 2);
+    this.shifts.needsUpdate = true;
+    this.dirtyFrom = Infinity;
+    this.dirtyTo = -1;
+  }
+
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+    this.mesh.dispose();
+  }
+}
+
+/** Pixels of one digit cell of the count atlas, and its grid. */
+const COIN = 48;
+const COIN_COLUMNS = 10;
+/** Largest count with its own cell; more is written "99+". */
+const COIN_MAX = 99;
+
+let countAtlas: THREE.CanvasTexture | undefined;
+
+/** Every count from 2 to 99, then "99+", each on a dark coin ringed in white so it reads without colour. */
+function drawCountAtlas(): THREE.CanvasTexture {
+  const cells = COIN_MAX - 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = COIN * COIN_COLUMNS;
+  canvas.height = COIN * Math.ceil(cells / COIN_COLUMNS);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2D canvas for the counts");
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < cells; i++) {
+    const x = (i % COIN_COLUMNS) * COIN + COIN / 2;
+    const y = Math.floor(i / COIN_COLUMNS) * COIN + COIN / 2;
+    ctx.beginPath();
+    ctx.arc(x, y, COIN / 2 - 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#111b26";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
+    const text = i === cells - 1 ? `${String(COIN_MAX)}+` : String(i + 2);
+    ctx.fillStyle = "#fff";
+    ctx.font = `700 ${String(text.length > 2 ? 22 : 31)}px Inter, system-ui, sans-serif`;
+    ctx.fillText(text, x, y + 1);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  // Rows are counted from the top, as in the other atlases.
+  texture.flipY = false;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  return texture;
+}
+
+const countFragmentShader = /* glsl */ `
+  uniform sampler2D atlas;
+  in vec3 vColor;
+  in vec2 vUv;
+  in float vFade;
+  layout(location = 0) out highp vec4 outColor;
+
+  void main() {
+    // The cell number rides in the instance colour's red, in whole units.
+    float n = floor(vColor.r * 255.0 + 0.5);
+    vec2 cell = vec2(mod(n, ${String(COIN_COLUMNS)}.0), floor(n / ${String(COIN_COLUMNS)}.0));
+    vec2 grid = vec2(${String(COIN_COLUMNS)}.0, ${String(Math.ceil((COIN_MAX - 1) / COIN_COLUMNS))}.0);
+    vec4 t = texture(atlas, (cell + vec2(vUv.x, 1.0 - vUv.y)) / grid);
+    outColor = linearToOutputTexel(t);
+  }
+`;
+
+/**
+ * The counts that go with the groups of pieces: one coin each, sized in pixels
+ * and moved by the same fraction of the piece as its satellites, so it follows
+ * the group as the view zooms.
+ */
+export class CountLayer {
+  readonly mesh: THREE.InstancedMesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  private readonly matrix = new THREE.Matrix4();
+  private readonly cameraX = { value: 0 };
+  private readonly unitScale = { value: 1 };
+  private readonly shiftScale = { value: 1 };
+  private readonly shifts: THREE.InstancedBufferAttribute;
+  private readonly cell = new THREE.Color();
+  private dirtyFrom = Infinity;
+  private dirtyTo = -1;
+
+  constructor(
+    readonly options: {
+      readonly worldWidth: number;
+      readonly worldHeight: number;
+      readonly wrapsX?: boolean;
+      readonly capacity: number;
+      /** Size in tiles of the piece the coin belongs to, which its shift is a fraction of. */
+      readonly size: number;
+      readonly order: number;
+    },
+  ) {
+    countAtlas ??= drawCountAtlas();
+    const material = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      vertexShader,
+      fragmentShader: countFragmentShader,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: {
+        worldWidth: { value: options.worldWidth },
+        cameraX: this.cameraX,
+        unitScale: this.unitScale,
+        shiftScale: this.shiftScale,
+        wrapsX: { value: options.wrapsX ?? true },
+        pieceSize: { value: options.size },
+        atlas: { value: countAtlas },
+      },
+    });
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.setAttribute(
+      "fade",
+      new THREE.InstancedBufferAttribute(new Float32Array(options.capacity).fill(1), 1),
+    );
+    this.shifts = new THREE.InstancedBufferAttribute(new Float32Array(options.capacity * 2), 2);
+    this.shifts.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute("shift", this.shifts);
+    this.mesh = new THREE.InstancedMesh(geometry, material, options.capacity);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.setColorAt(0, this.cell.setRGB(0, 0, 0));
+    this.mesh.instanceColor?.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.renderOrder = options.order;
+    this.mesh.count = 0;
+    this.mesh.frustumCulled = false;
+  }
+
+  get count(): number {
+    return this.mesh.count;
+  }
+
+  set count(value: number) {
+    this.mesh.count = value;
+  }
+
+  /** Puts a coin of `n` (2 or more) beside the piece at tile (x, y), shifted by fractions of its size, y up. */
+  set(index: number, x: number, y: number, n: number, shiftX: number, shiftY: number): void {
+    this.matrix.makeTranslation(x + 0.5, this.options.worldHeight - y - 0.5, 0);
+    this.mesh.setMatrixAt(index, this.matrix);
+    // The cell number goes in the red channel of the instance colour as a raw value (no colour space).
+    const cellIndex = Math.min(Math.max(n, 2), COIN_MAX + 1) - 2;
+    this.mesh.setColorAt(
+      index,
+      this.cell.setRGB(cellIndex / 255, 0, 0, THREE.LinearSRGBColorSpace),
+    );
+    this.shifts.setXY(index, shiftX, shiftY);
+    this.dirtyFrom = Math.min(this.dirtyFrom, index);
+    this.dirtyTo = Math.max(this.dirtyTo, index);
+  }
+
+  /** `coin` tiles for the side of the coin, `piece` for the scale of the piece it is shifted along with. */
+  setScale(coin: number, piece: number): void {
+    this.unitScale.value = coin;
+    this.shiftScale.value = piece;
+  }
+
+  update(cameraX: number): void {
+    this.cameraX.value = cameraX;
+    if (this.dirtyTo < 0) return;
+    const count = this.dirtyTo - this.dirtyFrom + 1;
+    const { instanceMatrix, instanceColor } = this.mesh;
+    instanceMatrix.addUpdateRange(this.dirtyFrom * 16, count * 16);
+    instanceMatrix.needsUpdate = true;
+    if (instanceColor) {
+      instanceColor.addUpdateRange(this.dirtyFrom * 3, count * 3);
+      instanceColor.needsUpdate = true;
+    }
+    this.shifts.addUpdateRange(this.dirtyFrom * 2, count * 2);
+    this.shifts.needsUpdate = true;
     this.dirtyFrom = Infinity;
     this.dirtyTo = -1;
   }

@@ -5,6 +5,7 @@ import {
   outline,
   parts,
   partsAt,
+  settleLevel,
   type BuildingKind,
   type Level,
   type Point,
@@ -154,5 +155,23 @@ describe("pieces geometry", () => {
     };
     expect(rows("fort")).toBeLessThan(rows("city") - 3);
     expect(rows("palace")).toBeGreaterThan(rows("fort"));
+  });
+});
+
+describe("settleLevel", () => {
+  it("rises past a threshold only by a margin, and falls back the same way", () => {
+    expect(settleLevel(0, 31)).toBe(0);
+    expect(settleLevel(0, 34)).toBe(1);
+    expect(settleLevel(1, 29)).toBe(1);
+    expect(settleLevel(1, 26)).toBe(0);
+    expect(settleLevel(1, 72)).toBe(1);
+    expect(settleLevel(1, 78)).toBe(2);
+    expect(settleLevel(2, 68)).toBe(2);
+    expect(settleLevel(2, 60)).toBe(1);
+  });
+
+  it("jumps straight to the level a large change calls for", () => {
+    expect(settleLevel(0, 120)).toBe(2);
+    expect(settleLevel(2, 10)).toBe(0);
   });
 });

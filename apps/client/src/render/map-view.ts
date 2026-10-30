@@ -5,6 +5,7 @@ import type { EffectsLayer } from "./effects-layer.ts";
 import { applyView } from "./orthographic.ts";
 import type * as Pieces from "./pieces.ts";
 import type * as Hulls from "./ship-layer.ts";
+import { groupPieces, keyOf } from "./pieces-group.ts";
 import type {
   FalloutZone,
   MissileEnd,
@@ -50,8 +51,9 @@ const MISSILE_CAPACITY = 256;
 
 /**
  * Smallest size of a piece on screen, in CSS pixels, however far the view is
- * zoomed out: the art direction's 16 to 20 px at world zoom, where a glyph
- * is still told from the others, with the Palace drawn larger.
+ * zoomed out. A painted building needs 24 to 26 px at world zoom to be told
+ * from the others (the Palace 28, the capital and landmarks larger); ships and
+ * missiles are token plates and stay small.
  */
 const PIECE_MIN_PIXELS = {
   transport: 13,
@@ -59,11 +61,30 @@ const PIECE_MIN_PIXELS = {
   warship: 16,
   missile: 14,
   heavyMissile: 18,
-  structure: 16,
-  palace: 19,
-  capital: 22,
-  landmark: 20,
+  structure: 26,
+  palace: 28,
+  capital: 34,
+  landmark: 32,
 } as const;
+
+/** The structures that crowd into a carpet at world zoom and are drawn as a group instead. */
+const GROUPED = ["city", "fort", "port"] as const;
+type Grouped = (typeof GROUPED)[number];
+
+const isGrouped = (type: string): type is Grouped => (GROUPED as readonly string[]).includes(type);
+
+/** Two pieces closer than this many of their own sizes on screen are drawn as one group. */
+const GROUP_REACH = 1.35;
+/** Where a group's satellites stand and its count, as fractions of the piece's size, y up. */
+const SATELLITES = [
+  [-0.42, 0.22],
+  [0.4, 0.26],
+] as const;
+const COUNT_SHIFT = [0.4, -0.12] as const;
+/** Side of the count's coin, in CSS pixels. */
+const COIN_PIXELS = 20;
+/** Zoom must change by this much (a ratio's logarithm) before the groups are worked out again. */
+const REGROUP_STEP = 0.02;
 
 /** Structures drawn at once; each player's land rarely holds more than a few. */
 const STRUCTURE_CAPACITY = 1024;
@@ -72,8 +93,18 @@ const STRUCTURE_CAPACITY = 1024;
 interface Marker {
   readonly mesh: THREE.Object3D;
   count: number;
-  set(index: number, x: number, y: number, color: THREE.ColorRepresentation, built?: boolean): void;
+  set(
+    index: number,
+    x: number,
+    y: number,
+    color: THREE.ColorRepresentation,
+    built?: boolean,
+    shiftX?: number,
+    shiftY?: number,
+  ): void;
   setScale(scale: number): void;
+  /** Size on screen in CSS pixels, for the level of detail of a painted building. */
+  setPixels?(pixels: number): void;
   update(cameraX: number): unknown;
   dispose(): void;
 }
@@ -146,6 +177,19 @@ export class MapView implements Renderer {
   private readonly missiles: Marker;
   private readonly heavyMissiles: Marker;
   private readonly structures: Record<StructureMark["type"], StructureLayers>;
+  /** The coins that carry the count of each kind of group, once the pieces are there. */
+  private readonly counts: Partial<Record<Grouped, Pieces.CountLayer>> = {};
+  private marks: readonly StructureMark[] = [];
+  /** Whether the marks changed since they were last laid out. */
+  private marksChanged = false;
+  /** Tiles per pixel the pieces were last laid out at. */
+  private laidOutAt = 0;
+  /** For each grouped kind, the group number of each piece last time, to keep a group together at a threshold. */
+  private readonly grouped: Record<Grouped, Map<number, number>> = {
+    city: new Map(),
+    fort: new Map(),
+    port: new Map(),
+  };
   private readonly vignette: Vignette;
   private readonly startedAt = performance.now();
   /** Combat effects, once their code has arrived; they are not in the first bundle. */
@@ -281,6 +325,19 @@ export class MapView implements Renderer {
       capital: layers("capital", 5, 6.5, 0.1),
       landmark: layers("landmark", 4, 6, 0.05),
     };
+    if (pieces) {
+      for (const type of GROUPED) {
+        const layer = new pieces.CountLayer({
+          ...world,
+          capacity: STRUCTURE_CAPACITY / 2,
+          size: this.structures[type].size,
+          order: 4,
+        });
+        layer.mesh.position.copy(this.territory.mesh.position);
+        this.scene.add(layer.mesh);
+        this.counts[type] = layer;
+      }
+    }
     this.vignette = addVignette(this.scene);
     this.camera.position.z = 10;
     this.loadEffects();
@@ -431,6 +488,15 @@ export class MapView implements Renderer {
   }
 
   setStructures(structures: readonly StructureMark[]): void {
+    // Laid out by the next render, which knows how far the view is zoomed.
+    this.marks = structures;
+    this.marksChanged = true;
+  }
+
+  /** Puts every structure in its layer; at world zoom the crowded cities, forts and ports of one player into groups. */
+  private layOut(tilesPerPixel: number): void {
+    this.marksChanged = false;
+    this.laidOutAt = tilesPerPixel;
     for (const type of [
       "city",
       "palace",
@@ -441,10 +507,12 @@ export class MapView implements Renderer {
       "capital",
       "landmark",
     ] as const) {
-      const { outline, fill } = this.structures[type];
+      const { outline, fill, size, minPixels } = this.structures[type];
+      const kept = isGrouped(type) ? this.grouped[type] : undefined;
+      const coins = isGrouped(type) ? this.counts[type] : undefined;
       let count = 0;
-      for (const structure of structures) {
-        if (structure.type !== type || count >= STRUCTURE_CAPACITY) continue;
+      const placed = (structure: StructureMark, shiftX = 0, shiftY = 0): void => {
+        if (count >= STRUCTURE_CAPACITY) return;
         if (outline) {
           outline.set(count, structure.x, structure.y, STRUCTURE_COLORS.outline);
           fill.set(
@@ -454,9 +522,60 @@ export class MapView implements Renderer {
             structure.ready ? STRUCTURE_COLORS.fill : STRUCTURE_COLORS.building,
           );
         } else {
-          fill.set(count, structure.x, structure.y, structure.color ?? "#ffffff", structure.ready);
+          fill.set(
+            count,
+            structure.x,
+            structure.y,
+            structure.color ?? "#ffffff",
+            structure.ready,
+            shiftX,
+            shiftY,
+          );
         }
         count++;
+      };
+      const own = this.marks.filter((structure) => structure.type === type);
+      if (isGrouped(type) && coins && kept) {
+        // Finished pieces of a known owner group; pieces still being built stay one by one.
+        const single = own.filter((structure) => !structure.ready || !structure.color);
+        const ready = own.filter((structure) => structure.ready && structure.color);
+        const reach = GROUP_REACH * Math.max(size, minPixels * tilesPerPixel);
+        const groups = groupPieces(
+          ready.map((structure) => ({
+            x: structure.x,
+            y: structure.y,
+            owner: structure.color ?? "",
+          })),
+          reach,
+          kept,
+        );
+        const before = new Map<number, number>();
+        let coin = 0;
+        groups.forEach((group, number) => {
+          const [first, ...rest] = group.members;
+          const main = ready[first ?? 0];
+          if (!main) return;
+          if (rest.length === 0) {
+            placed(main);
+            return;
+          }
+          for (const member of group.members) {
+            const at = ready[member];
+            if (at) before.set(keyOf(at.x, at.y), number);
+          }
+          // The satellites stand behind the main piece, to the north, so they are drawn first.
+          rest.slice(0, SATELLITES.length).forEach((_, i) => {
+            const [dx, dy] = SATELLITES[i] ?? [0, 0];
+            placed(main, dx, dy);
+          });
+          placed(main);
+          coins.set(coin++, main.x, main.y, group.members.length, COUNT_SHIFT[0], COUNT_SHIFT[1]);
+        });
+        coins.count = coin;
+        this.grouped[type] = before;
+        for (const structure of single) placed(structure);
+      } else {
+        for (const structure of own) placed(structure);
       }
       if (outline) outline.count = count;
       fill.count = count;
@@ -485,6 +604,12 @@ export class MapView implements Renderer {
     this.territory.setTime(this.clock());
     this.territory.flush(this.renderer);
     const tilesPerPixel = (2 * view.halfWidth) / this.cssWidth;
+    if (
+      this.marksChanged ||
+      Math.abs(Math.log(tilesPerPixel / (this.laidOutAt || tilesPerPixel))) > REGROUP_STEP
+    ) {
+      this.layOut(tilesPerPixel);
+    }
     const sized = (kind: keyof typeof SHIP_SIZES): number =>
       shipScale(
         { tiles: SHIP_SIZES[kind].tiles, minPixels: PIECE_MIN_PIXELS[kind] },
@@ -505,8 +630,15 @@ export class MapView implements Renderer {
       const scale = Math.max(1, (minPixels * tilesPerPixel) / size);
       outline?.setScale(scale);
       fill.setScale(scale);
+      fill.setPixels?.(Math.max(size / tilesPerPixel, minPixels));
       outline?.update(this.camera.position.x);
       fill.update(this.camera.position.x);
+    }
+    for (const type of GROUPED) {
+      const { size, minPixels } = this.structures[type];
+      const scale = Math.max(1, (minPixels * tilesPerPixel) / size);
+      this.counts[type]?.setScale(COIN_PIXELS * tilesPerPixel, scale);
+      this.counts[type]?.update(this.camera.position.x);
     }
     this.effects?.update(this.clock(), this.camera.position.x, view, tilesPerPixel);
     this.renderer.render(this.scene, this.camera);
@@ -522,6 +654,7 @@ export class MapView implements Renderer {
     this.disposed = true;
     this.effects?.dispose();
     this.territory.dispose();
+    for (const type of GROUPED) this.counts[type]?.dispose();
     this.hulls?.dispose();
     this.ships?.dispose();
     this.tradeShips?.dispose();

@@ -84,6 +84,26 @@ export function levelFor(pixels: number): Level {
   return pixels < LEVEL_FROM_PIXELS[1] ? 1 : 2;
 }
 
+/** How far past a threshold a piece must be to change level, as a share of it. */
+const LEVEL_MARGIN = 0.1;
+
+/**
+ * The level a piece moves to from `current` as it is drawn `pixels` tall: it
+ * keeps its level until clearly past a threshold, so a zoom that rests on one
+ * does not make the details flicker.
+ */
+export function settleLevel(current: Level, pixels: number): Level {
+  const [first, second] = LEVEL_FROM_PIXELS;
+  const wanted = levelFor(pixels);
+  if (wanted > current) {
+    return pixels >= (current === 0 ? first : second) * (1 + LEVEL_MARGIN) ? wanted : current;
+  }
+  if (wanted < current) {
+    return pixels <= (current === 2 ? second : first) * (1 - LEVEL_MARGIN) ? wanted : current;
+  }
+  return current;
+}
+
 /** Squash of the ground ellipse under a cylinder or cone, relative to its radius. */
 const GROUND = 0.38;
 
