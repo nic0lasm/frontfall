@@ -133,9 +133,11 @@ export interface Balance {
   heavyMissileRadius: number;
   /** B-MISSILE-SPEED, tiles a missile flies per tick */
   missileSpeed: number;
-  /** B-FALLOUT-TIME, in ticks the land under a heavy missile stays unusable */
+  /** B-FALLOUT-COST, price of taking a tile under fallout, in % of its usual price */
+  falloutCostPercent: number;
+  /** B-FALLOUT-TIME, in ticks the land under a heavy missile stays irradiated */
   falloutTicks: number;
-  /** B-FALLOUT-TIME-LIGHT, in ticks the land under a light missile stays unusable; 0 for none */
+  /** B-FALLOUT-TIME-LIGHT, in ticks the land under a light missile stays irradiated; 0 for none */
   lightFalloutTicks: number;
   /** B-MISSILE-TROOPS, troops a strike kills, in % of the share of the land it took */
   missileTroopsPercent: number;
@@ -259,6 +261,7 @@ export const DEFAULT_BALANCE: Balance = {
   missileRadius: 12,
   heavyMissileRadius: 45,
   missileSpeed: 8,
+  falloutCostPercent: 200,
   falloutTicks: 90 * 10,
   lightFalloutTicks: 30 * 10,
   missileTroopsPercent: 300,

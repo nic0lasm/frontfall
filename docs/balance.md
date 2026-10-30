@@ -158,7 +158,8 @@ Distances and land are given for a map of 2^19 tiles, like the spawn values: on 
 | `B-MISSILE-RADIUS`       |      12 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 24 on World                                   |
 | `B-HEAVY-MISSILE-RADIUS` |      45 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 90 on World                                   |
 | `B-FALLOUT-TIME`         |      90 | s              | `R-UNIT-06`  | Under a heavy missile                                                 |
-| `B-FALLOUT-TIME-LIGHT`   |      30 | s              | `R-UNIT-06`  | Under a light missile: the land cannot be taken back at once          |
+| `B-FALLOUT-TIME-LIGHT`   |      30 | s              | `R-UNIT-06`  | Under a light missile                                                 |
+| `B-FALLOUT-COST`         |     200 | %              | `R-UNIT-06`  | Price of taking a tile under fallout, against its usual price         |
 | `B-MISSILE-TROOPS`       |     300 | %              | `R-UNIT-05`  | Of the share of troops the land under the blast held                  |
 | `B-AIR-DEFENSE-RADIUS`   |      60 | tiles          | `R-BUILD-05` | On a map of 2^19 tiles; 120 on World                                  |
 | `B-AIR-DEFENSE-CHANCE`   |      75 | %              | `R-BUILD-05` | Per missile flying into the radius                                    |

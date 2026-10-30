@@ -382,9 +382,9 @@ export class Game {
     return this.currentTick < this.balance.spawnPhaseTicks ? "spawn" : "play";
   }
 
-  /** Whether a tile can be taken now: ownable land with no fallout on it (R-UNIT-06). */
-  usable(tile: number): boolean {
-    return this.terrain.isOwnable(tile) && (this.falloutUntil[tile] as number) <= this.currentTick;
+  /** Whether fallout still lies on a tile, which makes it dearer to take (R-UNIT-06). */
+  irradiated(tile: number): boolean {
+    return (this.falloutUntil[tile] as number) > this.currentTick;
   }
 
   /** Whether this game has what a `Disable` bit stands for (R-MODE-03). */
@@ -793,6 +793,7 @@ function checkBalance(balance: Balance): void {
     "heavyMissileRadius",
     "falloutTicks",
     "lightFalloutTicks",
+    "falloutCostPercent",
     "missileTroopsPercent",
     "airDefenseRadius",
     "airDefenseReloadTicks",

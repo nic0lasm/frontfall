@@ -97,8 +97,11 @@ export function installBoats(game: Game): void {
     if (!player) return;
     const owner = territory.ownerOf(boat.target);
     // An ally's coast, since the ship sailed (R-DIPLO-02): the troops come home.
-    // Or a beach under fallout since (R-UNIT-06): they cannot land either.
-    if (owner === player.id || isAllied(game, player.id, owner) || !game.usable(boat.target)) {
+    if (
+      owner === player.id ||
+      isAllied(game, player.id, owner) ||
+      !game.terrain.isOwnable(boat.target)
+    ) {
       player.troops += boat.troops;
       return;
     }
@@ -113,7 +116,7 @@ export function installBoats(game: Game): void {
     const count = terrain.topology.neighborsInto(boat.target, around);
     for (let i = 0; i < count; i++) {
       const next = around[i] as number;
-      if (territory.ownerOf(next) !== owner || !game.usable(next)) continue;
+      if (territory.ownerOf(next) !== owner || !game.terrain.isOwnable(next)) continue;
       // The attack takes the troops back from the player; if it cannot start, they stay ashore.
       if (troops > 0) game.apply(player.id, { type: "attack", target: next, troops });
       return;

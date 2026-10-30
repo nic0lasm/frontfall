@@ -81,7 +81,7 @@ export class CasualPlayer {
       for (let j = 0; j < count; j++) {
         const tile = around[j] as number;
         const owner = territory.ownerOf(tile);
-        if (owner === id || !game.usable(tile) || isAllied(game, id, owner)) continue;
+        if (owner === id || !game.terrain.isOwnable(tile) || isAllied(game, id, owner)) continue;
         if (owner === NEUTRAL) return { type: "attack", target: tile, troops };
         const density = this.density(owner);
         if (enemy < 0 || density < enemyDensity) {

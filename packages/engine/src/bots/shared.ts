@@ -73,7 +73,7 @@ export function scanBorder(game: Game, bot: Player, accept: OwnerFilter = anyone
     for (let j = 0; j < count; j++) {
       const tile = around[j] as number;
       const owner = territory.ownerOf(tile);
-      if (owner === bot.id || !game.usable(tile)) continue;
+      if (owner === bot.id || !game.terrain.isOwnable(tile)) continue;
       if (isAllied(game, bot.id, owner)) continue;
       if (owner === NEUTRAL) {
         if (scan.neutral < 0) scan.neutral = tile;

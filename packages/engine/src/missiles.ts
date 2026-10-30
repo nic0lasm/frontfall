@@ -4,6 +4,7 @@ import { isqrt, mulDiv } from "./integer-math.ts";
 import { DrawUsage, derivedRandom } from "./random.ts";
 import { shieldedBy } from "./landmarks.ts";
 import { spawnSettings } from "./spawn.ts";
+import type { Topology } from "./topology.ts";
 import { StructureKind, isReady, type Structure } from "./structures.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
 
@@ -30,7 +31,7 @@ export interface Missile {
   readonly tried: number[];
 }
 
-/** Land made unusable by a heavy missile until `until` (R-UNIT-06). */
+/** Land made dearer to take by a missile until `until` (R-UNIT-06). */
 export interface Fallout {
   readonly tile: number;
   readonly radius: number;
@@ -146,15 +147,27 @@ export function missileError(
 }
 
 /**
+ * Every tile of the disc of `radius` around `center`, in row order. The
+ * topology's `tilesWithin` counts distance along the grid, which is a
+ * diamond: the disc is cut out of the wider diamond of twice the radius,
+ * which holds all of it.
+ */
+function tilesInDisc(topology: Topology, center: number, radius: number): number[] {
+  const reach = radius * radius;
+  return topology
+    .tilesWithin(center, 2 * radius)
+    .filter((tile) => topology.squaredDistance(tile, center) <= reach);
+}
+
+/**
  * Whether the disc of `radius` around `center` holds land of an ally or a
  * teammate of `player`, which a missile of theirs must spare.
  */
 function blastHitsAlly(game: Game, player: number, center: number, radius: number): boolean {
   const { terrain, territory } = game;
   const topology = terrain.topology;
-  const reach = radius * radius;
   const checked = new Map<number, boolean>();
-  for (const tile of topology.tilesWithin(center, radius)) {
+  for (const tile of tilesInDisc(topology, center, radius)) {
     const owner = territory.ownerOf(tile);
     if (owner === NEUTRAL || owner === player) continue;
     let allied = checked.get(owner);
@@ -162,7 +175,7 @@ function blastHitsAlly(game: Game, player: number, center: number, radius: numbe
       allied = isAllied(game, player, owner);
       checked.set(owner, allied);
     }
-    if (allied && topology.squaredDistance(tile, center) <= reach) return true;
+    if (allied) return true;
   }
   return false;
 }
@@ -204,7 +217,7 @@ export function missileTile(game: Game, missile: Missile, tick: number): number 
  * through strikes: every tile of land within its blast radius goes back to
  * nobody with what stands on it, and each player hit loses the share of
  * their troops that the tiles lost were of their land. A heavy missile also
- * leaves fallout on that land for B-FALLOUT-TIME: no one can take it. Runs
+ * leaves fallout on that land for B-FALLOUT-TIME: taking it costs B-FALLOUT-COST. Runs
  * after the warships and before the transport ships.
  */
 export function installMissiles(game: Game): void {
@@ -339,13 +352,13 @@ export function installMissiles(game: Game): void {
 
   function strike(missile: Missile): void {
     const radius = blastRadius(game, missile.size);
-    const reach = radius * radius;
     const heavy = missile.size === MissileSize.Heavy;
     const fallout = heavy ? balance.falloutTicks : balance.lightFalloutTicks;
     const until = game.tick + 1 + fallout;
     const lost = new Map<number, number>();
-    for (const tile of topology.tilesWithin(missile.to, radius)) {
-      if (!terrain.isOwnable(tile) || topology.squaredDistance(tile, missile.to) > reach) continue;
+    const disc = tilesInDisc(topology, missile.to, radius);
+    for (const tile of disc) {
+      if (!terrain.isOwnable(tile)) continue;
       if (fallout > 0) game.falloutUntil[tile] = Math.max(game.falloutUntil[tile] as number, until);
       const owner = territory.ownerOf(tile);
       if (owner === NEUTRAL) continue;
@@ -361,8 +374,8 @@ export function installMissiles(game: Game): void {
       );
       player.troops -= mulDiv(player.troops, share, territory.tileCount(owner));
     }
-    for (const tile of topology.tilesWithin(missile.to, radius)) {
-      if (!terrain.isOwnable(tile) || topology.squaredDistance(tile, missile.to) > reach) continue;
+    for (const tile of disc) {
+      if (!terrain.isOwnable(tile)) continue;
       if (territory.ownerOf(tile) !== NEUTRAL) territory.setOwner(tile, NEUTRAL);
     }
     if (fallout > 0) game.fallout.push({ tile: missile.to, radius, until });

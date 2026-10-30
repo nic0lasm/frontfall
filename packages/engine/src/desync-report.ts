@@ -139,7 +139,11 @@ export function readDesyncReport(value: unknown): DesyncReport {
 export type RecordedGame = Omit<DesyncReport, "version" | "build" | "hashes">;
 
 /** What a light missile did before `B-FALLOUT-TIME-LIGHT` and `B-MISSILE-TROOPS` (R-UNIT-05, R-UNIT-06). */
-const BEFORE_LIGHT_FALLOUT = { lightFalloutTicks: 0, missileTroopsPercent: 100 } as const;
+const BEFORE_LIGHT_FALLOUT = {
+  lightFalloutTicks: 0,
+  missileTroopsPercent: 100,
+  falloutCostPercent: 100,
+} as const;
 
 /** Checks the setup and turns of a parsed report or record. */
 export function readGame(report: Record<string, unknown>): RecordedGame {

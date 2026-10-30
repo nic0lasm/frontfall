@@ -11,6 +11,7 @@ import {
   missileTile,
   type Missile,
 } from "../src/missiles.ts";
+import { captureCost } from "../src/attacks.ts";
 import { orderError } from "../src/orders.ts";
 import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
@@ -165,7 +166,7 @@ describe("missiles (R-UNIT-05)", () => {
     expect(game.territory.ownerOf(target)).toBe(NEUTRAL);
     const radius = blastRadius(game, MissileSize.Light);
     let hit = 0;
-    for (const tile of grid.tilesWithin(target, radius)) {
+    for (let tile = 0; tile < grid.size; tile++) {
       if (grid.squaredDistance(tile, target) <= radius * radius) {
         hit++;
         expect(game.territory.ownerOf(tile)).toBe(NEUTRAL);
@@ -264,27 +265,39 @@ describe("missiles (R-UNIT-05)", () => {
 });
 
 describe("fallout (R-UNIT-06)", () => {
-  it("leaves the land under a heavy missile unusable for B-FALLOUT-TIME", () => {
-    const { game, grid, bea, step } = newGame();
+  it("burns a disc, not the diamond of tiles at the same distance along the grid", () => {
+    const { game, grid, step } = newGame();
     const target = grid.index(30, 10);
+    const radius = blastRadius(game, MissileSize.Heavy);
+    step([{ player: 1, order: launch(target, MissileSize.Heavy) }]);
+    while (game.missiles.length > 0) step();
+    // A corner of the square is outside the disc; a tile off the axes, well past the diamond, inside.
+    const inside = Math.floor(radius * 0.8);
+    expect(game.irradiated(grid.index(30 + inside, 10 + Math.floor(radius * 0.5)))).toBe(true);
+    expect(game.irradiated(grid.index(30 + radius, 10 + radius))).toBe(false);
+  });
+
+  it("leaves the land under a heavy missile open to attack, at B-FALLOUT-COST until it clears", () => {
+    const { game, grid, bea, step } = newGame();
+    // On Bea's own land, which she attacks again from the edge of the blast.
+    const target = grid.index(50, 10);
     step([{ player: 1, order: launch(target, MissileSize.Heavy) }]);
     while (game.missiles.length > 0) step();
     expect(game.territory.ownerOf(target)).toBe(NEUTRAL);
-    expect(game.usable(target)).toBe(false);
+    expect(game.irradiated(target)).toBe(true);
     expect(game.fallout).toHaveLength(1);
-    // Bea's attack on Cy cannot cross the burnt land; Cy's own land around it still falls.
-    const cyBefore = game.territory.tileCount(3);
-    step([{ player: 2, order: { type: "attack", target: grid.index(36, 10), troops: 100_000 } }]);
-    for (let i = 0; i < 20; i++) step();
-    expect(game.territory.tileCount(3)).toBeLessThan(cyBefore);
-    expect(game.territory.ownerOf(target)).toBe(NEUTRAL);
-    const cleared = (game.fallout[0]?.until ?? 0) - game.tick;
-    for (let i = 0; i < cleared; i++) step();
-    expect(game.usable(target)).toBe(true);
+    const usual = captureCost(game, grid.index(10, 10), undefined, 2);
+    expect(captureCost(game, target, undefined, 2)).toBe(
+      Math.floor((usual * game.balance.falloutCostPercent) / 100),
+    );
+    // Bea can take the burnt land at once.
     bea.troops = 100_000;
     step([{ player: 2, order: { type: "attack", target, troops: 50_000 } }]);
     for (let i = 0; i < 40 && game.territory.ownerOf(target) !== 2; i++) step();
     expect(game.territory.ownerOf(target)).toBe(2);
+    const cleared = (game.fallout[0]?.until ?? 0) - game.tick;
+    for (let i = 0; i <= cleared; i++) step();
+    expect(game.irradiated(target)).toBe(false);
     expect(game.fallout).toHaveLength(0);
   });
 });
@@ -307,15 +320,15 @@ describe("a light strike (R-UNIT-05, R-UNIT-06)", () => {
     }
   });
 
-  it("leaves its land unusable for B-FALLOUT-TIME-LIGHT", () => {
+  it("leaves its land irradiated for B-FALLOUT-TIME-LIGHT", () => {
     const { game, grid, step } = newGame({ lightFalloutTicks: 10 });
     const target = grid.index(50, 10);
     step([{ player: 1, order: launch(target) }]);
     while (game.missiles.length > 0) step();
-    expect(game.usable(target)).toBe(false);
+    expect(game.irradiated(target)).toBe(true);
     expect(game.fallout).toHaveLength(1);
     for (let i = 0; i < 10; i++) step();
-    expect(game.usable(target)).toBe(true);
+    expect(game.irradiated(target)).toBe(false);
   });
 });
 

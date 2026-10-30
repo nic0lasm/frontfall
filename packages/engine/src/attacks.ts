@@ -116,7 +116,7 @@ export function installAttacks(game: Game): void {
               }
             }
           }
-          if (a < 0 || !game.usable(tile)) continue;
+          if (a < 0 || !game.terrain.isOwnable(tile)) continue;
           seen[tile] = scan;
           frontLengths[a] = (frontLengths[a] as number) + 1;
           consider(a, player, tile);
@@ -230,7 +230,7 @@ export function installAttacks(game: Game): void {
       const count = topology.neighborsInto(territory.borderTile(player, i), around);
       for (let j = 0; j < count; j++) {
         const tile = around[j] as number;
-        if (owners[tile] === target && game.usable(tile)) return true;
+        if (owners[tile] === target && game.terrain.isOwnable(tile)) return true;
       }
     }
     return false;
@@ -335,7 +335,7 @@ export function installAttacks(game: Game): void {
       let start = -1;
       for (let j = 0; j < count && start < 0; j++) {
         const tile = around[j] as number;
-        if (owners[tile] === defender.id && game.usable(tile)) start = tile;
+        if (owners[tile] === defender.id && game.terrain.isOwnable(tile)) start = tile;
       }
       if (start < 0) continue;
       // Forts close enough to cover some of the stretch; the others cannot.
@@ -361,7 +361,7 @@ export function installAttacks(game: Game): void {
         start,
         (tile) =>
           owners[tile] === defender.id &&
-          game.usable(tile) &&
+          game.terrain.isOwnable(tile) &&
           topology.squaredDistance(tile, tip) <= depth * depth &&
           !holds(tile),
         limit,
@@ -516,6 +516,8 @@ export function captureCost(
       mulDiv(cost, Math.max(0, 100 - assaults * balance.landmarkAssaultPercent), 100),
     );
   }
+  // R-UNIT-06: land under fallout costs more to take, whoever held it.
+  if (game.irradiated(tile)) cost = mulDiv(cost, balance.falloutCostPercent, 100);
   if (!defender) return cost;
   const fort = fortified(game, tile, defender.id) ? balance.fortStrengthPercent : 100;
   const capital = guardedByCapital(game, tile, defender.id) ? balance.capitalStrengthPercent : 100;

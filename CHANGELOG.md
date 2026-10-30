@@ -4,6 +4,14 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- **A missile blast is a disc.** A missile's blast was a diamond, a good third smaller than the circle drawn around its target. It now burns the whole disc, so the land it takes matches the radius you see; heavy missiles reach further than before.
+
+### Changed
+
+- **Irradiated land can be taken back.** Land under fallout is no longer closed: you can attack or land on it at once, at twice the usual price while the fallout lasts (90 s after a heavy missile, 30 s after a light one). The marked zone on the map shows how long that lasts.
+
 ## [0.9.3] - 2026-10-30
 
 ### Fixed
