@@ -84,6 +84,14 @@ Narrow: the mini-map is a round button, 44, top right (bottom right on a short w
 
 When the screen is narrow because it is short (landscape phone), the leaderboard stays top right and stops 84 above the bottom so it never runs under the tools, the banner goes under the figures (top 88), and the first-steps banner becomes a short card (text on the left, Hide and Next on the right, 70 px high) that stops 264 short of the right edge, so the closed leaderboard stays whole.
 
+## Common rules of the controls
+
+- **Targets are 44 px**, with a mouse too: the tools, the folded map, the chart tabs, the help's buttons.
+- **The attack slider on a phone** has its figures over the rail, so the rail takes the panel's width; a touch screen draws a 28 px thumb and a track filled up to the value (`ui/range-click.ts` sets `--fill`, and reads `--thumb-size` to place a press).
+- **A building's kind is not colour alone**: a bar on top of its button (full economy, short defence, dotted weapons, striped demolition). The chosen building is pushed in and ringed in the text colour, with no category tint.
+- **A building's bubble** (hover, focus) gives name, keys, price and what it does; there is no native `title`. A finger gets the same text from a long press.
+- **The end screen's body scrolls, its buttons never cover it**; what the player earned comes before the chart. **The help's buttons stay in sight** at the foot of the panel.
+
 ## Adding an element
 
 1. Pick a zone from the tables, wide first.
