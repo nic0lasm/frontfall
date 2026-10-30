@@ -17,37 +17,38 @@ The mock-ups are drawn for this page with generated terrain. They fix the look, 
 
 ## Terrain
 
-Light comes from the north-west. Land is shaded from the height of each tile; the same height field drives both the shading and the colour.
+Light comes from the north-west. Land is lit from a height texture (one byte a tile, smoothed through a cubic B-spline), with ridged detail added in two octaves that fade out when a pixel becomes too big for them; the same height field drives shading and colour. The map is a table of stained glass: lit relief below, tinted glass above, a dark lead line between.
 
-| Part         | Treatment                                                                                        |
-| ------------ | ------------------------------------------------------------------------------------------------ |
-| Lowland      | `land` (`#3D4A3B`), the dark low-saturation green already used for unclaimed land                |
-| Highland     | Blends toward a warm olive (`#8A8E68`) with height, so ridges and plateaus read without textures |
-| Shading      | Brightness varies from 0.55 to 1.1 of the base colour with the slope facing the light            |
-| Shallow sea  | `#1F5878` next to the coast                                                                      |
-| Deep sea     | Fades to `ocean-deep` (`#0A1A28`) over about 30 tiles of depth                                   |
-| Coast        | One-tile foam line, white-blue at 55 % opacity, on the water side of every owned coast tile      |
-| Edge of view | A soft dark vignette, stronger on phones, to keep the interface readable                         |
+| Part         | Treatment                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plains       | The biome colour, varied in tone and brightness by two scales of noise, so a field is never flat                                                  |
+| Forest       | Darker and greener, with a canopy grain that fades out zoomed out                                                                                 |
+| Mountains    | Rock in the valleys and on the steep slopes, pale crests, a little snow on the highest; the ridges are decoration, not the altitude the game uses |
+| Shading      | Slope facing the light, with a cavity term in the folds, 0.4 to 1.5 of the base colour                                                            |
+| Sea          | Four tones of depth (shelf, middle, open, abyss), a slow swell, glints that twinkle, a surf line on the shore and two waves creeping in           |
+| Coast        | A smooth curve (B-spline of the coast distance), never steps of tiles; a fine cold line on the owned side                                         |
+| Edge of view | A vignette at world zoom only, as the map is an object on a dark table                                                                            |
 
-Unclaimed land stays dark and quiet so that every territory colour stands out from it (at least 2.7:1, as in the brand guide). New tokens are added to `tokens.json` under `map` when this is built: `land-light`, `sea-shallow`, `foam`.
+Unclaimed land stays dark and quiet so that every territory colour stands out from it (at least 2.7:1, as in the brand guide). There are no rivers: the maps hold no hydrography.
 
 ## Territories
 
-- The owner colour is tinted over the relief, never painted flat: the fill is the owner colour multiplied by the land shading, at about 84 % opacity. Hills stay visible under a territory.
-- The player's own territory gets no special colour; it is marked by the name label and the border highlight.
+- The owner colour is a translucent tint over the lit land (58 % close up, 76 % at world zoom), a little uneven from patch to patch (±26 %), lighter and more saturated in the first 10 px along the border, with a faint bevel that catches the north-west light. Hills stay visible under a territory.
+- The player's own territory gets no special colour; it is marked by the name label and a wider, whiter rim, as are allies (dashed) and the land under the pointer.
 - Names and troop counts sit on the territory in a bold sans with a soft shadow, sized by territory area, and fade out when a territory is too small to hold them.
 
 ## Borders and fronts
 
 Three kinds of edge, each drawn differently so they can be told apart without colour.
 
-| Edge                         | Look                                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| Border with unclaimed land   | Thin line in the owner colour at 38 % brightness                                          |
-| Coast                        | The same line plus the foam line on the water side                                        |
-| Front (two players in touch) | Line 1.7 times thicker, with a light ridge of the owner colour on top, so it looks raised |
+| Edge                       | Look                                                                                                                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Border with unclaimed land | A crisp dark lead line (1.3 px, 1.35 times wider for the player, allies and the hovered land) with a hair of light inside                                                                                   |
+| Coast                      | A finer, colder line, left out on a speck of land so an islet keeps its colour, plus the surf on the water side                                                                                             |
+| Contact (two players)      | The lead line 1.9 times wider                                                                                                                                                                               |
+| Front (land just taken)    | One thin ember line (1.5 to 2 px) with a hot core and a soft glow, the strip behind it darkened by half over about 15 px, sparks that rise and smoke that drifts, only near the line; quieter along a coast |
 
-When a front is under attack the ridge pulses slowly; see Motion.
+Never a wide band and no candy stripes. With less motion, sparks, smoke, flicker, glints, waves and the swell hold still; the ember line stays. Every width is in screen pixels, so it reads the same on a phone at 390 px.
 
 ## Pictograms
 
@@ -162,7 +163,7 @@ Every visual change is judged against these, on a capture or a measurement, so t
 
 ## Performance
 
-Shading is computed once per tile when the map loads and again only where the terrain changes. Foam and vignette are single textures. The look must keep to the budgets in [`performance.md`](performance.md) on the reference laptop and phone; a flatter setting exists for devices that cannot.
+The ground, its height and the coast distance are baked once per tile when the map loads and again only where the terrain changes; the rest is computed per pixel in the territory shader (`render/territory-layer.ts`, shipped minified, about 3 kB gzip, in the lazy chunk). It costs about 40 % more than the former look in software rendering, measured with `pnpm bench:render`; the cost on real GPUs is still to measure on the reference laptop and a mid-range phone. Octaves, grain and glints fade out as a pixel grows, so world zoom pays little. The Saver profile keeps the flat map. The look must keep to the budgets in [`performance.md`](performance.md) on the reference laptop and phone; a flatter setting exists for devices that cannot.
 
 ## Not covered here
 
