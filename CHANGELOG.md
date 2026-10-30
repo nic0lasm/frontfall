@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Added
+
+- **The Mosque of Cyrus.** A new building, next to the Micho Palace (key J): an air defense twice as effective. It tries twice to stop each missile that flies within its range instead of once, so it stops about nine in ten (against three in four for a plain air defense). It costs what your next two air defenses would, counts as two after, takes as long to build as an air defense, and is left out of a game that leaves air defenses out. Nations do not build it.
+
 ### Fixed
 
 - **A missile blast is a disc.** A missile's blast was a diamond, a good third smaller than the circle drawn around its target. It now burns the whole disc, so the land it takes matches the radius you see; heavy missiles reach further than before.

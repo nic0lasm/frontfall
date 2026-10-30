@@ -1,5 +1,5 @@
 /**
- * The shape of the eight buildings the map draws (docs/art-direction.md, pieces):
+ * The shape of the nine buildings the map draws (docs/art-direction.md, pieces):
  * one description per kind, as flat parts with a material role and a level of
  * detail, so the atlas painter and the tests read the same drawing. Pure data,
  * no canvas and no WebGL.
@@ -9,11 +9,12 @@
  */
 
 export type BuildingKind =
-  "city" | "palace" | "capital" | "fort" | "port" | "silo" | "airDefense" | "landmark";
+  "city" | "palace" | "mosque" | "capital" | "fort" | "port" | "silo" | "airDefense" | "landmark";
 
 export const BUILDING_KINDS: readonly BuildingKind[] = [
   "city",
   "palace",
+  "mosque",
   "capital",
   "fort",
   "port",
@@ -311,6 +312,50 @@ function describe(kind: BuildingKind): Op[] {
             [x + 4, -34],
             [x + 4, -26],
             [x, -26],
+          ],
+          1,
+        );
+      break;
+    }
+    case "mosque": {
+      // A prayer hall under one plain dome and a finial, between two slender minarets with
+      // pointed caps: tall and thin where the palace is wide and stocky, and nothing but the
+      // building itself, no figure and no emblem.
+      box(-22, -12, 44, 28, 16, "wall");
+      box(-22, -40, 44, 3, 16, "ownD");
+      dome("ownF", 3, -43, 19, 26);
+      poly("goldF", [
+        [1.5, -67],
+        [4.5, -67],
+        [4.5, -82],
+        [1.5, -82],
+      ]);
+      ellipse("goldT", 3, -84, 3.5, 3.5);
+      for (const cx of [-34, 40]) {
+        cylinder("wallF", cx, -12, 5, 58);
+        cylinder("ownDF", cx, -66, 7, 4, 1);
+        cone("ownF", cx, -70, 5.5, 26);
+      }
+      poly(
+        "dark",
+        [
+          [-5, -12],
+          [5, -12],
+          [5, -21],
+          [0, -28],
+          [-5, -21],
+        ],
+        1,
+      );
+      for (const x of [-17, -10, 8, 15])
+        poly(
+          "glass",
+          [
+            [x, -28],
+            [x + 3.5, -28],
+            [x + 3.5, -21],
+            [x + 1.75, -24],
+            [x, -21],
           ],
           1,
         );

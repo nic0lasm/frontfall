@@ -135,6 +135,7 @@ export {
   BuildError,
   StructureKind,
   cityLimit,
+  airDefenseShare,
   cityShare,
   disableBit,
   fortRadius,

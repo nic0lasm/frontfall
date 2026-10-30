@@ -51,6 +51,7 @@ const STRUCTURE_TEXT: Readonly<Record<StructureType, MessageKey>> = {
   port: "hud.port",
   silo: "hud.silo",
   airDefense: "hud.airDefense",
+  mosque: "hud.mosque",
 };
 
 /** Land that changed hands this update and was the player's: who took it, and where first. */

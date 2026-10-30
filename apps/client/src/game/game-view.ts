@@ -17,6 +17,7 @@ export type ClickMode =
   | "port"
   | "silo"
   | "airDefense"
+  | "mosque"
   | "warship"
   | "missile"
   | "heavyMissile"
@@ -239,7 +240,7 @@ export interface ClickPreview {
   radius?: number;
 }
 
-export type StructureType = "city" | "palace" | "fort" | "port" | "silo" | "airDefense";
+export type StructureType = "city" | "palace" | "fort" | "port" | "silo" | "airDefense" | "mosque";
 
 export interface StructureView {
   id: number;
@@ -260,6 +261,8 @@ export interface BuildView {
   warshipCost: number;
   siloCost: number;
   airDefenseCost: number;
+  /** What the next two air defenses would cost together (R-BUILD-09). */
+  mosqueCost: number;
   missileCost: number;
   heavyMissileCost: number;
   /** Whether a silo of the player's has a missile ready. */

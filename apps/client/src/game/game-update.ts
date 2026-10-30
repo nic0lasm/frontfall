@@ -38,6 +38,7 @@ const STRUCTURE_TYPES: Readonly<Record<StructureKind, StructureType>> = {
   [StructureKind.Silo]: "silo",
   [StructureKind.AirDefense]: "airDefense",
   [StructureKind.Palace]: "palace",
+  [StructureKind.Mosque]: "mosque",
 };
 
 /** Names follow the land twice a second at the default tick rate: a scan of the map each time. */
@@ -211,6 +212,7 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       warshipCost: warshipCost(game, you),
       siloCost: structureCost(game, you, StructureKind.Silo),
       airDefenseCost: structureCost(game, you, StructureKind.AirDefense),
+      mosqueCost: structureCost(game, you, StructureKind.Mosque),
       missileCost: missileCost(game, MissileSize.Light),
       heavyMissileCost: missileCost(game, MissileSize.Heavy),
       // Any tile will do: whether one is loaded does not depend on the target.

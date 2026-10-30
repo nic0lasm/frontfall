@@ -831,6 +831,7 @@
 .map-surface[data-mode="fort"],
 .map-surface[data-mode="silo"],
 .map-surface[data-mode="airDefense"],
+.map-surface[data-mode="mosque"],
 .map-surface[data-mode="missile"],
 .map-surface[data-mode="heavyMissile"],
 .map-surface[data-mode="demolish"] {
@@ -1487,7 +1488,8 @@ button.feed-entry:focus-visible {
 }
 
 .build-fort,
-.build-airDefense {
+.build-airDefense,
+.build-mosque {
   --tint: 60 203 127;
 }
 
@@ -2536,7 +2538,8 @@ button.feed-entry:focus-visible {
 }
 
 .build-fort::before,
-.build-airDefense::before {
+.build-airDefense::before,
+.build-mosque::before {
   right: 16px;
   left: 16px;
   height: 4px;

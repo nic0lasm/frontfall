@@ -85,6 +85,7 @@ Every structure is built on an owned land tile, costs gold, paid when the order 
 - **R-BUILD-06** A structure can be demolished by its owner, with no refund.
 - **R-BUILD-07** Two structures, whoever owns them, stand at least `B-BUILD-SPACING` tiles apart. A player may own as many cities as they can pay for, each dearer than the last (`B-COST-GROWTH`). A game can limit them to one, and one more for every `B-CITY-LAND` tiles of land (none by default); cities beyond what their land supports, after a loss of land or a capture, then do not count towards the cap.
 - **R-BUILD-08** Micho Palace: two cities on one tile. It costs what the player's next two cities would, counts as two cities towards the land limit when there is one (`R-BUILD-07`) and the cost of later cities and palaces, and once ready raises the population cap as two cities do (`R-BUILD-01`). It is built, captured and demolished like a city, and a game that leaves out cities leaves out palaces too (`R-MODE-03`).
+- **R-BUILD-09** Mosque of Cyrus: an air defense worth two. It costs what the player's next two air defenses would and counts as two towards the cost of later air defenses and mosques. It stops missiles as `R-BUILD-05` does, with the same radius, chance and reload, but gets two independent tries at each missile, so it stops one far more often than a single air defense (94 % against 75 % at the default chance). It is built, captured and demolished like an air defense, and a game that leaves out air defenses leaves out mosques too (`R-MODE-03`). Nations do not build it.
 
 ## 7. Units
 

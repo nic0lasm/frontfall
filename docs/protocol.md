@@ -1,6 +1,6 @@
 # Network protocol
 
-Version 26. Clients and the game server talk over one WebSocket per player. The schemas live in [`packages/protocol`](../packages/protocol/src), which the client and the server both import; this page describes them for anyone writing a bot, a replay tool or another client.
+Version 27. Clients and the game server talk over one WebSocket per player. The schemas live in [`packages/protocol`](../packages/protocol/src), which the client and the server both import; this page describes them for anyone writing a bot, a replay tool or another client.
 
 The server never simulates the game ([ADR 0001](adr/0001-deterministic-lockstep.md)). It fills games with players, gives every player a number, then closes the orders it receives into one numbered turn every 100 ms and sends the same turns to every player. Each client runs the engine on those turns and reaches the same state.
 
@@ -21,7 +21,7 @@ The server pings every 25 seconds and drops a connection that missed the previou
 
 ```text
 client                                   server
-  | -- hello { version: 26, name } ----------> |
+  | -- hello { version: 27, name } ----------> |
   | <------------------ welcome { version } -- |
   | -- play ---------------------------------> |   or create, or join { game }
   | <-------------- lobby { players, ... } --- |   again after every change
@@ -55,7 +55,7 @@ Before a game starts, a dropped connection keeps its seat for 30 seconds, unless
 ### `hello`
 
 ```json
-{ "type": "hello", "version": 26, "name": "Léa", "build": "0d25e267bbae" }
+{ "type": "hello", "version": 27, "name": "Léa", "build": "0d25e267bbae" }
 ```
 
 First message of every connection. `version` is `PROTOCOL_VERSION`. A server running another version closes the connection with `4000`: the page is out of date and must be reloaded. This message keeps the same shape in every version of the protocol, so the mismatch can always be reported.
@@ -212,7 +212,7 @@ Tiles are indexes in the map, below 2^31. The server checks only the shape of an
 ### `welcome`
 
 ```json
-{ "type": "welcome", "version": 26 }
+{ "type": "welcome", "version": 27 }
 ```
 
 The hello was accepted.
@@ -422,7 +422,7 @@ A turn with 32 orders takes about a tenth of its JSON size (214 bytes against 2,
 
 ## Versioning
 
-Client and server ship together in one image, so a mismatch only affects pages loaded before a deployment. Two checks catch them, both answered with close code `4000` and a reload. `PROTOCOL_VERSION` changes when a message changes shape or an order kind is added: version 2 added `retreat` and `embark`, version 3 the game options (`configure`, `bots` and `difficulty` in `lobby`, `difficulty` in `started`), version 4 the hashes in `desync`, version 5 `build` and `demolish`, version 6 `ally` and `betray`, version 7 `nations` in the game options, `lobby` and `started`, version 8 `teams` in the same three places, version 9 `embargo`, version 10 `warship` and `patrol`, version 11 `missile`, version 12 `gift` and `disabled` in the game options, `lobby` and `started`, version 13 `quick`, version 14 `token` in `lobby`, `rejoin` before the start, the `restart` reason of `ended`, the `restarting` error and `maintenance`, version 15 `5`, the palace, among the structures of `build`, version 16 `visibility` and `name` in `create` for public games of one's own, `name` in `play` and `configure`, `capacity` and `autoStart` in the game options, `hold` and `active`, and `seq` in `configure`, and `name`, `autoStart`, `minPlayers`, `holdable`, `configured` and a host for every game in `lobby`, version 17 `kick`, the `removed` reason of `ended`, and the `removed` and `too_many_seats` errors, version 18 `report` and `reported`, the `too_many_reports` error and close code `4005`, version 19 `speed` in the game options, `lobby` and `started`, with as many turns per frame, version 20 `work`, version 22 `rules`, the special rules, in the game options, `lobby` and `started`, version 23 `capitals` among them, version 24 `operatorGold` in `configure`, `operator` and `goldBonus` in `lobby`, `goldBonus` in `started` and the `not_operator` error, version 25 `operatorBonuses` in their place, version 26 `0.5` among the speeds. The `build` sent in `hello` catches everything else, such as a change of the engine or the balance, which leaves the protocol as it is but would desynchronise an older page. The protocol makes no promise of compatibility between simulation builds: an older page of another one is always sent away.
+Client and server ship together in one image, so a mismatch only affects pages loaded before a deployment. Two checks catch them, both answered with close code `4000` and a reload. `PROTOCOL_VERSION` changes when a message changes shape or an order kind is added: version 2 added `retreat` and `embark`, version 3 the game options (`configure`, `bots` and `difficulty` in `lobby`, `difficulty` in `started`), version 4 the hashes in `desync`, version 5 `build` and `demolish`, version 6 `ally` and `betray`, version 7 `nations` in the game options, `lobby` and `started`, version 8 `teams` in the same three places, version 9 `embargo`, version 10 `warship` and `patrol`, version 11 `missile`, version 12 `gift` and `disabled` in the game options, `lobby` and `started`, version 13 `quick`, version 14 `token` in `lobby`, `rejoin` before the start, the `restart` reason of `ended`, the `restarting` error and `maintenance`, version 15 `5`, the palace, among the structures of `build`, version 16 `visibility` and `name` in `create` for public games of one's own, `name` in `play` and `configure`, `capacity` and `autoStart` in the game options, `hold` and `active`, and `seq` in `configure`, and `name`, `autoStart`, `minPlayers`, `holdable`, `configured` and a host for every game in `lobby`, version 17 `kick`, the `removed` reason of `ended`, and the `removed` and `too_many_seats` errors, version 18 `report` and `reported`, the `too_many_reports` error and close code `4005`, version 19 `speed` in the game options, `lobby` and `started`, with as many turns per frame, version 20 `work`, version 22 `rules`, the special rules, in the game options, `lobby` and `started`, version 23 `capitals` among them, version 24 `operatorGold` in `configure`, `operator` and `goldBonus` in `lobby`, `goldBonus` in `started` and the `not_operator` error, version 25 `operatorBonuses` in their place, version 26 `0.5` among the speeds, version 27 `6`, the mosque, among the structures of `build`. The `build` sent in `hello` catches everything else, such as a change of the engine or the balance, which leaves the protocol as it is but would desynchronise an older page. The protocol makes no promise of compatibility between simulation builds: an older page of another one is always sent away.
 
 ### Simulation build
 

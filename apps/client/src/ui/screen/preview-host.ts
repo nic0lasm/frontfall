@@ -22,6 +22,7 @@ const STRUCTURE_MODES: Partial<Record<ClickMode, StructureMark["type"]>> = {
   port: "port",
   silo: "silo",
   airDefense: "airDefense",
+  mosque: "mosque",
 };
 
 export interface PreviewHostOptions {

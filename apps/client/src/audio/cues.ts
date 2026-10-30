@@ -35,6 +35,7 @@ const STRUCTURE_CUES: Record<StructureType, Cue> = {
   port: "port",
   silo: "silo",
   airDefense: "defense",
+  mosque: "defense",
 };
 
 /** An attack that wins at least this many tiles, or this share of the player's land, is a grand one. */

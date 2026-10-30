@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { NATION_DIFFICULTIES, installNations } from "../src/bots/index.ts";
 import { createGame } from "../src/create-game.ts";
-import type { Order, Player } from "../src/game.ts";
+import { Disable, type Order, type Player } from "../src/game.ts";
 import {
   MissileError,
   MissileSize,
@@ -13,7 +13,7 @@ import {
 } from "../src/missiles.ts";
 import { captureCost } from "../src/attacks.ts";
 import { orderError } from "../src/orders.ts";
-import { StructureKind } from "../src/structures.ts";
+import { StructureKind, airDefenseShare, disableBit, structureCost } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
@@ -425,6 +425,55 @@ describe("air defense (R-BUILD-05)", () => {
     a.step([{ player: 1, order: launch(a.grid.index(30, 10), MissileSize.Heavy) }]);
     b.step();
     expect(a.game.hash()).not.toBe(b.game.hash());
+  });
+});
+
+describe("mosque (R-BUILD-09)", () => {
+  /** Share of the missiles flown at a defense of this kind, with a 50 % chance per try. */
+  function stopped(kind: StructureKind): number {
+    const { game, grid, build, step, run } = newGame({
+      airDefenseChancePercent: 50,
+      airDefenseReloadTicks: 0,
+    });
+    step([{ player: 2, order: build(2, kind, grid.index(50, 10)) }]);
+    run(2);
+    // Far enough past the defense that its blast never reaches it.
+    const target = grid.index(57, 10);
+    for (let i = 0; i < 120; i++) {
+      step([{ player: 1, order: launch(target) }]);
+      while (game.missiles.length > 0) step();
+      run(balance.siloReloadTicks);
+      game.players().forEach((p) => (p.gold = 100_000));
+    }
+    // The log keeps the latest missiles only, so compare shares, not counts.
+    const flown = game.missileEvents.length;
+    return game.missileEvents.filter((e) => e.type === "intercepted").length / flown;
+  }
+
+  it("gets two tries at each missile, so it stops more than an air defense", () => {
+    const single = stopped(StructureKind.AirDefense);
+    const double = stopped(StructureKind.Mosque);
+    expect(double).toBeGreaterThan(single);
+    // 50 % twice is 75 %, against 50 %.
+    expect(double).toBeGreaterThan(0.65);
+    expect(single).toBeLessThan(0.6);
+  });
+
+  it("costs the next two air defenses, counts as two after, and goes with their disable bit", () => {
+    const { game } = newGame({ costGrowthPercent: 150 });
+    expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(1000);
+    expect(structureCost(game, 1, StructureKind.Mosque)).toBe(1000 + 1500);
+    game.structures.push({
+      id: 99,
+      player: 1,
+      kind: StructureKind.Mosque,
+      tile: 0,
+      readyAt: 0,
+      reloadAt: 0,
+    });
+    expect(airDefenseShare(game, 1)).toBe(2);
+    expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(2250);
+    expect(disableBit(StructureKind.Mosque)).toBe(Disable.AirDefense);
   });
 });
 

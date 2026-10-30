@@ -59,6 +59,7 @@ const MODE_BANNERS = {
   port: "hud.modePort",
   silo: "hud.modeSilo",
   airDefense: "hud.modeAirDefense",
+  mosque: "hud.modeMosque",
   warship: "hud.modeWarship",
   missile: "hud.modeMissile",
   heavyMissile: "hud.modeHeavyMissile",
@@ -147,6 +148,7 @@ export class Hud {
   private readonly warshipCost = h("span", { class: "build-cost" });
   private readonly siloCost = h("span", { class: "build-cost" });
   private readonly airDefenseCost = h("span", { class: "build-cost" });
+  private readonly mosqueCost = h("span", { class: "build-cost" });
   private readonly missileCost = h("span", { class: "build-cost" });
   private readonly heavyMissileCost = h("span", { class: "build-cost" });
   private readonly cityCount = h("span", { class: "build-count" });
@@ -252,6 +254,7 @@ export class Hud {
           port: this.portCost,
           silo: this.siloCost,
           airDefense: this.airDefenseCost,
+          mosque: this.mosqueCost,
           warship: this.warshipCost,
           missile: this.missileCost,
           heavyMissile: this.heavyMissileCost,
@@ -715,9 +718,11 @@ export class Hud {
     this.cityCost.textContent = formatCount(cityCost);
     this.palaceCost.textContent = formatCount(palaceCost);
     this.fortCost.textContent = formatCount(fortCost);
-    const { siloCost, airDefenseCost, missileCost, heavyMissileCost, loaded } = update.build;
+    const { siloCost, airDefenseCost, mosqueCost, missileCost, heavyMissileCost, loaded } =
+      update.build;
     this.siloCost.textContent = formatCount(siloCost);
     this.airDefenseCost.textContent = formatCount(airDefenseCost);
+    this.mosqueCost.textContent = formatCount(mosqueCost);
     this.missileCost.textContent = formatCount(missileCost);
     this.heavyMissileCost.textContent = formatCount(heavyMissileCost);
     // R-BUILD-07: without a land limit, only the count of cities built.
@@ -733,6 +738,7 @@ export class Hud {
       port: playing && human.gold >= portCost,
       silo: playing && human.gold >= siloCost,
       airDefense: playing && human.gold >= airDefenseCost,
+      mosque: playing && human.gold >= mosqueCost,
       missile: playing && loaded && human.gold >= missileCost,
       heavyMissile: playing && loaded && human.gold >= heavyMissileCost,
       warship:

@@ -79,7 +79,7 @@ Ships are not plates: each is a hull seen from above, painted procedurally in on
 
 ## Piece geometry
 
-The eight buildings (city, Micho Palace, capital, fort, port, silo, air defence, landmark) share one drawing, `apps/client/src/render/pieces-geo.ts`: flat parts with a material role (stone, metal, wood, gold, owner colour) and a level of detail. Level 0 is the silhouette alone and is kept at every size; level 1 (windows, crenels, flags) appears from about 30 px; level 2 only close up. Nothing in level 0 is thinner than 2.5 units of the 100-unit piece, so it survives at 24 px.
+The nine buildings (city, Micho Palace, Mosque of Cyrus, capital, fort, port, silo, air defence, landmark) share one drawing, `apps/client/src/render/pieces-geo.ts`: flat parts with a material role (stone, metal, wood, gold, owner colour) and a level of detail. Level 0 is the silhouette alone and is kept at every size; level 1 (windows, crenels, flags) appears from about 30 px; level 2 only close up. Nothing in level 0 is thinner than 2.5 units of the 100-unit piece, so it survives at 24 px.
 
 The three that used to merge at 20 px are drawn apart on purpose: the city is the only lopsided piece, a skyline climbing to one slender spire; the fort is low and wide with no roof; the Palace is symmetric under a round dome with a gilded spire. A test rasterises the silhouettes at 16, 20 and 24 px and fails if any two pieces overlap too much.
 

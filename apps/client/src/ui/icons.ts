@@ -11,6 +11,7 @@ export const ICON_NAMES = [
   "palace",
   "silo",
   "airDefense",
+  "mosque",
   "warship",
   "trade",
   "missile",
@@ -43,6 +44,7 @@ const SPRITE = `<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" foc
   <symbol id="i-palace" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5 21v-7h2.2C7.4 9.5 9.4 6.8 12 5.4c2.6 1.4 4.6 4.1 4.8 8.6H19v7zM2.5 21V11.5L4 8.5l1.5 3V21zM18.5 21V11.5L20 8.5l1.5 3V21zM11.5 1.5h1V5.4h-1zM7.6 16h1.5v5H7.6zM11.25 16h1.5v5h-1.5zM14.9 16h1.5v5h-1.5z"/><path class="ac" d="M12.5 1.5 16.2 2.9 12.5 4.3z"/></symbol>
   <symbol id="i-silo" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5.5 21V11L8 8.5h8l2.5 2.5v10zM12 2l2.4 6.1H9.6zM7.5 13h9v1.5h-9zM7.5 17h9v1.5h-9z"/></symbol>
   <symbol id="i-airDefense" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2.5 20 5.5v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10v-6zM12 7 16.6 12.5h-3.1V17h-3V12.5H7.4z"/></symbol>
+  <symbol id="i-mosque" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M5 21v-6h2.5c0-3.2 2-5.4 4.5-6.4 2.5 1 4.5 3.2 4.5 6.4H19v6zM2.5 21V8.5L3.5 3l1 5.5V21zM19.5 21V8.5l1-5.5 1 5.5V21zM11.6 4.4h.8V8.7h-.8zM10.5 21v-3.5a1.5 1.5 0 0 1 3 0V21z"/></symbol>
   <symbol id="i-warship" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2.5 15.5h17L22 17.5 19 20.8H6zM8 11.5h8v4H8zM10.4 8.5h3.2v3h-3.2zM5.8 17.3h1.4v1.4H5.8zM8.8 17.3h1.4v1.4H8.8zM11.8 17.3h1.4v1.4h-1.4zM14.8 17.3h1.4v1.4h-1.4z"/><g fill="none" stroke="currentColor" stroke-linecap="round"><path d="M12 8.5V4" stroke-width="1.3"/><path d="M13.5 9.8 20 8.4" stroke-width="1.8"/></g></symbol>
   <symbol id="i-trade" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M2.5 17h19L19 21H5zM5 12.4h4.2v4H5zM9.8 12.4H14v4H9.8zM14.6 12.4h4.2v4h-4.2zM7.4 8h4.2v4H7.4zM12.2 8h4.2v4h-4.2z"/></symbol>
   <symbol id="i-missile" viewBox="0 0 24 24"><g transform="rotate(45 12 12)"><path fill-rule="evenodd" d="M12 1.8C14.6 5 15.2 9 15.2 13v4H8.8v-4C8.8 9 9.4 5 12 1.8zM8.8 13.5 5.2 18.5l3.6-1zM15.2 13.5l3.6 5-3.6-1zM12 6.8a1.7 1.7 0 1 1 0 3.4 1.7 1.7 0 0 1 0-3.4z"/><path class="ac" d="M10.4 17.4h3.2L12 22.4z"/></g></symbol>
