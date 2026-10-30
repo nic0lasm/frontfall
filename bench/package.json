@@ -11,6 +11,7 @@
     "sim": "tsx sim/run.ts",
     "balance": "tsx balance/run.ts",
     "balance:doctrines": "tsx balance/doctrines.ts",
+    "campaign": "tsx campaign/run.ts",
     "load": "node --import tsx server/run.ts",
     "typecheck": "tsc -p tsconfig.json",
     "determinism": "tsx determinism/run.ts",
