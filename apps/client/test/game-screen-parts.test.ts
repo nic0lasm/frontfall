@@ -228,18 +228,20 @@ describe("orders", () => {
     players: [{ id: 1, troops: 101, gold: 1, workShare: 0 }],
   } as never;
 
-  it("sends nothing while the game is held, won or not started", () => {
-    for (const { orders, sent } of [
-      setup(undefined),
-      setup(playing, true),
-      setup({ ...(playing as object), winner: 2 }),
-    ]) {
+  it("sends nothing while the game is held or not started", () => {
+    for (const { orders, sent } of [setup(undefined), setup(playing, true)]) {
       expect(orders.click(3, "attack", 1)).toBe(false);
       expect(orders.diplomatic("ally", 2)).toBe(false);
       orders.retreat(1);
       orders.quick(2, 0);
       expect(sent).toEqual([]);
     }
+  });
+
+  it("keeps sending once the game is won, for a player who plays on (R-WIN-03)", () => {
+    const { orders, sent } = setup({ ...(playing as object), winner: 2 });
+    orders.retreat(1);
+    expect(sent).not.toEqual([]);
   });
 
   it("lets clicks go out in the spawn phase, but neither diplomacy nor the usage report", () => {

@@ -35,7 +35,7 @@ export function attackPreview(
   balance: Balance = DEFAULT_BALANCE,
 ): AttackPreview | undefined {
   const you = update.players.find((player) => player.id === update.you);
-  if (!you?.alive || update.phase !== "play" || update.winner !== undefined) return undefined;
+  if (!you?.alive || update.phase !== "play") return undefined;
   if (target === you.id) return undefined;
   const { allies, teammates, traitors } = update.diplomacy;
   if (teammates.includes(target) || allies.some((ally) => ally.id === target)) return undefined;

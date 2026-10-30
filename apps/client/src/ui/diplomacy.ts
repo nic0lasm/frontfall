@@ -189,7 +189,7 @@ export class DiplomacyPanel {
     const pending = diplomacy.outgoing.includes(id);
     const waiting = diplomacy.waiting.includes(id);
     const traitor = diplomacy.traitors.find((x) => x.id === id);
-    const playing = update.phase === "play" && update.winner === undefined;
+    const playing = update.phase === "play";
     // Nations answer on their own terms (R-BOT-19): say them before the player asks.
     const nation = id >= this.rules.firstNation;
 

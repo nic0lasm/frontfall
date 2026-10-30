@@ -117,7 +117,7 @@ export function orderForClick(
 ): ClickResult {
   const { terrain, territory } = game;
   const human = game.player(you);
-  if (!human?.alive || game.winner !== undefined) return { refused: "over" };
+  if (!human?.alive) return { refused: "over" };
   if (!Number.isInteger(tile) || tile < 0 || tile >= terrain.topology.size) {
     return { refused: "terrain" };
   }

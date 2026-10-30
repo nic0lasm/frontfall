@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Changed
+
+- **Keep playing after the game is decided.** Choosing "Keep watching" on the end screen no longer takes your orders away: if you still hold land, you can attack, build, trade and talk to the others while the game goes on. Only a player who has been wiped out just watches.
+
 ## [0.9.4] - 2026-10-30
 
 ### Added

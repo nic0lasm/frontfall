@@ -136,7 +136,7 @@ Every structure is built on an owned land tile, costs gold, paid when the order 
 
 - **R-WIN-01** A player wins by owning `B-WIN-SHARE` of all ownable land, or by being the last player standing.
 - **R-WIN-02** A game that reaches `B-MAX-DURATION` ends; the player with the most territory wins, the lowest player number on a tie.
-- **R-WIN-03** Eliminated players can keep watching the game.
+- **R-WIN-03** Once a game is decided it goes on. Eliminated players can keep watching it; a player still standing keeps playing.
 - **R-WIN-04** In capital mode (`R-CAP`), a player also falls when another takes their capital, and the one who took it gets their empire: the last player standing wins sooner.
 - **R-MODE-01** Free-for-all: every player for themselves; alliances follow `R-DIPLO`.
 - **R-MODE-02** Teams: 2, 3 or 4 teams. Every player, bots and nations included, is dealt into a team in turn by player number, so team sizes differ by at most one. Teammates are allies for the whole game: they cannot attack each other, ask each other for an alliance or betray each other. A team wins when its members together own `B-WIN-SHARE` of the ownable land, or when it is the last team standing; at `B-MAX-DURATION`, the team with the most land wins. The team's member with the most land is named the winner.

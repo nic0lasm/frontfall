@@ -117,6 +117,20 @@ describe("SoloGame", () => {
     expect(next.tick).toBe(update.tick + 1);
     expect(next.winner).toBe(update.winner);
   }, 60_000);
+
+  it("keeps the orders of a player still standing once the game is decided (R-WIN-03)", () => {
+    const solo = newGame(options);
+    let update = solo.step([{ type: "spawn", tile: firstLand(options.map) }]);
+    while (update.phase === "spawn") update = solo.step([]);
+    // Someone else takes the win; the player still holds land.
+    solo.game.winner = 2;
+    const you = update.players.find((player) => player.id === update.you);
+    expect(you?.alive).toBe(true);
+    const share = solo.game.player(update.you)?.workShare ?? 0;
+    const wanted = share === 10 ? 20 : 10;
+    solo.step([{ type: "work", share: wanted }]);
+    expect(solo.game.player(update.you)?.workShare).toBe(wanted);
+  }, 60_000);
 });
 
 describe("SoloGame attacks", () => {

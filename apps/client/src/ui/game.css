@@ -250,8 +250,7 @@
   padding: 6px 8px;
 }
 
-.decided .guide,
-.decided .attack-list {
+.decided .guide {
   display: none;
 }
 

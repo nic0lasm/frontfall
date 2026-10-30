@@ -176,15 +176,14 @@ export class SoloGame {
 
   /**
    * Solo: runs one tick with the player's orders and returns what changed.
-   * Once the game is decided the bots play on for spectators (R-WIN-03), and
-   * the player's orders are dropped.
+   * Once the game is decided the bots play on (R-WIN-03) and the player,
+   * if still standing, plays on with them.
    */
   step(orders: readonly Order[]): GameUpdate {
     // The local relay: the turn the server would send, with this player's orders only.
     const turn: Turn = {
       tick: this.game.tick,
-      orders:
-        this.game.winner === undefined ? orders.map((order) => ({ player: this.you, order })) : [],
+      orders: orders.map((order) => ({ player: this.you, order })),
     };
     return this.playTurns([turn]);
   }

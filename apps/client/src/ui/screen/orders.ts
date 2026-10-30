@@ -28,7 +28,7 @@ export class Orders {
   /** Whether a click on the map would go out now. */
   get clickable(): boolean {
     const update = this.state.latest();
-    return update !== undefined && !this.state.held() && update.winner === undefined;
+    return update !== undefined && !this.state.held();
   }
 
   /** A click on the map, which the game reads by its mode; whether it went out. */
@@ -74,7 +74,7 @@ export class Orders {
   /** Puts a share of the troops at home to work (R-ECO-07); allowed before play starts too. */
   work(share: number): void {
     const update = this.state.latest();
-    if (!update || this.state.held() || update.winner !== undefined) return;
+    if (!update || this.state.held()) return;
     this.session.sendOrder({ type: "work", share });
   }
 
@@ -86,7 +86,7 @@ export class Orders {
 
   retreat(attack: number): void {
     const update = this.state.latest();
-    if (!update || this.state.held() || update.winner !== undefined) return;
+    if (!update || this.state.held()) return;
     this.ordered(update);
     this.session.sendOrder({ type: "retreat", attack });
   }
@@ -94,7 +94,7 @@ export class Orders {
   /** The game as it stands while play goes on and the player can act, or none. */
   private playing(): GameUpdate | undefined {
     const update = this.state.latest();
-    if (!update || this.state.held() || update.phase !== "play" || update.winner !== undefined) {
+    if (!update || this.state.held() || update.phase !== "play") {
       return undefined;
     }
     return update;
