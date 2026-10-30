@@ -4,9 +4,15 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-30
+
 ### Fixed
 
 - **Easy is really easy.** Easy nations are slower and calmer: they expand and decide more slowly, send smaller attacks, wait ten minutes before turning on you instead of five, and fire a missile every ten minutes instead of every four. A newcomer is no longer overrun by the whole map a few minutes in. Normal and hard are unchanged.
+
+### Changed
+
+- **A menu that opens sooner.** The generated maps' pictures are drawn when the game is built, the graphics check runs when the browser is idle, the map's ground is prepared in the background while the menu waits, and the chosen map and the simulation are fetched ahead, so a game starts sooner.
 
 ## [0.9.2] - 2026-10-30
 
@@ -531,7 +537,8 @@ The first playable beta: a solo game in the browser against bots on a map of the
 - The server trusts the `X-Client-IP` header only from a proxy on a private address, and accepts WebSocket connections without an `Origin` header, as sent by bots and tools.
 - A client that cannot read a turn asks for a reload instead of playing on out of step, and one that notices a gap in its turns rejoins to fetch the missing ones.
 
-[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/nic0lasm/frontfall/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/nic0lasm/frontfall/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/nic0lasm/frontfall/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/nic0lasm/frontfall/compare/v0.8.0...v0.9.0
