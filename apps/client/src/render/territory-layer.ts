@@ -469,7 +469,7 @@ const fragmentShader = /* glsl */ `
     // distance goes through a cubic B-spline, so it has no steps of tiles.
     float groundLod = max(0.0, log2(pixel));
     vec4 groundSample = textureLod(ground, at / worldSize, groundLod);
-    float coastAlpha = pixel < 1.0 ? coastAlphaSmooth(at, groundLod) : groundSample.a;
+    float coastAlpha = coastAlphaSmooth(at, groundLod);
     float coast = coastDistance(coastAlpha);
     float coastPixels = coast / max(fwidth(coast), 1e-4);
     // Land above the coast, with an edge one pixel soft.
@@ -678,8 +678,8 @@ const fragmentShader = /* glsl */ `
       float spacing = max(0.55, 11.0 * pixel);
       float phase = fract(depth / spacing - t * 0.11);
       float wave = exp(-phase * 15.0) * smoothstep(0.0, 0.04, phase) * (1.0 - smoothstep(0.0, 2.6 * spacing, depth)) * smoothstep(0.25 * spacing, 0.7 * spacing, depth);
-      wave *= smoothstep(0.45, 0.95, foamBreak) * (1.0 - smoothstep(0.6, 1.5, pixel));
-      seaColor = mix(seaColor, foamColor * 1.05, clamp(surf * 0.85 + wave * 0.55, 0.0, 1.0));
+      wave *= smoothstep(0.45, 0.95, foamBreak) * (1.0 - smoothstep(0.25, 0.8, pixel));
+      seaColor = mix(seaColor, foamColor * 1.05, clamp(surf * 0.85 + wave * 0.35, 0.0, 1.0));
       seaColor += foamColor * 0.045 * exp(-depth / max(0.7, 1.6 * pixel));
     }
     color = mix(seaColor, landColor, landCover);
@@ -702,21 +702,23 @@ const fragmentShader = /* glsl */ `
       float ring = ringMix > 0.0 ? 10.0 * (1.0 - clamp(2.0 * ringShare(ato, owner, pixel), 0.0, 1.0)) : 10.0;
       float dpx = mix(toBorder, min(ring, toBorder), ringMix);
       float dFront = mix(toFront, min(ring, toFront + 4.0), ringMix);
-      float prox = pow(1.0 - clamp(dpx / (mine ? 14.0 : 10.0), 0.0, 1.0), 1.5);
+      // Pale colours already sit close to white: they get less of every brightening.
+      float pale = smoothstep(0.35, 0.75, ownerLight);
+      float prox = pow(1.0 - clamp(dpx / (mine ? 9.0 : 10.0), 0.0, 1.0), 1.5);
       // The owner's colour is a translucent tint over the lit land, deeper in
       // the heart, brighter at the rim, a little uneven from patch to patch.
       float vn = nz(at * 0.05 + float(owner) * 5.3) * 0.6 + nz(at * 0.17 + float(owner) * 2.1) * 0.4;
-      vec3 glass = ownerColor * mix(vec3(0.9, 1.0, 1.1), vec3(1.1, 1.0, 0.86), vn) * (0.74 + 0.52 * vn) * (0.45 + 0.6 * shade);
-      vec3 fill = mix(albedo * shade * 1.25, glass, mix(0.58, 0.76, zoomedOut) * (1.0 - 0.22 * hm));
+      vec3 glass = ownerColor * mix(vec3(0.9, 1.0, 1.1), vec3(1.1, 1.0, 0.86), vn) * (0.74 + 0.52 * vn) * (0.45 + 0.6 * shade) * mix(1.0, 0.72, pale);
+      vec3 fill = mix(albedo * shade * 1.25, glass, mix(0.58, 0.76, zoomedOut) * mix(1.0, 0.8, pale) * (1.0 - 0.22 * hm));
       fill *= 1.0 + 0.2 * detail * fineFade + (fineFade > 0.0 ? 0.07 * (nz(at * 3.3) - 0.5) * fineFade : 0.0) + forest * (canopy - 0.5) * 0.3;
       fill *= mix(0.9, 1.0, prox);
-      vec3 rimColor = mix(ownerColor, vec3(1.0), mine ? 0.5 : 0.18) * (mine ? 1.35 : 1.18);
-      fill = mix(fill, rimColor, (mine ? 0.68 : 0.58) * prox);
+      vec3 rimColor = mix(ownerColor, vec3(1.0), (mine ? 0.5 : 0.18) * (1.0 - 0.7 * pale)) * mix(mine ? 1.35 : 1.18, 1.0, pale);
+      fill = mix(fill, rimColor, (mine ? 0.45 : 0.58) * (1.0 - 0.4 * pale) * prox);
       // A faint bevel: the rim catches the north-west light, the south-east one sinks.
       fill *= 1.0 + 0.28 * dot(inward, vec2(0.707, 0.707)) * (1.0 - smoothstep(0.0, 3.5, dpx));
       if (pointed) fill = mix(fill, vec3(1.0), 0.16);
       // The lead line: crisp and dark, wider for the player, their allies and the land under the pointer.
-      float width = max(1.25 * pixel, min(0.14, 2.8 * pixel)) * (wide ? 1.35 : 1.0);
+      float width = max(1.25 * pixel, min(0.14, 2.8 * pixel)) * (mine ? 1.15 : (wide ? 1.35 : 1.0));
       vec3 lineColor = mine ? mix(ownerColor, vec3(1.0), 0.85) : ownerColor * mix(0.22, 0.12, smoothstep(0.35, 0.75, ownerLight));
       float border = 1.0 - smoothstep(width - pixel, width, lineOwn);
       // The coast is a finer, colder line; a speck of land or a thin strip keeps its colour.
@@ -727,7 +729,7 @@ const fragmentShader = /* glsl */ `
       owned = mix(owned, mix(lineColor, vec3(0.03, 0.06, 0.09), 0.7), coastLine * 0.85);
       // A hair of light just inside the dark line, so every country reads as cut glass.
       float inner = (1.0 - smoothstep(0.0, pixel * 1.1, abs(lineOwn - (width + 1.25 * pixel)))) * (1.0 - border);
-      owned = mix(owned, mix(rimColor, vec3(1.0), 0.35), inner * 0.55 * dash * (mine ? 1.0 : 0.7));
+      owned = mix(owned, mix(rimColor, vec3(1.0), 0.35), inner * 0.4 * dash * (mine ? 0.8 : 0.7) * (1.0 - smoothstep(0.5, 1.2, pixel)));
       // Between two players the line is firmer still.
       float contactWidth = 1.9 * width;
       owned = mix(owned, lineColor * 0.7, (1.0 - smoothstep(contactWidth - pixel, contactWidth, lineContact)) * dash);
