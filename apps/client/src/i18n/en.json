@@ -103,6 +103,8 @@
   "hud.growthNow": "+{troops}/s: troops your army gains each second right now.",
   "hud.growthHelp": "Troops grow every second up to your cap, fastest while your army is in the bright band. Troops at home also earn gold.",
   "webgl.missing": "Frontfall needs WebGL 2 to draw the map, and this browser could not provide it. Try updating your browser, or turning on hardware acceleration in its settings.",
+  "webgl.broken": "Frontfall cannot draw the map: the browser created WebGL 2 but draws nothing. Try updating your browser, turning on hardware acceleration, or opening the game in another window.",
+  "webgl.brave": "Brave is blocking the map (fingerprinting protection). Click the lion icon next to the address bar, set “Block fingerprinting” to “Standard” or turn Shields off for this site, then reload the page.",
   "compat.missing": "This browser cannot run Frontfall yet: it lacks {features}. Try updating it, or open the game in a recent Chrome, Firefox, Safari or Edge.",
   "compat.feature.webgl2": "WebGL 2 (turn on hardware acceleration in its settings)",
   "compat.feature.worker": "web workers",

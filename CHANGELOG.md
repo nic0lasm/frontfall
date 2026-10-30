@@ -22,6 +22,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
   - **Nations.** They take free land first, then turn on a player once their army reaches half or more of their cap, and send what they have above a reserve. Easy nations hold fewer troops, grow a little slower and leave a human player alone three times in four; normal ones once in four. They no longer wait out a grace period.
 - **Games recorded before this version can no longer be replayed.** They were played under the old economy.
 
+### Fixed
+
+- **A blank map now says why.** When a browser (Brave with its fingerprinting shield, for one) creates WebGL 2 but draws nothing, the game now stops with a message that says what to change instead of leaving an empty map under the controls.
+
 ## [0.9.4] - 2026-10-30
 
 ### Added

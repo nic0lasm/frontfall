@@ -103,6 +103,8 @@
   "hud.growthNow": "+{troops}/s : troupes gagnées chaque seconde en ce moment.",
   "hud.growthHelp": "Vos troupes augmentent chaque seconde jusqu'au plafond, le plus vite tant que votre armée est dans la zone claire. Les troupes à la maison rapportent aussi de l'or.",
   "webgl.missing": "Frontfall a besoin de WebGL 2 pour dessiner la carte, et ce navigateur ne le fournit pas. Essayez de mettre à jour votre navigateur, ou d’activer l’accélération matérielle dans ses réglages.",
+  "webgl.broken": "Frontfall n’arrive pas à dessiner la carte : le navigateur a créé WebGL 2 mais refuse d’afficher. Essayez de mettre à jour votre navigateur, d’activer l’accélération matérielle, ou d’ouvrir le jeu dans une autre fenêtre.",
+  "webgl.brave": "Brave bloque le dessin de la carte (protection contre le fingerprinting). Cliquez sur le lion à droite de la barre d’adresse, puis réglez « Bloquer le fingerprinting » sur « Standard » ou désactivez les Shields pour ce site, et rechargez la page.",
   "compat.missing": "Ce navigateur ne peut pas encore faire tourner Frontfall : il lui manque {features}. Essayez de le mettre à jour, ou ouvrez le jeu dans un Chrome, Firefox, Safari ou Edge récent.",
   "compat.feature.webgl2": "WebGL 2 (activez l’accélération matérielle dans ses réglages)",
   "compat.feature.worker": "les web workers",

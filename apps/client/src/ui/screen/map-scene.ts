@@ -443,6 +443,13 @@ export class MapScene {
     if (this.view && drawn) {
       this.placeShips(now);
       this.view.render(view);
+      const fault = this.view.fault?.();
+      if (fault) {
+        console.error(`the map cannot be drawn: ${fault}`);
+        usage().error("webgl");
+        this.onFailure(isBrave() ? "webgl.brave" : "webgl.broken");
+        return;
+      }
       this.drawnView = view;
       // Ships still glide after their last tick: one more frame to settle them.
       this.dirty = moving;
@@ -604,4 +611,9 @@ function sameView(a: CameraView, b: CameraView | undefined): boolean {
     a.halfWidth === b.halfWidth &&
     a.halfHeight === b.halfHeight
   );
+}
+
+/** Brave's fingerprinting shield is the usual reason a context exists but draws nothing. */
+function isBrave(): boolean {
+  return (navigator as { brave?: unknown }).brave !== undefined;
 }
