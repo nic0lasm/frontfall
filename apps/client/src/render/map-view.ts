@@ -129,6 +129,7 @@ export class MapView implements Renderer {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
   private readonly territory: TerritoryLayer;
+  private readonly bufferSize = new THREE.Vector2();
   private readonly ships: Marker;
   private readonly tradeShips: Marker;
   private readonly warships: Marker;
@@ -421,6 +422,8 @@ export class MapView implements Renderer {
 
   render(view: CameraView): void {
     applyView(this.camera, view, this.options.width, this.options.height);
+    this.renderer.getDrawingBufferSize(this.bufferSize);
+    this.territory.setViewport(this.bufferSize.x, this.bufferSize.y);
     this.territory.setTime(this.clock());
     this.territory.flush(this.renderer);
     const tilesPerPixel = (2 * view.halfWidth) / this.cssWidth;

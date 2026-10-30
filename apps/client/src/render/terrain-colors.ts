@@ -64,7 +64,15 @@ export interface TerrainColorOptions {
   readonly wrapsX: boolean;
   /** Latitudes of the south and north edges, which set the climate. Temperate when left out. */
   readonly latitudes?: Latitudes | undefined;
+  /**
+   * Filled with the height the ground is lit from, one byte a tile, for the
+   * shader to light again (HEIGHT_SCALE bytes an elevation band, water at 0).
+   */
+  readonly heightOut?: Uint8Array | undefined;
 }
+
+/** Bytes of height per elevation band in TerrainColorOptions.heightOut. */
+export const HEIGHT_SCALE = 8;
 
 /** Signed distance to the coast, as the alpha channel holds it. */
 export function encodeCoast(distance: number): number {
@@ -135,6 +143,10 @@ export function bakeTerrainColors(options: TerrainColorOptions): Uint8Array {
   const fine = smooth.slice();
   blur(fine, width, height, wrapsX, 1);
   blur(smooth, width, height, wrapsX, RELIEF_BLUR);
+  const heightOut = options.heightOut;
+  if (heightOut)
+    for (let tile = 0; tile < size; tile++)
+      heightOut[tile] = Math.min(255, Math.round((smooth[tile] as number) * HEIGHT_SCALE));
   const level = (x: number, y: number): number => smooth[at(x, y)] as number;
   const crest = (x: number, y: number): number => fine[at(x, y)] as number;
 
