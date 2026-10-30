@@ -79,13 +79,11 @@ describe("EffectTracker", () => {
     expect(still.particles.map((p) => p.shape)).toEqual(["dot", "dot"]);
   });
 
-  it("spaces a trail by distance, not by frames", () => {
+  it("leaves a missile's trail to the missile layer: a flying missile starts no mark", () => {
     const { tracker: t, particles } = tracker();
     t.ships([missile(1, 10)], 0);
-    for (let i = 1; i <= 10; i++) t.ships([missile(1, 10 + i * 0.1)], i * 0.016);
-    expect(particles).toEqual([]);
     t.ships([missile(1, 14)], 1);
-    expect(particles).toHaveLength(1);
+    expect(particles).toEqual([]);
   });
 
   it("leaves a ship's wake to its hull: a sailing ship starts no mark", () => {
@@ -109,8 +107,7 @@ describe("EffectTracker", () => {
     const { tracker: t, particles } = tracker(false);
     t.ships([missile(1, 10), boat(2, 20)], 0);
     t.ships([missile(1, 14), boat(2, 24)], 0.1);
-    expect(particles).toHaveLength(1);
-    particles.length = 0;
+    expect(particles).toEqual([]);
     t.ships([], 0.2);
     // Only the transport's landing: the missile's end arrives apart.
     expect(particles).toHaveLength(1);
