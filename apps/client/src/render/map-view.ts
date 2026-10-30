@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { MAP_COLORS, STRUCTURE_COLORS } from "../palette.ts";
 import type { CameraView } from "./camera.ts";
 import type { EffectsLayer } from "./effects-layer.ts";
+import type { FalloutLayer } from "./fallout-layer.ts";
 import { applyView } from "./orthographic.ts";
 import type * as Pieces from "./pieces.ts";
 import type * as Hulls from "./ship-layer.ts";
@@ -194,6 +195,9 @@ export class MapView implements Renderer {
   private readonly startedAt = performance.now();
   /** Combat effects, once their code has arrived; they are not in the first bundle. */
   private effects: EffectsLayer | undefined;
+  /** Zones of fallout, once their code has arrived, and the ones to show when it does. */
+  private fallout: FalloutLayer | undefined;
+  private falloutZones: readonly FalloutZone[] = [];
   private moving = true;
   private disposed = false;
   /** Width of the canvas in CSS pixels, to keep structures readable when zoomed out. */
@@ -341,6 +345,7 @@ export class MapView implements Renderer {
     this.vignette = addVignette(this.scene);
     this.camera.position.z = 10;
     this.loadEffects();
+    this.loadFallout();
   }
 
   private loadEffects(): void {
@@ -378,6 +383,32 @@ export class MapView implements Renderer {
     );
   }
 
+  private loadFallout(): void {
+    void import("./fallout-layer.ts").then(
+      ({ FalloutLayer }) => {
+        if (this.disposed) return;
+        this.fallout = new FalloutLayer({
+          three: [
+            THREE.Mesh,
+            THREE.ShaderMaterial,
+            THREE.InstancedBufferGeometry,
+            THREE.InstancedBufferAttribute,
+            THREE.BufferAttribute,
+          ],
+          map: this.options,
+          ground: this.territory.groundTexture,
+          scene: this.scene,
+          anchor: this.territory.mesh.position,
+          moving: this.moving,
+          coarse: matchMedia("(pointer: coarse)").matches,
+        });
+        this.fallout.set(this.falloutZones, this.clock());
+      },
+      // The map is as playable without them, with the land under fallout left plain.
+      () => undefined,
+    );
+  }
+
   setPlayerColor(id: number, color: string): void {
     this.territory.setOwnerColor(id, color);
   }
@@ -399,6 +430,7 @@ export class MapView implements Renderer {
     this.moving = moving;
     this.effects?.setMotion(moving);
     this.hulls?.setMotion(moving);
+    this.fallout?.setMotion(moving);
     this.territory.setMotion(moving);
   }
 
@@ -476,11 +508,13 @@ export class MapView implements Renderer {
   }
 
   animating(): boolean {
-    return this.effects?.alive(this.clock()) ?? false;
+    const now = this.clock();
+    return (this.effects?.alive(now) ?? false) || (this.fallout?.alive(now) ?? false);
   }
 
   setFallout(zones: readonly FalloutZone[]): boolean {
-    return this.territory.setFallout(zones);
+    this.falloutZones = zones;
+    return this.fallout?.set(zones, this.clock()) ?? false;
   }
 
   missileStruck(end: MissileEnd): void {
@@ -645,6 +679,7 @@ export class MapView implements Renderer {
       this.counts[type]?.update(this.camera.position.x);
     }
     this.effects?.update(this.clock(), this.camera.position.x, view, tilesPerPixel);
+    this.fallout?.update(this.clock(), this.camera.position.x, tilesPerPixel);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -657,6 +692,7 @@ export class MapView implements Renderer {
     this.vignette.dispose();
     this.disposed = true;
     this.effects?.dispose();
+    this.fallout?.dispose();
     this.territory.dispose();
     for (const type of GROUPED) this.counts[type]?.dispose();
     this.hulls?.dispose();
