@@ -123,6 +123,8 @@ export function endScreen(
         : []),
       ...operatorLine(update, summary.operator),
       ...(update.capitals ? capitalStory(update, summary.ticksPerSecond) : []),
+      // Before the chart, which is the long part: what was earned is in view without scrolling.
+      ...(summary.achievements.length > 0 ? [newAchievements(summary.achievements)] : []),
       ...present(
         statsChart({
           history: summary.stats,
@@ -132,7 +134,6 @@ export function endScreen(
           color: summary.color,
         }),
       ),
-      ...(summary.achievements.length > 0 ? [newAchievements(summary.achievements)] : []),
       // A thumbs up or down, once per game played (not for a replay).
       ...(tracker ? [feedbackBlock(tracker, summary.details)] : []),
     ),

@@ -2382,3 +2382,252 @@ button.feed-entry:focus-visible {
 .game {
   animation: screen-in 0.3s ease-out;
 }
+
+/* Common fixes to the in-game interface, whatever its look (refonte, lot V1-hud-commun). */
+
+/* The attack slider on a phone: the share and the troops it sends sit over the rail, so the rail
+   takes the whole width of the panel (about 130 px at 390, where the value beside it left 43). */
+@media (width < 720px) {
+  .ratio {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 8px;
+  }
+
+  .ratio > .ratio-row:not(.work-row) .range-value {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    justify-self: end;
+    padding-right: 2px;
+  }
+
+  .ratio > .ratio-row:not(.work-row) label {
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  .ratio > .ratio-row:not(.work-row) input {
+    grid-row: 2;
+    grid-column: 2;
+  }
+}
+
+/* A finger takes a thumb it can see: 28 px, on a rail it can read, filled up to the value
+   (ui/range-click.ts sets --fill). A mouse keeps the browser's own slider. */
+@media (pointer: coarse) {
+  .ratio input[type="range"] {
+    --thumb-size: 28px;
+    --thumb-color: var(--ff-ember);
+
+    appearance: none;
+    background: transparent;
+  }
+
+  .work-row input[type="range"] {
+    --thumb-color: var(--ff-warning);
+  }
+
+  .ratio input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--thumb-color) calc(14px + (100% - 28px) * var(--fill, 0)),
+      var(--ff-night-500) 0
+    );
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 50%);
+  }
+
+  .ratio input[type="range"]::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--thumb-color) calc(14px + (100% - 28px) * var(--fill, 0)),
+      var(--ff-night-500) 0
+    );
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 50%);
+  }
+
+  .ratio input[type="range"]::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+    margin-top: -10px;
+    border: 3px solid var(--ff-text);
+    border-radius: 50%;
+    appearance: none;
+    background: var(--thumb-color);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 55%);
+  }
+
+  .ratio input[type="range"]::-moz-range-thumb {
+    box-sizing: border-box;
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--ff-text);
+    border-radius: 50%;
+    background: var(--thumb-color);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 55%);
+  }
+
+  .ratio input[type="range"]:focus-visible {
+    outline: 2px solid var(--ff-text);
+    outline-offset: 2px;
+  }
+}
+
+/* The bubble over a build button: name and keys, what it does, what it costs. */
+.build-info {
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: 260px;
+  white-space: normal;
+}
+
+.build-price {
+  margin-left: auto;
+  color: var(--ff-warning);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.build-desc {
+  flex-basis: 100%;
+  color: var(--ff-slate-300);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* The ends of the dock keep their bubble on the screen. */
+.build-button:nth-child(-n + 3) .build-info {
+  left: 0;
+  transform: none;
+}
+
+.build-button:nth-last-child(-n + 3) .build-info {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+/* On a narrow screen the name and the cost stay under the buttons, not in a bubble. */
+@media (width < 720px), (height < 560px) {
+  .build-desc,
+  .build-price {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* The category of a building does not rest on colour alone: a bar on top of its button, full
+   for the economy, short and round for defence, dotted for weapons, crossed for demolition. */
+.build-button::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 8px;
+  left: 8px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(var(--tint));
+  pointer-events: none;
+}
+
+.build-fort::before,
+.build-airDefense::before {
+  right: 16px;
+  left: 16px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.build-silo::before,
+.build-warship::before,
+.build-missile::before,
+.build-heavyMissile::before {
+  background: repeating-linear-gradient(90deg, rgb(var(--tint)) 0 3px, transparent 3px 6px);
+}
+
+.build-demolish::before {
+  background: repeating-linear-gradient(135deg, rgb(var(--tint)) 0 3px, transparent 3px 5px);
+}
+
+/* The chosen one is the key that is down: pushed in, rimmed in the text colour, and plain of any
+   category tint, so a selected weapon no longer looks like the weapons beside it. */
+.build-button[aria-pressed="true"] {
+  border-color: var(--ff-text);
+  background: linear-gradient(180deg, rgb(0 0 0 / 35%), rgb(var(--tint) / 22%));
+  box-shadow:
+    0 0 0 2px var(--ff-night-800),
+    0 0 0 4px var(--ff-text),
+    inset 0 3px 6px rgb(0 0 0 / 50%);
+  transform: translateY(2px);
+}
+
+.build-button[aria-pressed="true"] .build-icon {
+  filter: none;
+}
+
+/* A target is 44 px, with a mouse too: the tools, the folded map and the tabs of the chart. */
+.icon-button {
+  width: 44px;
+  height: 44px;
+}
+
+.minimap:not([data-open]) .minimap-toggle {
+  width: 44px;
+  height: 44px;
+}
+
+.minimap-toggle {
+  width: 44px;
+  height: 44px;
+}
+
+.stats-tab {
+  min-height: 44px;
+}
+
+/* The end of a game: the title is a moment of its own. The buttons stay under the scrolling body,
+   set off by a rule, and the body fades under it where there is more to see. */
+.end-screen h1 {
+  position: relative;
+  margin: 4px 0 6px;
+  padding-bottom: 14px;
+  font-size: 44px;
+  line-height: 1.05;
+}
+
+.end-screen h1::after {
+  content: "";
+  position: absolute;
+  right: 25%;
+  bottom: 0;
+  left: 25%;
+  height: 3px;
+  border-radius: 2px;
+  background: currentcolor;
+  opacity: 0.55;
+}
+
+.end-screen.lost h1 {
+  color: var(--ff-slate-300);
+}
+
+.end-actions {
+  margin-top: 12px;
+  border-top: 1px solid var(--ff-night-500);
+}
+
+@media (max-height: 560px) {
+  .end-screen .end-actions,
+  .end-screen:has(.end-stats-chart) .end-actions {
+    border-top: 0;
+  }
+}
+
+.end-achievements {
+  margin-top: 12px;
+}

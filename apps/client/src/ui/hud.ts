@@ -12,7 +12,7 @@ import { LeaderList } from "./leader-list.ts";
 import { PopulationBar } from "./population-bar.ts";
 import { BUILD_MODES, costOf, numberOf, offers } from "./build-modes.ts";
 import { safeStorage } from "./setup.ts";
-import { pressToSet } from "./range-click.ts";
+import { paintFill, pressToSet } from "./range-click.ts";
 import { workText } from "./work-text.ts";
 
 // Also found here, where it was first defined.
@@ -137,6 +137,8 @@ export class Hud {
   private readonly attackRows = new Map<number, { row: HTMLElement; text: HTMLElement }>();
   private readonly onRetreat: (attack: number) => void;
   private readonly buildButtons = new Map<ClickMode, HTMLButtonElement>();
+  /** The price in each button's bubble, kept up to date with the cost under its icon. */
+  private readonly tipPrices = new Map<ClickMode, HTMLElement>();
   private readonly cityCost = h("span", { class: "build-cost" });
   private readonly palaceCost = h("span", { class: "build-cost" });
   private readonly fortCost = h("span", { class: "build-cost" });
@@ -256,6 +258,8 @@ export class Hud {
         const cost = costs[mode];
         const price = mode === "city" ? this.cityCost : cost;
         const count = mode === "city" ? [this.cityCount] : [];
+        const tipPrice = mode === "demolish" ? undefined : h("span", { class: "build-price" });
+        if (tipPrice) this.tipPrices.set(mode, tipPrice);
         const button = h(
           "button",
           {
@@ -263,7 +267,7 @@ export class Hud {
             class: `build-button build-${mode}`,
             id: `build-${mode}`,
             "aria-pressed": "false",
-            "data-i18n-attr": `title:hud.${mode}Hint`,
+            "aria-describedby": `build-desc-${mode}`,
             // The number that picks it, drawn in the corner by the styles: no text of its own.
             ...(digit === undefined ? {} : { "data-num": String(digit) }),
             "aria-keyshortcuts": digit === undefined ? key : `${key} ${String(digit)}`,
@@ -282,6 +286,14 @@ export class Hud {
               ? []
               : [h("kbd", { class: "build-key", "aria-hidden": "true" }, String(digit))]),
             ...count,
+            // What it does and what it costs: in the bubble on hover and focus, read out by the label.
+            ...(tipPrice ? [tipPrice] : []),
+            h("span", {
+              class: "build-desc",
+              id: `build-desc-${mode}`,
+              "data-i18n": `help.place.${mode}`,
+              "data-i18n-params": JSON.stringify({ spacing: DEFAULT_BALANCE.buildSpacing }),
+            }),
           ),
         );
         // A finger has no tooltip: holding the button explains it instead.
@@ -298,7 +310,7 @@ export class Hud {
             explained = true;
             this.explain(
               t("hud.named", {
-                action: t(`hud.${mode}`),
+                action: this.nameWithPrice(mode),
                 reason: t(`help.place.${mode}`, { spacing: DEFAULT_BALANCE.buildSpacing }),
               }),
             );
@@ -434,6 +446,13 @@ export class Hud {
     place();
   }
 
+  /** A building's name, with what the next one costs when the game has said. */
+  private nameWithPrice(mode: ClickMode): string {
+    const name = t(`hud.${mode}` as MessageKey);
+    const price = this.last ? costOf(mode, this.last.build) : undefined;
+    return price === undefined ? name : `${name} · ${formatCount(price)}`;
+  }
+
   /** Opens or closes the tray of buildings where it is a tray (narrow screens). */
   private setBuildOpen(open: boolean): void {
     this.buildPanel.classList.toggle("open", open);
@@ -458,6 +477,7 @@ export class Hud {
   setRatio(percent: number): void {
     const value = Math.max(MIN_RATIO, Math.min(100, Math.round(percent)));
     this.ratioInput.value = String(value);
+    paintFill(this.ratioInput);
     this.renderShares();
     if (this.last) this.renderPreview(this.last);
   }
@@ -470,6 +490,7 @@ export class Hud {
   /** Shows a work share on the slider, with the gold it brings, before the game has it. */
   private showWork(share: number): void {
     this.workInput.value = String(share);
+    paintFill(this.workInput);
     this.renderShares();
     if (this.last) {
       const human = this.you(this.last);
@@ -725,6 +746,8 @@ export class Hud {
       const label =
         price === undefined ? name : t("hud.buildLabel", { name, cost: formatCount(price) });
       button.setAttribute("aria-label", label);
+      const tipPrice = this.tipPrices.get(mode);
+      if (tipPrice && price !== undefined) tipPrice.textContent = formatCount(price);
     }
   }
 
