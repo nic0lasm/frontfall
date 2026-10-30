@@ -237,6 +237,9 @@ export class GameScreen {
       onEmbargo: (player, on) => {
         this.orders.diplomatic("embargo", player, on);
       },
+      onTribute: (player) => {
+        this.orders.diplomatic("tribute", player);
+      },
       onBetray: (player) => {
         this.orders.diplomatic("betray", player);
       },

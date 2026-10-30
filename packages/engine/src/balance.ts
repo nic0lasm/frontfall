@@ -133,6 +133,14 @@ export interface Balance {
   embargoNoticeTicks: number;
   /** B-EMBARGO-AUTO, in ticks an embargo placed after an attack lasts */
   embargoAutoTicks: number;
+  /** B-TRIBUTE-DURATION, in ticks a truce bought by tribute lasts */
+  tributeTruceTicks: number;
+  /** B-TRIBUTE-BASE, gold of the price of a tribute before the land of the payer */
+  tributeBase: number;
+  /** B-TRIBUTE-PER-TILE, gold added to the price for each tile of the payer */
+  tributePerTile: number;
+  /** B-TRIBUTE-LEAD, percent of the payer's land that the receiver must hold at least */
+  tributeLeadPercent: number;
   /** B-COST-SILO, gold for a player's first missile silo */
   siloCost: number;
   /** B-COST-AIR-DEFENSE, gold for a player's first air defense */
@@ -280,6 +288,10 @@ export const DEFAULT_BALANCE: Balance = {
   warMemoryTicks: 30 * 10,
   embargoNoticeTicks: 30 * 10,
   embargoAutoTicks: 5 * 60 * 10,
+  tributeTruceTicks: 2 * 60 * 10,
+  tributeBase: 100_000,
+  tributePerTile: 100,
+  tributeLeadPercent: 125,
   siloCost: 1_000_000,
   airDefenseCost: 1_500_000,
   longBuildTicks: 10 * 10,

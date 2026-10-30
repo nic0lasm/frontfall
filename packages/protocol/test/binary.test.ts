@@ -112,7 +112,7 @@ describe("frames", () => {
   });
 
   it("carries alliance requests and betrayals with their target player", () => {
-    for (const type of ["ally", "betray"] as const) {
+    for (const type of ["ally", "betray", "tribute"] as const) {
       expect(decodeFrame(encodeOrderFrame({ type, target: 0xffff }))).toEqual({
         kind: "order",
         order: { type, target: 0xffff },
@@ -181,7 +181,7 @@ describe("order kinds", () => {
       version: PROTOCOL_VERSION,
       kinds: ORDER_KINDS.map((kind) => kind.type),
     }).toEqual({
-      version: 27,
+      version: 28,
       kinds: [
         "spawn",
         "attack",
@@ -198,6 +198,7 @@ describe("order kinds", () => {
         "gift",
         "quick",
         "work",
+        "tribute",
       ],
     });
   });

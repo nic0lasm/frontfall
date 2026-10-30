@@ -43,7 +43,9 @@ export type Order =
   /** Sends player `target` the preset quick message `phrase` (R-DIPLO-07). */
   | { type: "quick"; target: number; phrase: number }
   /** Puts `share` % of the troops at home to work (R-ECO-07). */
-  | { type: "work"; share: number };
+  | { type: "work"; share: number }
+  /** Pays the price of a tribute to `target` for a truce (R-DIPLO-10). */
+  | { type: "tribute"; target: number };
 
 /** Every order accepted during one tick, in the order the server accepted them (R-FAIR-03). */
 export interface Turn {
@@ -485,6 +487,8 @@ export class Game {
       hash = mix(hash, a.until);
       hash = mix(hash, a.renewA ? 1 : 0);
       hash = mix(hash, a.renewB ? 1 : 0);
+      // Alliances and truces hash as alliances did before truces existed.
+      if (a.truce) hash = mix(hash, 1);
     }
     hash = mix(hash, this.allianceRequests.length);
     for (const r of this.allianceRequests) {
@@ -814,6 +818,10 @@ function checkBalance(balance: Balance): void {
     "warMemoryTicks",
     "embargoNoticeTicks",
     "embargoAutoTicks",
+    "tributeTruceTicks",
+    "tributeBase",
+    "tributePerTile",
+    "tributeLeadPercent",
     "siloCost",
     "airDefenseCost",
     "longBuildTicks",

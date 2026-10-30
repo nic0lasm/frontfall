@@ -10,11 +10,16 @@ import {
   DiplomacyError,
   allianceOf,
   embargoed,
+  inTruce,
+  alliesOf,
+  tributePrice,
+  truceMatesOf,
   isAllied,
   isTraitor,
   requestBetween,
 } from "../src/diplomacy.ts";
 import type { Order, Player } from "../src/game.ts";
+import { GiftError } from "../src/gifts.ts";
 import { orderError } from "../src/orders.ts";
 import { atWar } from "../src/warships.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
@@ -498,5 +503,76 @@ describe("embargoes after an attack (R-DIPLO-09)", () => {
     kept.step([{ player: 2, order: { type: "embargo", target: 1, on: 1 } }]);
     kept.run(40);
     expect(embargoed(kept.game, 1, 2)).toBe(true);
+  });
+});
+
+describe("tribute (R-DIPLO-10)", () => {
+  /** Bea holds half as much again as Ada, who has the gold for a tribute. */
+  function tributeGame(overrides: Partial<Balance> = {}) {
+    const setup = newGame({ tributeTruceTicks: 60, ...overrides });
+    for (let tile = 0; tile < setup.grid.size; tile++) {
+      if (setup.grid.x(tile) >= 40 && setup.grid.x(tile) < 50)
+        setup.game.territory.setOwner(tile, 2);
+    }
+    setup.ada.gold = tributePrice(setup.game, 1);
+    return setup;
+  }
+  const pay = (target: number): Order => ({ type: "tribute", target });
+
+  it("charges a price that grows with the payer's land, to a clearly stronger player only", () => {
+    const { game, ada, bea, cy } = tributeGame();
+    expect(tributePrice(game, 1)).toBe(
+      game.balance.tributeBase + game.balance.tributePerTile * game.territory.tileCount(1),
+    );
+    expect(orderError(game, ada, pay(2))).toBeUndefined();
+    // Cy holds less than Ada's lead: no tribute to a weaker player, nor to oneself.
+    expect(orderError(game, ada, pay(3))).toBe(DiplomacyError.Weaker);
+    expect(orderError(game, ada, pay(1))).toBe(DiplomacyError.Self);
+    ada.gold -= 1;
+    expect(orderError(game, ada, pay(2))).toBe(DiplomacyError.Poor);
+    expect(orderError(game, bea, pay(1))).toBe(DiplomacyError.Weaker);
+    expect(cy.id).toBe(3);
+  });
+
+  it("buys a truce that stops attacks both ways, is no alliance, and runs out", () => {
+    const { game, grid, ada, bea, step, run } = tributeGame();
+    const price = tributePrice(game, 1);
+    const before = bea.gold;
+    step([{ player: 1, order: pay(2) }]);
+    // Only the income of the tick is left.
+    expect(ada.gold).toBeLessThan(price / 100);
+    expect(bea.gold).toBeGreaterThanOrEqual(before + price);
+    expect(game.diplomacyEvents).toContainEqual({
+      tick: 0,
+      type: "tribute",
+      a: 1,
+      b: 2,
+      gold: price,
+    });
+    expect(isAllied(game, 1, 2)).toBe(true);
+    expect(inTruce(game, 1, 2)).toBe(true);
+    expect(alliesOf(game, 1)).toEqual([]);
+    expect(truceMatesOf(game, 2)).toEqual([1]);
+    const attack = (target: number): Order => ({ type: "attack", target, troops: 100 });
+    expect(orderError(game, bea, attack(grid.index(5, 5)))).toBe(DiplomacyError.Ally);
+    expect(orderError(game, ada, attack(grid.index(25, 5)))).toBe(DiplomacyError.Ally);
+    ada.gold = 10;
+    // No alliance while it runs, and no gifts: a truce is only peace.
+    expect(orderError(game, ada, { type: "ally", target: 2 })).toBe(DiplomacyError.Truce);
+    expect(orderError(game, ada, { type: "gift", target: 2, troops: 0, gold: 1 })).toBe(
+      GiftError.Ally,
+    );
+    run(61);
+    expect(isAllied(game, 1, 2)).toBe(false);
+    expect(orderError(game, ada, attack(grid.index(25, 5)))).toBeUndefined();
+  });
+
+  it("can be broken like an alliance, at the price of a traitor's mark", () => {
+    const { game, ada, step } = tributeGame();
+    step([{ player: 1, order: pay(2) }]);
+    expect(orderError(game, ada, pay(2))).toBe(DiplomacyError.Allied);
+    step([{ player: 1, order: { type: "betray", target: 2 } }]);
+    expect(isAllied(game, 1, 2)).toBe(false);
+    expect(isTraitor(game, ada)).toBe(true);
   });
 });

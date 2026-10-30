@@ -178,7 +178,9 @@ function writeState(game: Game, out: SnapshotWriter): void {
   for (const f of game.fights) for (const value of [f.a, f.b, f.until]) out.uint(value);
   out.uint(game.alliances.length);
   for (const a of game.alliances) {
-    for (const value of [a.a, a.b, a.until, a.renewA ? 1 : 0, a.renewB ? 1 : 0]) out.uint(value);
+    for (const value of [a.a, a.b, a.until, a.renewA ? 1 : 0, a.renewB ? 1 : 0, a.truce ? 1 : 0]) {
+      out.uint(value);
+    }
   }
   out.uint(game.allianceRequests.length);
   for (const r of game.allianceRequests) {
@@ -334,6 +336,7 @@ function readState(game: Game, tick: number, from: SnapshotReader): void {
       until: id(),
       renewA: from.below(2, "renewal") === 1,
       renewB: from.below(2, "renewal") === 1,
+      truce: from.below(2, "truce") === 1,
     });
   }
   for (let n = from.count(); n > 0; n--) {

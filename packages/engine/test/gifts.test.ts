@@ -62,7 +62,14 @@ function newGame(disabled = 0) {
 
 /** An alliance that outlasts the test, put in place as an order would have. */
 function ally(game: ReturnType<typeof newGame>["game"], a: number, b: number): void {
-  game.alliances.push({ a, b, until: game.tick + 1_000_000, renewA: false, renewB: false });
+  game.alliances.push({
+    a,
+    b,
+    until: game.tick + 1_000_000,
+    renewA: false,
+    renewB: false,
+    truce: false,
+  });
 }
 
 const gift = (target: number, troops: number, gold: number): Order => ({

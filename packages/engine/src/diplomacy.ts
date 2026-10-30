@@ -11,6 +11,8 @@ export interface Alliance {
   /** Whether each side asked to renew in the last part of the alliance. */
   renewA: boolean;
   renewB: boolean;
+  /** A truce bought by tribute (R-DIPLO-10): it stops attacks like an alliance, and is none otherwise. */
+  truce: boolean;
 }
 
 /** An alliance asked for and not answered yet (R-DIPLO-01). */
@@ -52,6 +54,7 @@ export interface DiplomacyEvent {
    * an attack of `a` around `tile` (R-ATTACK-10). In capital mode (R-CAP),
    * `a` took `b`'s capital and with it all their land ("capital"), or `a`'s
    * capital was razed and moved ("razed", with `b` the same player).
+   * "tribute": `a` paid `gold` to `b` for a truce (R-DIPLO-10).
    * "eliminated": `a` took the last tile of `b`, and with it `gold` (R-ECO-08).
    * "landmark": `a` took the landmark numbered `landmark` from `b`, NEUTRAL
    * when nobody held it (R-LAND-03).
@@ -60,6 +63,7 @@ export interface DiplomacyEvent {
     | "allied"
     | "ended"
     | "betrayed"
+    | "tribute"
     | "embargo"
     | "lifted"
     | "captured"
@@ -99,6 +103,9 @@ export const DiplomacyError = {
   CityState: "city-states take no allies",
   Embargoed: "already under your embargo",
   NotEmbargoed: "not under your embargo",
+  Truce: "a truce runs between you: no alliance until it ends",
+  Weaker: "only a player with clearly more land takes tribute",
+  Poor: "not enough gold for the tribute",
   NoTrade: "the game has no ports, so no trade to cut off",
 } as const;
 
@@ -128,11 +135,46 @@ export function allianceOf(game: Game, a: number, b: number): Alliance | undefin
   return undefined;
 }
 
-/** Ids of a player's allies, in ascending order. */
+/** Whether two players are held back from each other only by a truce bought by tribute (R-DIPLO-10). */
+export function inTruce(game: Game, a: number, b: number): boolean {
+  return allianceOf(game, a, b)?.truce === true;
+}
+
+/** Price of a tribute from `player` (R-DIPLO-10): grows with their land, so a big empire pays more. */
+export function tributePrice(game: Game, player: number): number {
+  const { balance } = game;
+  return balance.tributeBase + balance.tributePerTile * game.territory.tileCount(player);
+}
+
+/** Why `player` cannot pay tribute to `target` now, or undefined (R-DIPLO-10). */
+export function tributeError(game: Game, player: Player, target: number): string | undefined {
+  if (game.phase !== "play") return DiplomacyError.Early;
+  if (target === player.id) return DiplomacyError.Self;
+  const to = game.player(target);
+  if (!to?.alive) return DiplomacyError.Player;
+  if (sameTeam(game, player.id, target)) return DiplomacyError.Teammate;
+  if (isAllied(game, player.id, target)) return DiplomacyError.Allied;
+  const mine = game.territory.tileCount(player.id);
+  const theirs = game.territory.tileCount(target);
+  if (theirs * 100 < mine * game.balance.tributeLeadPercent) return DiplomacyError.Weaker;
+  if (player.gold < tributePrice(game, player.id)) return DiplomacyError.Poor;
+  return undefined;
+}
+
+/** Ids of a player's allies, in ascending order; truces (R-DIPLO-10) are not alliances. */
 export function alliesOf(game: Game, player: number): number[] {
+  return partnersOf(game, player, false);
+}
+
+/** Ids of the players in a truce with `player`, in ascending order (R-DIPLO-10). */
+export function truceMatesOf(game: Game, player: number): number[] {
+  return partnersOf(game, player, true);
+}
+
+function partnersOf(game: Game, player: number, truces: boolean): number[] {
   const allies: number[] = [];
-  for (const { a, b, until } of game.alliances) {
-    if (game.tick >= until) continue;
+  for (const { a, b, until, truce } of game.alliances) {
+    if (game.tick >= until || truce !== truces) continue;
     if (a === player) allies.push(b);
     else if (b === player) allies.push(a);
   }
@@ -165,6 +207,7 @@ export function allyError(game: Game, player: Player, target: number): string | 
   if (game.cityStates.has(player.id) || game.cityStates.has(target))
     return DiplomacyError.CityState;
   const alliance = allianceOf(game, player.id, target);
+  if (alliance?.truce) return DiplomacyError.Truce;
   if (alliance) {
     const voted = player.id === alliance.a ? alliance.renewA : alliance.renewB;
     return canRenew(game, alliance) && !voted ? undefined : DiplomacyError.Renewal;
@@ -266,6 +309,24 @@ export function installDiplomacy(game: Game): void {
   });
 
   game.onOrder((_, player, order) => {
+    if (order.type !== "tribute") return false;
+    const price = tributePrice(game, player.id);
+    const to = game.player(order.target);
+    if (!to) return false;
+    player.gold -= price;
+    to.gold += price;
+    form(player.id, order.target, true);
+    logEvent(game, {
+      tick: game.tick,
+      type: "tribute",
+      a: player.id,
+      b: order.target,
+      gold: price,
+    });
+    return true;
+  });
+
+  game.onOrder((_, player, order) => {
     if (order.type !== "betray") return false;
     const broken = allianceOf(game, player.id, order.target);
     removeWhere(game.alliances, (a) => a === broken);
@@ -341,8 +402,8 @@ export function installDiplomacy(game: Game): void {
     removeWhere(game.requestCooldowns, (c) => tick >= c.until);
   });
 
-  /** R-DIPLO-02: the new allies' attacks on each other end, and their troops go home as from a retreat. */
-  function form(first: number, second: number): void {
+  /** R-DIPLO-02: the new allies (or the two of a truce, R-DIPLO-10)' attacks on each other end, and their troops go home as from a retreat. */
+  function form(first: number, second: number, truce = false): void {
     const low = Math.min(first, second);
     const high = Math.max(first, second);
     removeWhere(
@@ -352,9 +413,10 @@ export function installDiplomacy(game: Game): void {
     game.alliances.push({
       a: low,
       b: high,
-      until: game.tick + balance.allianceTicks,
+      until: game.tick + (truce ? balance.tributeTruceTicks : balance.allianceTicks),
       renewA: false,
       renewB: false,
+      truce,
     });
     game.alliances.sort((x, y) => x.a - y.a || x.b - y.b);
     removeWhere(
@@ -362,7 +424,7 @@ export function installDiplomacy(game: Game): void {
       (e) =>
         e.until !== 0 && ((e.from === low && e.to === high) || (e.from === high && e.to === low)),
     );
-    logEvent(game, { tick: game.tick, type: "allied", a: low, b: high });
+    if (!truce) logEvent(game, { tick: game.tick, type: "allied", a: low, b: high });
     for (const attack of game.attacks) {
       const against =
         (attack.player === low && attack.target === high) ||

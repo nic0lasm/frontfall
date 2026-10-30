@@ -88,7 +88,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     ada.gold = 100_000;
     nation.gold = 0;
     // Gifts go to allies only (R-DIPLO-06).
-    game.alliances.push({ a: 1, b: 2, until: 100_000, renewA: false, renewB: false });
+    game.alliances.push({ a: 1, b: 2, until: 100_000, renewA: false, renewB: false, truce: false });
     run(1, [{ player: 2, order: { type: "gift", target: 1, troops: 0, gold: 50_000 } }]);
     run(1, [{ player: 2, order: { type: "gift", target: 1, troops: 0, gold: 50_000 } }]);
     expect(nationMood(game, 1, 2)).toBe("friendly");
@@ -103,7 +103,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     bea.troops = 1000;
     ada.gold = 100_000;
     // Gifts go to allies only (R-DIPLO-06): Ada wins the nation over, then the pact lapses.
-    game.alliances.push({ a: 1, b: 2, until: 100_000, renewA: false, renewB: false });
+    game.alliances.push({ a: 1, b: 2, until: 100_000, renewA: false, renewB: false, truce: false });
     run(1, [{ player: 2, order: { type: "gift", target: 1, troops: 0, gold: 50_000 } }]);
     run(1, [{ player: 2, order: { type: "gift", target: 1, troops: 0, gold: 50_000 } }]);
     game.alliances.length = 0;

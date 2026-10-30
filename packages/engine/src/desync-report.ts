@@ -343,6 +343,8 @@ function order(value: unknown): Order {
         target: readInteger(raw.target, "order target"),
         on: readInteger(raw.on, "embargo switch"),
       };
+    case "tribute":
+      return { type: "tribute", target: readInteger(raw.target, "order target") };
     case "gift":
       return {
         type: "gift",
