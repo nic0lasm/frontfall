@@ -28,6 +28,8 @@ const { values } = parseArgs({
     map: { type: "string", default: "world" },
     // Groups of bots as difficulty:count, separated by commas.
     bots: { type: "string", default: "normal:8" },
+    // City-states placed at random (R-BOT-29).
+    cities: { type: "string", default: "0" },
     // The map's nations play, at this difficulty.
     nations: { type: "string" },
     teams: { type: "string" },
@@ -87,6 +89,7 @@ const setups: BalanceSetup[] = seeds.map((seed) => ({
   seed,
   bots,
   ...(values.nations ? { nations: difficulty(values.nations) } : {}),
+  ...(Number(values.cities) > 0 ? { cityStates: Number(values.cities) } : {}),
   ...(values.teams ? { teams: Number(values.teams) } : {}),
   ...(values.casual || values.intermediate ? { casual: true } : {}),
   ...(values.intermediate ? { intermediate: true } : {}),
@@ -140,7 +143,7 @@ if (values.json) writeFileSync(values.json, `${JSON.stringify({ summary, reports
 function print(s: BalanceSummary): void {
   const round = (value: number, digits = 1): string => value.toFixed(digits);
   console.log(
-    `\n${values.map}, bots ${values.bots}${values.nations ? `, nations ${values.nations}` : ""}` +
+    `\n${values.map}, bots ${values.bots}${values.nations ? `, nations ${values.nations}` : ""}${Number(values.cities) > 0 ? `, ${values.cities} city-states` : ""}` +
       `${values.teams ? `, ${values.teams} teams` : ""}${values.average ? ", average player" : values.intermediate ? ", intermediate player" : values.casual ? ", casual player" : ""}` +
       (values.set.length ? `, ${values.set.join(" ")}` : "") +
       (values.rule.length ? `, rules ${values.rule.join(" ")}` : ""),

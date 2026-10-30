@@ -114,8 +114,12 @@ export class FeedWatcher {
   observe(update: GameUpdate, lost: LandLost, ownerAt: (tile: number) => number): FeedEntry[] {
     const entries: FeedEntry[] = [];
     const name = (id: number): string => update.players.find((p) => p.id === id)?.name ?? "";
+    const cityState = (id: number): boolean =>
+      update.players.find((p) => p.id === id)?.cityState === true;
     for (const event of update.events) {
       this.track(event);
+      // R-BOT-29: city-states fall by the hundred; only the player's own catches are news.
+      if (event.type === "eliminated" && event.a !== update.you && cityState(event.b)) continue;
       if (event.type === "collapsed" && !this.collapseNews(event, update.tick, update.you))
         continue;
       const entry = this.eventEntry(event, update.you, name);

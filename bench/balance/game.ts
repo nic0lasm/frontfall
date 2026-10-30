@@ -5,6 +5,7 @@ import {
   DEFAULT_BALANCE,
   type GameRules,
   installBots,
+  installCityStates,
   installNations,
   isReady,
   loadMap,
@@ -21,7 +22,8 @@ import {
   type Turn,
 } from "@frontfall/engine";
 import { AveragePlayer } from "./average.ts";
-import { CasualPlayer, INTERMEDIATE_PACE } from "./casual.ts";
+import { CasualPlayer } from "./casual.ts";
+import { HumanPlayer } from "./human.ts";
 import { CombatLog, type CombatReport } from "./combat.ts";
 
 /** One headless game of the balance runs: who plays, where, for how long. */
@@ -30,12 +32,14 @@ export interface BalanceSetup {
   readonly seed: number;
   /** Groups of bots, each at its own difficulty, in player-id order after the scripted player. */
   readonly bots: readonly { readonly difficulty: BotDifficulty; readonly count: number }[];
+  /** City-states placed at random (R-BOT-29), in player-id order after the nations. */
+  readonly cityStates?: number;
   /** Whether the map's nations play, at this difficulty. */
   readonly nations?: BotDifficulty;
   readonly teams?: number;
   /** Whether player 1 is the scripted casual player, starting near the middle of the map. */
   readonly casual?: boolean;
-  /** Whether the casual player is the intermediate one: an order every 3 s with 40 % of its troops. */
+  /** Whether player 1 is the intermediate human-like player (human.ts) instead of the casual one. */
   readonly intermediate?: boolean;
   /** Whether player 1 is the scripted average player instead, starting away from the nations. */
   readonly average?: boolean;
@@ -47,7 +51,7 @@ export interface BalanceSetup {
   readonly rules?: Partial<GameRules>;
 }
 
-export type PlayerKind = "casual" | "average" | "bot" | "nation";
+export type PlayerKind = "casual" | "average" | "bot" | "city" | "nation";
 
 export interface PlayerReport {
   readonly id: number;
@@ -178,6 +182,14 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     }
   }
 
+  // After the nations, as the client numbers them.
+  const cities: number[] = [];
+  for (let i = 0; i < (setup.cityStates ?? 0); i++) {
+    const id = players.length + 1;
+    players.push({ id, name: `City ${String(id)}` });
+    kinds.set(id, { kind: "city" });
+    cities.push(id);
+  }
   const game = createGame({
     terrain,
     seed: setup.seed,
@@ -187,6 +199,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     ...(setup.rules ? { rules: setup.rules } : {}),
   });
   for (const { ids, difficulty } of groups) installBots(game, ids, difficulty);
+  if (cities.length > 0) installCityStates(game, cities);
   if (setup.nations) installNations(game, nations, setup.nations);
   const casual = setup.average
     ? new AveragePlayer(
@@ -195,14 +208,20 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
         manifest.nations.map((n) => n.tile),
         setup.seed,
       )
-    : setup.casual
-      ? new CasualPlayer(
+    : setup.intermediate
+      ? new HumanPlayer(
           game,
           1,
-          topology.index(Math.floor(topology.width / 2), Math.floor(topology.height / 3)),
-          setup.intermediate ? INTERMEDIATE_PACE : undefined,
+          manifest.nations.map((n) => n.tile),
+          setup.seed,
         )
-      : undefined;
+      : setup.casual
+        ? new CasualPlayer(
+            game,
+            1,
+            topology.index(Math.floor(topology.width / 2), Math.floor(topology.height / 3)),
+          )
+        : undefined;
 
   const combat = new CombatLog(game);
   const ownable = terrain.ownableCount;

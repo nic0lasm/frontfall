@@ -56,7 +56,8 @@ export class StatsRecorder {
     }
     for (const player of update.players) {
       if (!player.alive && this.alive.delete(player.id)) {
-        this.mark({ tick, kind: "out", a: player.id, b: 0 });
+        // R-BOT-29: hundreds of city-states fall; their marks would crowd out the others.
+        if (player.cityState !== true) this.mark({ tick, kind: "out", a: player.id, b: 0 });
       } else if (player.alive) this.alive.add(player.id);
     }
     if (update.phase === "play" && tick >= this.nextTick) this.sample(update);

@@ -98,6 +98,8 @@ export interface PlayerView {
   alive: boolean;
   /** Tile of the player's capital, in capital mode (R-CAP-01). */
   capital?: number;
+  /** A city-state (R-BOT-29): small, takes no allies, and its fall is no news to others. */
+  cityState?: true;
 }
 
 /** A capital that fell or was razed (R-CAP-03, R-CAP-04). */

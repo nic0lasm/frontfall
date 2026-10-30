@@ -104,7 +104,9 @@ function place(game: Game, player: Player, tile: number): void {
     }
   }
   player.start = tile;
-  player.troops = troops;
+  // R-BOT-04: a nation may start with a share of the troops.
+  const start = game.popFactors.get(player.id)?.start;
+  player.troops = start === undefined ? troops : mulDiv(troops, start, 100);
 }
 
 /**

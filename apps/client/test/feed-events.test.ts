@@ -51,6 +51,49 @@ describe("landLost", () => {
 });
 
 describe("FeedWatcher", () => {
+  it("tells of a city-state's fall only when the player took it (R-BOT-29)", () => {
+    const players = [
+      { id: 1, name: "Ada", troops: 500, cap: 900, gold: 1200, tiles: 50, alive: true },
+      { id: 2, name: "Bo", troops: 80, cap: 200, gold: 10, tiles: 20, alive: true },
+      {
+        id: 3,
+        name: "Arada",
+        troops: 0,
+        cap: 100,
+        gold: 0,
+        tiles: 0,
+        alive: false,
+        cityState: true,
+      },
+      {
+        id: 4,
+        name: "Calon",
+        troops: 0,
+        cap: 100,
+        gold: 0,
+        tiles: 0,
+        alive: false,
+        cityState: true,
+      },
+    ];
+    const watcher = new FeedWatcher(true);
+    watcher.observe(update({ players }), new Map(), mine);
+    const entries = watcher.observe(
+      update({
+        tick: 200,
+        players,
+        events: [
+          { tick: 200, type: "eliminated", a: 2, b: 3, gold: 50 },
+          { tick: 200, type: "eliminated", a: 1, b: 4, gold: 70 },
+        ],
+      } as Partial<GameUpdate>),
+      new Map(),
+      mine,
+    );
+    expect(entries.map((entry) => entry.text).join(" ")).not.toContain("Arada");
+    expect(entries.map((entry) => entry.text).join(" ")).toContain("Calon");
+  });
+
   it("presents several landmarks in one line, so that they do not push one another out", () => {
     const landmark = (id: string, tile: number, en: string) => ({
       id,

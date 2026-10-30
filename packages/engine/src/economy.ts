@@ -32,8 +32,11 @@ function landRoot(tiles: number): number {
 export function populationCap(game: Game, player: Player): number {
   const { popBase, popLand, popPerCity } = game.balance;
   const tiles = game.territory.tileCount(player.id);
-  const cap =
+  const full =
     popBase + Math.floor(landRoot(tiles) * popLand) + workingCities(game, player) * popPerCity;
+  // R-BOT-26, R-BOT-29: a nation or a city-state holds a share of a player's cap.
+  const share = game.popFactors.get(player.id)?.cap;
+  const cap = share === undefined ? full : mulDiv(full, share, 100);
   // R-MODE-09: the operator's troop bonus doubles the cap.
   return game.hasBonus(player.id, OperatorBonus.Troops) ? cap * OPERATOR_FACTOR : cap;
 }
@@ -104,7 +107,9 @@ export function installEconomy(game: Game): void {
 export function goldIncome(game: Game, player: Player): number {
   const { goldBase, goldPerThousandTroops, workGoldPercent } = game.balance;
   const cap = populationCap(game, player);
-  const fixed = goldBase * 1000;
+  // R-BOT-29: a city-state earns a share of it.
+  const share = game.popFactors.get(player.id)?.gold;
+  const fixed = share === undefined ? goldBase * 1000 : mulDiv(goldBase * 1000, share, 100);
   const working =
     cap > 0 ? mulDiv(fixed * workGoldPercent, Math.min(workers(player), cap), 100 * cap) : 0;
   const idle = soldiers(player) * goldPerThousandTroops;

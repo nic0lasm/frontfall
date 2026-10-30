@@ -88,39 +88,9 @@ export class AveragePlayer {
     return orders;
   }
 
-  /** The candidate start, drawn from the seed, farthest from any nation, on a land mass of some size. */
+  /** A start away from the nations, as a human picks one. */
   private spawnTile(): number {
-    const { terrain } = this.game;
-    const { topology } = terrain;
-    let state = (this.seed * 2654435761) >>> 0 || 1;
-    const next = (): number => {
-      state ^= state << 13;
-      state >>>= 0;
-      state ^= state >>> 17;
-      state ^= state << 5;
-      state >>>= 0;
-      return state;
-    };
-    let best = -1;
-    let bestDistance = -1;
-    for (let i = 0; i < SPAWN_CANDIDATES; i++) {
-      const tile = next() % topology.size;
-      if (!terrain.isOwnable(tile)) continue;
-      let nearest = Number.MAX_SAFE_INTEGER;
-      for (const start of this.avoid) {
-        nearest = Math.min(nearest, topology.squaredDistance(tile, start));
-      }
-      // Some randomness among good spots, as a human does not measure.
-      const score = nearest + (next() % 400);
-      if (score > bestDistance) {
-        best = tile;
-        bestDistance = score;
-      }
-    }
-    if (best >= 0) return best;
-    let tile = 0;
-    while (!terrain.isOwnable(tile)) tile++;
-    return tile;
+    return startAwayFrom(this.game, this.avoid, this.seed);
   }
 
   /** At most one building per round: fort under attack, then city, port, air defense, silo. */
@@ -337,4 +307,39 @@ export class AveragePlayer {
     const player = this.game.player(owner);
     return divFloor(player?.troops ?? 0, Math.max(1, this.game.territory.tileCount(owner)));
   }
+}
+
+/** The candidate start, drawn from the seed, farthest from any of `avoid`, with some randomness, as a human picks one. */
+export function startAwayFrom(game: Game, avoid: readonly number[], seed: number): number {
+  const { terrain } = game;
+  const { topology } = terrain;
+  let state = (seed * 2654435761) >>> 0 || 1;
+  const next = (): number => {
+    state ^= state << 13;
+    state >>>= 0;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    return state;
+  };
+  let best = -1;
+  let bestDistance = -1;
+  for (let i = 0; i < SPAWN_CANDIDATES; i++) {
+    const tile = next() % topology.size;
+    if (!terrain.isOwnable(tile)) continue;
+    let nearest = Number.MAX_SAFE_INTEGER;
+    for (const start of avoid) {
+      nearest = Math.min(nearest, topology.squaredDistance(tile, start));
+    }
+    // Some randomness among good spots, as a human does not measure.
+    const score = nearest + (next() % 400);
+    if (score > bestDistance) {
+      best = tile;
+      bestDistance = score;
+    }
+  }
+  if (best >= 0) return best;
+  let tile = 0;
+  while (!terrain.isOwnable(tile)) tile++;
+  return tile;
 }

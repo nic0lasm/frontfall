@@ -52,6 +52,7 @@ export class SoloGame {
   private readonly players: PlayerSetup[];
   private readonly botIds: number[];
   private readonly nationIds: number[];
+  private readonly cityStateIds: number[];
   private readonly difficulty: Difficulty;
   /** Every turn with orders, for a record of the game and, online, a desync report. */
   private readonly history: Turn[] = [];
@@ -74,11 +75,12 @@ export class SoloGame {
       map.landmarks.map(({ id, tile, effect }) => ({ id, tile, effect })),
     );
     const { record } = options;
-    const { players, botIds, nationIds, balance } = record
+    const { players, botIds, nationIds, cityStateIds, balance } = record
       ? {
           players: record.players,
           botIds: record.bots.ids,
           nationIds: record.nations ?? [],
+          cityStateIds: record.cityStates ?? [],
           balance: record.balance,
         }
       : newSetup(options, map.nations);
@@ -95,6 +97,7 @@ export class SoloGame {
         botIds,
         nationIds,
         difficulty,
+        cityStateIds,
       );
     const { snapshot } = options;
     const loaded =
@@ -109,6 +112,7 @@ export class SoloGame {
     this.players = players;
     this.botIds = botIds;
     this.nationIds = nationIds;
+    this.cityStateIds = cityStateIds;
     this.difficulty = difficulty;
     this.online = options.players !== undefined && !options.record;
     if (options.record) {
@@ -245,6 +249,7 @@ export class SoloGame {
       players: this.players,
       bots: { ids: this.botIds, difficulty: this.difficulty },
       ...(this.nationIds.length > 0 ? { nations: this.nationIds } : {}),
+      ...(this.cityStateIds.length > 0 ? { cityStates: this.cityStateIds } : {}),
       ...(this.game.teams > 0 ? { teams: this.game.teams } : {}),
       ...(this.game.disabled > 0 ? { disabled: this.game.disabled } : {}),
       ...(ruleBits(this.game.rules) !== 0 ? { rules: { ...this.game.rules } } : {}),
@@ -279,6 +284,7 @@ export class SoloGame {
       players: this.players,
       bots: { ids: this.botIds, difficulty: this.difficulty },
       ...(this.nationIds.length > 0 ? { nations: this.nationIds } : {}),
+      ...(this.cityStateIds.length > 0 ? { cityStates: this.cityStateIds } : {}),
       ...(this.game.teams > 0 ? { teams: this.game.teams } : {}),
       ...(this.game.disabled > 0 ? { disabled: this.game.disabled } : {}),
       ...(ruleBits(this.game.rules) !== 0 ? { rules: { ...this.game.rules } } : {}),

@@ -16,7 +16,7 @@ import {
   structureCount,
 } from "../structures.ts";
 import { NEUTRAL } from "../territory/territory-map.ts";
-import { BOT_DIFFICULTIES, NATION_DIFFICULTIES, type BotDifficulty } from "./difficulty.ts";
+import { NATION_DIFFICULTIES, type BotDifficulty, type NationStrategy } from "./difficulty.ts";
 import {
   MOOD_BETRAYED,
   MOOD_FRIENDLY,
@@ -36,11 +36,7 @@ import {
   scanBorder,
   persistCooldowns,
   type Cooldowns,
-  type OwnerFilter,
 } from "./shared.ts";
-
-/** Troops, in % of its population cap, from which a nation attacks as boldly as a bot: its army can grow no more. */
-export const NATION_FULL_PERCENT = 90; // B-NATION-FULL
 
 /**
  * Share of its troops at home, in %, a nation puts to work while nobody
@@ -48,11 +44,15 @@ export const NATION_FULL_PERCENT = 90; // B-NATION-FULL
  */
 export const NATION_WORK_PERCENT = 40; // B-NATION-WORK
 
-/** Seconds of play during which a nation opens no front against a player already under attack by `NATION_PILE_MAX` nations, unless that player leads. */
-export const NATION_PILE_SECONDS = 600; // B-NATION-PILE-TIME
+/** Troops, in % of its population cap, from which a nation at peace puts some to work (R-BOT-15). */
+export const NATION_WORK_FROM_PERCENT = 90; // B-NATION-WORK-FROM
 
-/** Nations that may attack the same player at once during `NATION_PILE_SECONDS`; the leader is not protected. */
-export const NATION_PILE_MAX = 2; // B-NATION-PILE
+/** A nation asks each neighbour for an alliance one decision in this many (R-BOT-28). */
+export const NATION_ASK_ODDS = 30; // B-NATION-ASK
+
+/** A nation with land neighbours sends a ship one decision in this many, without them one in `NATION_SHIP_ODDS_ALONE` (R-BOT-27). */
+export const NATION_SHIP_ODDS = 10; // B-NATION-SHIP
+export const NATION_SHIP_ODDS_ALONE = 5; // B-NATION-SHIP-ALONE
 
 /** An attack counts as a threat to a nation from this share of the nation's troops: smaller ones do not stop it. */
 export const NATION_THREAT_PERCENT = 10; // B-NATION-THREAT
@@ -63,23 +63,8 @@ export const NATION_SILO_CITIES = 2; // B-NATION-SILO-CITIES
 /** Share of all ownable land, in %, from which the leading player becomes a nation's missile target (R-BOT-12). */
 export const NATION_MISSILE_LEADER_PERCENT = 30; // B-NATION-MISSILE-LEADER
 
-/** Allies a nation keeps at most (R-BOT-19). */
-export const NATION_ALLIANCE_MAX = 2; // B-NATION-ALLIANCE-MAX
-
-/**
- * A nation allies with a player whose land is under this share of its own,
- * in %, so that the leader cannot buy peace with everyone (R-BOT-19).
- */
-export const NATION_ALLIANCE_SIZE_PERCENT = 150; // B-NATION-ALLIANCE-SIZE
-
 /** Border tiles a nation measures the distance to an enemy capital from (R-BOT-17). */
 const CAPITAL_SAMPLES = 64;
-
-/**
- * A neighbour whose land is below this share of the nation's own, in %, is
- * down to scraps: the nation looks overseas before it fights them (R-BOT-18).
- */
-export const NATION_SCRAPS_PERCENT = 5; // B-NATION-SCRAPS
 
 /** Seconds between two looks of a nation at its neighbours: greetings, embargoes, alliance requests (R-BOT-23). */
 export const NATION_COURT_SECONDS = 20; // B-NATION-COURT
@@ -112,20 +97,17 @@ const NEIGHBOUR_SAMPLES = 256;
 const FORT_SETBACK = 8;
 
 /**
- * Nations (R-BOT-02, R-BOT-07 to R-BOT-09, R-BOT-14): computer players
- * named after a country, starting on the tile their map gives them (see
- * installSpawn). They play like bots, at their own pace for the difficulty
- * (B-NATION-INTERVAL, B-NATION-ATTACK-RATIO, B-NATION-RESERVE, R-BOT-04),
- * but steadier:
- *
- * - under attack, they hold: no order at all until their troops are above
- *   B-NATION-HOLD of their cap, and then only against the attacker, and they
- *   build a fort facing the attacker when their gold allows;
- * - they attack a player only when the odds favour them (B-NATION-ODDS),
- *   or as a bot would once their army is full (B-NATION-FULL), and fight one
- *   player at a time: while an attack of theirs runs against a player, they
- *   open no front against another one. Free land is always fair game, and
- *   the only target during their first B-NATION-GRACE of play.
+ * Nations (R-BOT-02, R-BOT-07, R-BOT-26 to R-BOT-28): computer players named
+ * after a country, starting on the tile their map gives them (see
+ * installSpawn), on the genre's classic nation rule. Every B-NATION-INTERVAL
+ * a nation takes free land first, with what lies above a small reserve; now
+ * and then sends a ship; then saves up to its reserve and its trigger and
+ * tries, in its difficulty's order, its ways of choosing a target: answering
+ * an attack, helping an ally, a grudge, a traitor, the runaway leader, the
+ * weakest neighbour, and at hard the very weak, the juiciest and the victim
+ * of others. It attacks a player only with more troops than them, and lets
+ * a human be B-NATION-HUMAN of the time. It asks and answers alliances by
+ * difficulty, builds, and puts troops to work while at peace (R-BOT-15).
  *
  * Like bots, they decide from the game state and the game's Random only,
  * and act through game.apply (R-BOT-03).
@@ -138,12 +120,10 @@ export function installNations(
   graceSeconds = NATION_DIFFICULTIES[difficulty].graceSeconds,
 ): void {
   const { territory, balance } = game;
-  const params = BOT_DIFFICULTIES[difficulty];
   const nationParams = NATION_DIFFICULTIES[difficulty];
   const interval = Math.max(1, nationParams.intervalSeconds * balance.ticksPerSecond);
   const retryTicks = RETRY_DECISIONS * interval;
   const graceTicks = graceSeconds * balance.ticksPerSecond;
-  const pileTicks = NATION_PILE_SECONDS * balance.ticksPerSecond;
   const topology = game.terrain.topology;
   // R-BOT-16: soldiers' reach along each neighbour's front, reused every decision.
   const facing = new Map<number, number>();
@@ -154,7 +134,11 @@ export function installNations(
     if (!game.player(id)) throw new RangeError(`unknown player ${String(id)}`);
   }
   for (const id of nations) {
-    game.popFactors.set(id, { cap: nationParams.capPercent, growth: nationParams.growthPercent });
+    game.popFactors.set(id, {
+      cap: nationParams.capPercent,
+      growth: nationParams.growthPercent,
+      start: nationParams.startPercent,
+    });
   }
   const seaCooldowns: Cooldowns = new Map();
   const cityCooldowns: Cooldowns = new Map();
@@ -183,53 +167,15 @@ export function installNations(
     }
   });
 
-  /** What spared() knows, computed once per decision: a scan asks about every tile of the border. */
-  let pileFresh = false;
-  const piled = new Map<number, number>();
-  let pileLeader: number = NEUTRAL;
-
-  /**
-   * R-BOT-13: whether a nation may open a front against `owner` early on:
-   * fewer than `NATION_PILE_MAX` nations are attacking them, or they lead.
-   */
-  function spared(owner: number): boolean {
-    if (!pileFresh) {
-      pileFresh = true;
-      piled.clear();
-      for (const attack of game.attacks) {
-        if (attack.target !== NEUTRAL && nationSet.has(attack.player)) {
-          piled.set(attack.target, (piled.get(attack.target) ?? 0) + 1);
-        }
-      }
-      pileLeader = leader();
-    }
-    return (piled.get(owner) ?? 0) < NATION_PILE_MAX || owner === pileLeader;
-  }
-
-  /** The player with the most land, the lowest number among equals. */
-  function leader(): number {
-    let best = NEUTRAL;
-    let most = -1;
-    for (const player of game.players()) {
-      const tiles = territory.tileCount(player.id);
-      if (tiles > most) {
-        most = tiles;
-        best = player.id;
-      }
-    }
-    return best;
-  }
-
   function decide(nation: Player): void {
-    pileFresh = false;
     const tiles = territory.tileCount(nation.id);
     if (tiles === 0 || territory.borderCount(nation.id) === 0) return;
     answerAlliances(
       game,
       nation,
-      NATION_ALLIANCE_SIZE_PERCENT,
-      NATION_ALLIANCE_MAX,
-      (other, theirs, ours) => willAlly(nation.id, other, theirs, ours),
+      0,
+      Number.MAX_SAFE_INTEGER,
+      (other) => willAlly(nation, other, true),
       (from, expiresAt) => {
         // Turned down once, when the request is new.
         if (game.tick - (expiresAt - balance.allianceRequestTicks) < interval) {
@@ -247,17 +193,17 @@ export function installNations(
     // R-BOT-17: a front near its capital comes before any other attacker.
     const besieger = capitalThreat(game, nation.id);
     const attacker = besieger !== NEUTRAL ? besieger : mainAttacker(nation.id);
-    // R-BOT-09: one war at a time. Alliances (#47) will narrow this further.
-    const enemies = new Set<number>();
+    let fighting = false;
     for (const attack of game.attacks) {
-      if (attack.player === nation.id && attack.target !== NEUTRAL) enemies.add(attack.target);
+      if (attack.player === nation.id && attack.target !== NEUTRAL) fighting = true;
     }
-    // Troops past the cap would be wasted: a full army takes the odds a bot would.
-    const full = nation.troops * 100 >= cap * NATION_FULL_PERCENT;
-    // R-BOT-15: at work while full and at peace.
+    // R-BOT-15: at work while its army is near full and it is at peace.
     work(
       nation,
-      attacker === NEUTRAL && full && enemies.size === 0 && !exposedAtWork(nation)
+      attacker === NEUTRAL &&
+        nation.troops * 100 >= cap * NATION_WORK_FROM_PERCENT &&
+        !fighting &&
+        !exposedAtWork(nation)
         ? NATION_WORK_PERCENT
         : 0,
     );
@@ -265,100 +211,330 @@ export function installNations(
     const own = nationRatios(nation.id);
     const reserve = percentOf(cap, own.reserve);
     // R-ECO-07: only soldiers leave; workers count towards the reserve at home.
-    // Against a player, a nation sends what lies above its reserve.
     const sendable = (): number => Math.max(0, Math.min(nation.troops - reserve, soldiers(nation)));
-    // Into free land, what lies above the smaller reserve of an expanding nation.
-    const expanding = (): number =>
-      Math.max(0, Math.min(nation.troops - percentOf(cap, own.expand), soldiers(nation)));
-    const troops = sendable();
-    const freeTroops = expanding();
-    // R-BOT-26: a player is attacked only from the trigger share of the cap, but one time in ten whatever the army.
-    const triggered = nation.troops * 100 >= cap * own.trigger || game.random.nextInt(0, 10) === 0;
     // R-BOT-15: everyone back under arms before turning on a player.
     const armed = (): number => {
       work(nation, 0);
       return sendable();
     };
+    const cheapest = cheapestTile(balance);
 
-    // R-BOT-08: hold the border, and answer the attacker alone once strong enough.
-    const front = attacker === NEUTRAL ? -1 : borderWith(nation, attacker);
-    if (front >= 0) {
-      // R-BOT-17: a besieged capital gets the first fort; its troops stay home, where they defend it.
+    // R-BOT-08: a fort facing the attacker.
+    if (attacker !== NEUTRAL) {
+      const front = borderWith(nation, attacker);
       if (besieger !== NEUTRAL && nation.capital !== undefined) buildFort(nation, nation.capital);
-      buildFort(nation, front);
-      if (nation.troops * 100 <= cap * nationParams.holdPercent) return;
-      if (troops >= cheapestTile(balance)) {
-        game.apply(nation.id, { type: "attack", target: capitalAim(game, front), troops });
-      }
-      return;
+      if (front >= 0) buildFort(nation, front);
     }
-    // Less than the price of one tile would come straight back.
-    if (Math.max(troops, freeTroops) < cheapestTile(balance)) return;
+    // R-BOT-27: a hard nation answers an attack at once.
+    if (nationParams.answer === "at once" && retaliate(nation, attacker, armed)) return;
+
+    // R-BOT-26: free land first, sending what lies above the smaller reserve of an expanding nation.
+    const { neutral } = scanBorder(game, nation);
+    if (neutral >= 0) {
+      const troops = Math.max(
+        0,
+        Math.min(nation.troops - percentOf(cap, own.expand), soldiers(nation)),
+      );
+      if (troops >= cheapest) {
+        game.apply(nation.id, { type: "attack", target: neutral, troops });
+        return;
+      }
+    }
     // R-BOT-16: a front about to give way gets everything the nation can send.
     if (game.rules.collapsingFronts && press(nation, armed)) return;
 
-    // R-BOT-09: early on, free land only; an attacker is still answered above (R-BOT-08).
-    // So is a nation whose attacker holds no land along its border yet, as when a ship has not landed.
-    const settling = game.tick < balance.spawnPhaseTicks + graceTicks || attacker !== NEUTRAL;
-    const open: OwnerFilter | undefined =
-      enemies.size === 0 ? undefined : (owner) => enemies.has(owner);
-    // Its workers come back at once when it fights: its strength is all of its troops.
-    const ownDensity = nation.troops;
-    // R-BOT-22: a traitor first, at any time, then a player it is hostile to once settled.
-    if (revenge(nation, ownDensity, full, settling, armed, open)) return;
-    // R-BOT-24: an ally under attack next.
-    if (helpAllies(nation, ownDensity, full, settling, cap, reserve, armed, open)) return;
-    // R-BOT-20: a friend is left alone, unless it leads (R-BOT-14).
-    const unfriendly = (owner: number): boolean => memory.score(nation.id, owner) < MOOD_FRIENDLY;
-    const accept: OwnerFilter | undefined = settling
-      ? () => false
-      : game.tick < pileTicks
-        ? (owner) =>
-            unfriendly(owner) && (open?.(owner) ?? true) && (enemies.has(owner) || spared(owner))
-        : (owner) => unfriendly(owner) && (open?.(owner) ?? true);
-    // R-BOT-14: once settled, the leader comes first when it borders the nation and the odds allow.
-    if (!settling && hunt(nation, ownDensity, armed, open)) return;
-    // R-BOT-17: an enemy capital within reach of its border is worth more than any other target.
-    if (!settling && strikeCapital(nation, ownDensity, armed, accept)) return;
-    const { neutral, enemy, enemyDensity } = scanBorder(game, nation, accept);
-    const odds = nationParams.oddsPercent;
-    // R-BOT-26: easier nations let a human player be more often than they let each other be.
-    const goes =
-      enemy < 0 ||
-      nationSet.has(territory.ownerOf(enemy)) ||
-      game.random.nextInt(0, 100) < nationParams.humanPercent;
-    const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * odds && triggered && goes;
-    // R-BOT-26: free land comes first.
-    const target = neutral >= 0 ? neutral : weak ? enemy : -1;
-    // R-BOT-18: scraps of a neighbour make no front; a larger prize may lie overseas.
-    const scraps =
-      enemy >= 0 &&
-      target === enemy &&
-      territory.tileCount(territory.ownerOf(enemy)) * 100 < tiles * NATION_SCRAPS_PERCENT;
-    if (scraps && sail(game, nation, armed(), odds, seaCooldowns, retryTicks, accept)) return;
-    if (target >= 0) {
-      const sent = target === enemy ? armed() : freeTroops;
-      const aim = target >= 0 && target === enemy ? capitalAim(game, target) : target;
-      game.apply(nation.id, { type: "attack", target: aim, troops: sent });
-    } else if (triggered) sail(game, nation, troops, odds, seaCooldowns, retryTicks, accept);
+    // R-BOT-27: its neighbours, the fewest troops first.
+    const neighbours = neighboursOf(nation).sort(
+      (a, b) => (game.player(a) as Player).troops - (game.player(b) as Player).troops || a - b,
+    );
+    // R-BOT-28: alliance requests to its neighbours, now and then.
+    for (const other of neighbours) {
+      if (game.random.nextInt(0, NATION_ASK_ODDS) !== 0) continue;
+      if (allyError(game, nation, other) !== undefined || !willAlly(nation, other, false)) continue;
+      game.apply(nation.id, { type: "ally", target: other });
+    }
+    // R-BOT-27: now and then a ship, carrying a fifth of its soldiers; held back under attack above easy.
+    const holdsShips =
+      attacker !== NEUTRAL &&
+      (nationParams.answer === "at once" ||
+        (nationParams.answer === "after reserve" && game.random.nextInt(0, 2) === 0));
+    const shipOdds = neighbours.length === 0 ? NATION_SHIP_ODDS_ALONE : NATION_SHIP_ODDS;
+    if (!holdsShips && game.random.nextInt(0, shipOdds) === 0) {
+      const sailed = sail(
+        game,
+        nation,
+        divFloor(soldiers(nation), 5),
+        100,
+        seaCooldowns,
+        retryTicks,
+        (owner) => goes(owner),
+      );
+      if (sailed && neighbours.length > 0) return;
+    }
+    // R-BOT-26: saving up to its reserve, then to its trigger, but one time in ten whatever the army.
+    if (nation.troops < reserve) return;
+    if (nationParams.answer === "after reserve" && retaliate(nation, attacker, armed)) return;
+    if (nation.troops * 100 < cap * own.trigger && game.random.nextInt(0, 10) !== 0) return;
+
+    const troops = nation.troops;
+    // R-BOT-27: the first of its neighbours, the fewest troops first, that `find` picks.
+    const pick = (find: (owner: Player) => boolean): boolean => {
+      for (const id of neighbours) {
+        const other = game.player(id) as Player;
+        if (find(other) && goes(id) && strike(nation, id, armed())) return true;
+      }
+      return false;
+    };
+    const strategies: Record<NationStrategy, () => boolean> = {
+      answer: () => retaliate(nation, attacker, armed),
+      assist: () => helpAllies(nation, reserve, armed),
+      hated: () => hated(nation, armed),
+      traitor: () => pick((other) => isTraitor(game, other) && other.troops * 10 < troops * 12),
+      crown: () => crown(nation, neighbours, armed),
+      capital: () => strikeCapital(nation, armed),
+      veryWeak: () =>
+        pick(
+          (other) =>
+            other.troops * 100 < populationCap(game, other) * 15 && other.troops * 10 < troops * 12,
+        ),
+      juicy: () => juicy(nation, neighbours, armed),
+      victim: () =>
+        pick(
+          (other) => other.troops * 10 <= troops * 12 && incomingOn(other.id) * 2 > other.troops,
+        ),
+      weakest: () => pick((other) => other.troops < troops),
+      island: () =>
+        neighbours.length === 0 &&
+        sail(game, nation, divFloor(soldiers(nation), 5), 100, seaCooldowns, retryTicks, goes),
+    };
+    for (const strategy of nationParams.strategies) {
+      if (strategies[strategy]()) return;
+    }
   }
 
   /**
-   * R-BOT-23: whether the nation allies with `other`: never while wary of
-   * them, and with a friend twice as large as a stranger.
+   * R-BOT-27: whether the nation turns on `owner` when it chooses to: always
+   * a nation, a city-state or a traitor; a player never during B-NATION-GRACE,
+   * then only B-NATION-HUMAN of the time.
    */
-  function willAlly(id: number, other: number, theirs: number, ours: number): boolean {
-    const score = memory.score(id, other);
+  function goes(owner: number): boolean {
+    const player = game.player(owner);
+    if (nationSet.has(owner) || game.bots.has(owner) || (player && isTraitor(game, player))) {
+      return true;
+    }
+    // B-NATION-GRACE: no player is chosen early on.
+    if (game.tick < balance.spawnPhaseTicks + graceTicks) return false;
+    return game.random.nextInt(0, 100) < nationParams.humanPercent;
+  }
+
+  /** Troops in attacks on `id`'s land. */
+  function incomingOn(id: number): number {
+    let total = 0;
+    for (const attack of game.attacks) if (attack.target === id) total += attack.troops;
+    return total;
+  }
+
+  /**
+   * R-BOT-27: an attack on `owner` with `troops`, by land when they border it,
+   * or else a ship with a fifth of its soldiers. A hard nation keeps back
+   * B-NATION-RETAIN of its strongest neighbour's troops unless it answers
+   * an attack, and sends nothing under B-NATION-TOO-WEAK of the target's.
+   * Whether it attacked.
+   */
+  function strike(nation: Player, owner: number, troops: number, opponent = false): boolean {
+    const target = game.player(owner);
+    if (!target?.alive) return false;
+    const incoming = incomingOn(nation.id);
+    let sent = troops;
+    if (nationParams.retainPercent > 0) {
+      let strongest = 0;
+      for (const id of neighboursOf(nation)) {
+        if (id === owner && opponent) continue;
+        if (game.bots.has(id)) continue;
+        strongest = Math.max(strongest, (game.player(id) as Player).troops);
+      }
+      const kept = Math.ceil((strongest * nationParams.retainPercent) / 100);
+      sent = Math.min(sent, Math.max(nation.troops - kept, incoming));
+    }
+    if (sent < cheapestTile(balance)) return false;
+    if (incoming === 0 && sent * 100 < target.troops * nationParams.tooWeakPercent) {
+      return false;
+    }
+    const tile = borderWith(nation, owner);
+    if (tile >= 0) {
+      return game.apply(nation.id, {
+        type: "attack",
+        target: capitalAim(game, tile),
+        troops: sent,
+      });
+    }
+    return sail(
+      game,
+      nation,
+      Math.min(sent, divFloor(soldiers(nation), 5)),
+      100,
+      seaCooldowns,
+      retryTicks,
+      (other) => other === owner,
+    );
+  }
+
+  /** R-BOT-27: an answer to the main attacker, a hard nation sending at least what comes at it. Whether it attacked. */
+  function retaliate(nation: Player, attacker: number, armed: () => number): boolean {
+    if (attacker === NEUTRAL || game.bots.has(attacker)) return false;
+    let troops = armed();
+    if (nationParams.answer === "at once") {
+      troops = Math.max(troops, Math.min(soldiers(nation), incomingOn(nation.id)));
+    }
+    return strike(nation, attacker, troops, true);
+  }
+
+  /**
+   * R-BOT-27: the runaway leader, a player with B-NATION-RUNAWAY times the
+   * land of the runner-up, when it borders the nation; a normal nation only
+   * joins attacks already on them. Whether it attacked.
+   */
+  function crown(nation: Player, neighbours: readonly number[], armed: () => number): boolean {
+    const top = runaway();
+    if (top === NEUTRAL || !neighbours.includes(top) || !goes(top)) return false;
+    const leaderTroops = (game.player(top) as Player).troops;
+    if (nationParams.answer !== "at once" && incomingOn(top) * 10 < leaderTroops) return false;
+    if (!strike(nation, top, armed(), true)) return false;
+    // R-BOT-21: and calls on its allies to join in, now and then.
+    if (game.tick >= (memory.lastCall.get(nation.id) ?? 0)) {
+      memory.lastCall.set(nation.id, game.tick + NATION_CALL_SECONDS * balance.ticksPerSecond);
+      for (const ally of alliesOf(game, nation.id)) {
+        if (ally !== top) memory.say(nation.id, ally, Phrase.Leader);
+      }
+    }
+    return true;
+  }
+
+  /** R-BOT-27: the player, city-states aside, with B-NATION-RUNAWAY times the land of the next; NEUTRAL if none. */
+  function runaway(): number {
+    if (nationParams.runawayPercent === 0 || game.teams > 0) return NEUTRAL;
+    let first = NEUTRAL;
+    let most = 0;
+    let second = 0;
+    for (const player of game.players()) {
+      if (!player.alive || game.bots.has(player.id)) continue;
+      const land = territory.tileCount(player.id);
+      if (land > most) {
+        second = most;
+        most = land;
+        first = player.id;
+      } else if (land > second) second = land;
+    }
+    if (first === NEUTRAL || second === 0) return NEUTRAL;
+    return most * 100 >= second * nationParams.runawayPercent ? first : NEUTRAL;
+  }
+
+  /**
+   * R-BOT-27: among the neighbours with at most three quarters of its troops,
+   * the one richest in buildings, emptiest of troops and largest, each
+   * measured against the others. Whether it attacked.
+   */
+  function juicy(nation: Player, neighbours: readonly number[], armed: () => number): boolean {
+    const candidates = neighbours.filter(
+      (id) => (game.player(id) as Player).troops * 4 <= nation.troops * 3,
+    );
+    if (candidates.length === 0) return false;
+    const stats = candidates.map((id) => {
+      const player = game.player(id) as Player;
+      const cap = Math.max(1, populationCap(game, player));
+      let buildings = 0;
+      for (const s of game.structures) {
+        if (s.player === id && s.kind !== StructureKind.Fort && s.kind !== StructureKind.Silo) {
+          buildings++;
+        }
+      }
+      // In thousandths, to stay in integers.
+      return {
+        id,
+        buildings,
+        gap: 1000 - divFloor(player.troops * 1000, cap),
+        land: territory.tileCount(id),
+      };
+    });
+    const span = (values: number[]) => [Math.min(...values), Math.max(...values)] as const;
+    const [b0, b1] = span(stats.map((s) => s.buildings));
+    const [g0, g1] = span(stats.map((s) => s.gap));
+    const [l0, l1] = span(stats.map((s) => s.land));
+    const scaled = (v: number, lo: number, hi: number) =>
+      hi > lo ? divFloor((v - lo) * 1000, hi - lo) : 0;
+    let best = stats[0] as (typeof stats)[number];
+    let bestScore = -1;
+    for (const s of stats) {
+      const score = scaled(s.buildings, b0, b1) + scaled(s.gap, g0, g1) + scaled(s.land, l0, l1);
+      if (score > bestScore) {
+        best = s;
+        bestScore = score;
+      }
+    }
+    return goes(best.id) && strike(nation, best.id, armed());
+  }
+
+  /**
+   * R-BOT-28: whether the nation allies with `other`, answering their request
+   * or asking them. It is now and then confused and answers at random; it
+   * nearly always turns down a traitor, and above easy a runaway leader; it
+   * takes a much stronger player's hand above easy; it turns down a player it
+   * is wary of and takes a friend's; then, unless it has allies enough,
+   * it takes most hands early on, and later those of players about as strong.
+   * A request is weighed once: an answer to it is drawn from the request itself.
+   */
+  function willAlly(nation: Player, owner: number, answering: boolean): boolean {
+    const other = game.player(owner);
+    if (!other?.alive) return false;
+    let salt = game.tick;
+    if (answering) {
+      const request = game.allianceRequests.find((r) => r.from === owner && r.to === nation.id);
+      salt = request?.expiresAt ?? divFloor(game.tick, balance.allianceRequestTicks);
+    }
+    let draws = 0;
+    // A request is answered the same way each time it is weighed; a nation's own asks use the game's draws.
+    const roll = (n: number): number =>
+      answering ? hashRoll(nation.id, owner, salt, draws++) % n : game.random.nextInt(0, n);
+    if (roll(nationParams.confusedOdds) === 0) return roll(2) === 0;
+    if (isTraitor(game, other) && roll(100) >= 10) return false;
+    if (runaway() === owner) return false;
+    const strong =
+      nationParams.threat === "troops"
+        ? other.troops * 10 > nation.troops * 25
+        : nationParams.threat === "cap"
+          ? other.troops > nation.troops &&
+            populationCap(game, other) > populationCap(game, nation) * 2
+          : false;
+    if (strong) return true;
+    const score = memory.score(nation.id, owner);
     if (score < MOOD_WARY) return false;
-    const limit = NATION_ALLIANCE_SIZE_PERCENT * (score >= MOOD_FRIENDLY ? 2 : 1);
-    return theirs * 100 < ours * limit;
+    if (score >= MOOD_FRIENDLY && roll(100) >= nationParams.friendRefusePercent) return true;
+    const allies = alliesOf(game, nation.id).length;
+    if (nationParams.allianceMax > 0 && allies >= nationParams.allianceMax + roll(2)) return false;
+    const early =
+      game.tick < balance.spawnPhaseTicks + nationParams.earlySeconds * balance.ticksPerSecond;
+    if (early && roll(100) < nationParams.earlyAcceptPercent) return true;
+    // About as strong: troops, or land with half the troops, above a share drawn from a range.
+    const out = (id: number) => {
+      let total = (game.player(id) as Player).troops;
+      for (const attack of game.attacks) if (attack.player === id) total += attack.troops;
+      return total;
+    };
+    const ours = out(nation.id);
+    const theirs = out(owner);
+    const troopShare = nationParams.similarTroopsPercent + roll(10);
+    const landShare = nationParams.similarLandPercent + roll(10);
+    return (
+      theirs * 100 > ours * troopShare ||
+      (territory.tileCount(owner) * 100 > territory.tileCount(nation.id) * landShare &&
+        theirs * 2 > ours)
+    );
   }
 
   /**
    * R-BOT-21 to R-BOT-23, once every B-NATION-COURT: greets new neighbours,
    * places an embargo on the players it is hostile to and lifts it once it
-   * no longer is wary of them, and asks one neighbour for an alliance: a
-   * friend, one who asked by quick message, or one who fears the same leader.
+   * no longer is wary of them, and eyes its allies (R-BOT-25).
    */
   function court(nation: Player): void {
     const neighbours = neighboursOf(nation);
@@ -378,55 +554,6 @@ export function installNations(
       }
     }
     covet(nation);
-    // Allies and teammates alike (R-BOT-10).
-    let allies = 0;
-    for (const player of game.players()) {
-      if (player.alive && isAllied(game, nation.id, player.id)) allies++;
-    }
-    if (allies >= NATION_ALLIANCE_MAX) {
-      for (const other of neighbours) {
-        if (memory.askedToAlly(nation.id, other)) memory.say(nation.id, other, Phrase.Down);
-      }
-      return;
-    }
-    const ours = territory.tileCount(nation.id);
-    const top = leader();
-    const topTiles = territory.tileCount(top);
-    // A leader that the hunt would go after (R-BOT-14) makes neighbours friends.
-    const feared =
-      nationParams.huntPercent > 0 &&
-      topTiles * 100 >= game.terrain.ownableCount * nationParams.huntPercent;
-    let best = NEUTRAL;
-    let bestScore = 0;
-    for (const other of neighbours) {
-      const player = game.player(other) as Player;
-      const score = memory.score(nation.id, other);
-      const asked = memory.askedToAlly(nation.id, other);
-      const theirs = territory.tileCount(other);
-      const willing =
-        !isTraitor(game, player) &&
-        allyError(game, nation, other) === undefined &&
-        willAlly(nation.id, other, theirs, ours);
-      if (!willing) {
-        if (asked) memory.say(nation.id, other, Phrase.Down);
-        continue;
-      }
-      const common = feared && other !== top && nation.id !== top && score >= 0;
-      // B-NATION-COURT-PLAYERS: a smaller player who has not attacked it.
-      const offered =
-        nationParams.courtPlayersSeconds > 0 &&
-        game.tick >= nationParams.courtPlayersSeconds * balance.ticksPerSecond &&
-        !nationSet.has(other) &&
-        score >= 0 &&
-        theirs < ours;
-      if (score < MOOD_FRIENDLY && !asked && !common && !offered) continue;
-      // The friendliest first, the lowest number among equals.
-      if (best === NEUTRAL || score > bestScore) {
-        best = other;
-        bestScore = score;
-      }
-    }
-    if (best !== NEUTRAL) game.apply(nation.id, { type: "ally", target: best });
   }
 
   /**
@@ -496,79 +623,46 @@ export function installNations(
   }
 
   /**
-   * R-BOT-22: an attack on a player who betrayed the nation, at any time,
-   * whatever war it fights, within its boldness, by land or else by sea;
-   * once settled, and at a difficulty with B-NATION-GRUDGE, on a neighbour
-   * it is hostile to, within its odds and one war at a time (R-BOT-09).
-   * Whether it attacked.
+   * R-BOT-22: an attack on a player who betrayed the nation, or on the ally
+   * it betrayed for a while, or, at a difficulty with B-NATION-GRUDGE, on a
+   * neighbour it is hostile to, by land or else by sea, unless they have
+   * three times its troops. Whether it attacked.
    */
-  function revenge(
-    nation: Player,
-    ownDensity: number,
-    full: boolean,
-    settling: boolean,
-    armed: () => number,
-    open: OwnerFilter | undefined,
-  ): boolean {
-    // R-BOT-25: the ally it betrayed, for a while.
+  function hated(nation: Player, armed: () => number): boolean {
     const prey =
       game.tick < (memory.preyUntil.get(nation.id) ?? 0) ? memory.prey.get(nation.id) : undefined;
-    // A traitor comes before the war the nation was fighting.
-    const accept = (owner: number): boolean => {
-      const score = memory.score(nation.id, owner);
-      if (score <= MOOD_BETRAYED || owner === prey) return true;
-      return score <= MOOD_HOSTILE && !settling && nationParams.grudge && (open?.(owner) ?? true);
-    };
-    const { enemy, enemyDensity } = scanBorder(game, nation, accept);
-    if (enemy >= 0) {
-      const owner = territory.ownerOf(enemy);
-      const betrayed = memory.score(nation.id, owner) <= MOOD_BETRAYED || owner === prey;
-      const odds = betrayed || full ? params.boldnessPercent : nationParams.oddsPercent;
-      if (enemyDensity * 100 > ownDensity * odds) return false;
-      game.apply(nation.id, { type: "attack", target: capitalAim(game, enemy), troops: armed() });
-      return true;
+    for (const player of game.players()) {
+      if (player.id === nation.id || !player.alive || isAllied(game, nation.id, player.id))
+        continue;
+      const score = memory.score(nation.id, player.id);
+      const hostile =
+        score <= MOOD_BETRAYED ||
+        player.id === prey ||
+        (nationParams.grudge && score <= MOOD_HOSTILE);
+      if (!hostile || player.troops > nation.troops * 3 || !goes(player.id)) continue;
+      if (strike(nation, player.id, armed())) return true;
     }
-    // A traitor overseas is worth a ship.
-    const traitor = (owner: number): boolean => memory.score(nation.id, owner) <= MOOD_BETRAYED;
-    let any = false;
-    for (const player of game.players()) any ||= player.alive && traitor(player.id);
-    if (!any) return false;
-    return sail(game, nation, armed(), params.boldnessPercent, seaCooldowns, retryTicks, traitor);
+    return false;
   }
 
   /**
    * R-BOT-24: for each of its allies, the lowest number first, an attack on
-   * the player attacking that ally the most, when they border the nation and
-   * the odds allow, once settled and still one war at a time; or else, at
-   * most once every B-NATION-GIFT-PAUSE, B-NATION-GIFT of its soldiers to an
-   * ally who asked for help or is under attack with troops under B-NATION-NEED
-   * of its cap, from troops above its reserve. Whether it attacked.
+   * the player attacking that ally the most, for an ally it likes or that
+   * asked; or else, at most once every B-NATION-GIFT-PAUSE, B-NATION-GIFT of
+   * its soldiers to an ally who asked for help or is under attack with troops
+   * under B-NATION-NEED of its cap, from twice its reserve. Whether it attacked.
    */
-  function helpAllies(
-    nation: Player,
-    ownDensity: number,
-    full: boolean,
-    settling: boolean,
-    cap: number,
-    reserve: number,
-    armed: () => number,
-    open: OwnerFilter | undefined,
-  ): boolean {
+  function helpAllies(nation: Player, reserve: number, armed: () => number): boolean {
     const allies = alliesOf(game, nation.id);
     if (allies.length === 0) return false;
     for (const ally of allies) {
       const friend = game.player(ally) as Player;
       const foe = mainFoe(ally);
       const asked = memory.askedForHelp(nation.id, ally);
-      if (foe !== NEUTRAL && !settling && (open?.(foe) ?? true)) {
-        const { enemy, enemyDensity } = scanBorder(game, nation, (owner) => owner === foe);
-        const odds = full ? params.boldnessPercent : nationParams.oddsPercent;
-        if (enemy >= 0 && enemyDensity * 100 <= ownDensity * odds) {
-          game.apply(nation.id, {
-            type: "attack",
-            target: capitalAim(game, enemy),
-            troops: armed(),
-          });
+      // Only for an ally it likes, at a foe that is not its own ally.
+      const liked = memory.score(nation.id, ally) >= MOOD_FRIENDLY || asked;
+      if (foe !== NEUTRAL && foe !== nation.id && liked && !isAllied(game, nation.id, foe)) {
+        if (goes(foe) && strike(nation, foe, armed())) {
           if (asked) {
             memory.forgetHelp(nation.id, ally);
             memory.say(nation.id, ally, Phrase.Up);
@@ -582,7 +676,7 @@ export function installNations(
           friend.troops * 100 < populationCap(game, friend) * NATION_NEED_PERCENT);
       if (!needy || game.tick < (memory.lastGift.get(nation.id) ?? 0)) continue;
       // Only from a strong army: never at the cost of its own defense.
-      if (nation.troops * 100 < cap * nationParams.holdPercent * 2) continue;
+      if (nation.troops < reserve * 2) continue;
       const troops = Math.min(
         percentOf(soldiers(nation), NATION_GIFT_PERCENT),
         nation.troops - reserve,
@@ -684,61 +778,12 @@ export function installNations(
   }
 
   /**
-   * R-BOT-14: an attack on the player who is not its ally with the most land,
-   * once they hold B-NATION-HUNT of it, from a sample of the border, if their
-   * troops per tile are within B-BOT-BOLDNESS of the nation's own. Whether
-   * it attacked.
-   */
-  function hunt(
-    nation: Player,
-    ownDensity: number,
-    armed: () => number,
-    open: OwnerFilter | undefined,
-  ): boolean {
-    if (nationParams.huntPercent === 0) return false;
-    let top = NEUTRAL;
-    let most = 0;
-    for (const player of game.players()) {
-      if (player.id === nation.id || !player.alive || isAllied(game, nation.id, player.id))
-        continue;
-      const tiles = territory.tileCount(player.id);
-      if (tiles > most) {
-        top = player.id;
-        most = tiles;
-      }
-    }
-    if (top === NEUTRAL || territory.tileCount(nation.id) >= most) return false;
-    // R-BOT-17: with capitals, a runaway leader is a threat twice as soon.
-    const huntShare = game.rules.capitals
-      ? divFloor(nationParams.huntPercent, 2)
-      : nationParams.huntPercent;
-    if (most * 100 < game.terrain.ownableCount * huntShare) return false;
-    if (open && !open(top)) return false;
-    const { enemy, enemyDensity } = scanBorder(game, nation, (owner) => owner === top);
-    if (enemy < 0 || enemyDensity * 100 > ownDensity * params.boldnessPercent) return false;
-    game.apply(nation.id, { type: "attack", target: capitalAim(game, enemy), troops: armed() });
-    // R-BOT-21: and calls on its allies to join in, now and then.
-    if (game.tick >= (memory.lastCall.get(nation.id) ?? 0)) {
-      memory.lastCall.set(nation.id, game.tick + NATION_CALL_SECONDS * balance.ticksPerSecond);
-      for (const ally of alliesOf(game, nation.id)) {
-        if (ally !== top) memory.say(nation.id, ally, Phrase.Leader);
-      }
-    }
-    return true;
-  }
-
-  /**
    * R-BOT-17: in capital mode, an attack on the capital of a neighbour not
    * its ally whose capital lies within B-CAPITAL-ALERT of the nation's
-   * border, if that neighbour's troops per tile are within its boldness,
-   * the lowest player number first. Whether it attacked.
+   * border, if that neighbour has fewer troops than the nation, the lowest
+   * player number first. Whether it attacked.
    */
-  function strikeCapital(
-    nation: Player,
-    ownDensity: number,
-    armed: () => number,
-    accept: OwnerFilter | undefined,
-  ): boolean {
+  function strikeCapital(nation: Player, armed: () => number): boolean {
     if (!capitalsStand(game)) return false;
     const topology = game.terrain.topology;
     const reach = capitalAlertDistance(game);
@@ -747,16 +792,13 @@ export function installNations(
     for (const player of game.players()) {
       const capital = player.capital;
       if (player.id === nation.id || !player.alive || capital === undefined) continue;
-      if (isAllied(game, nation.id, player.id) || (accept && !accept(player.id))) continue;
+      if (isAllied(game, nation.id, player.id) || player.troops >= nation.troops) continue;
       let near = false;
       for (let i = 0; i < borders && !near; i += stride) {
         near = topology.distance(territory.borderTile(nation.id, i), capital) <= reach;
       }
-      if (!near) continue;
-      const { enemy, enemyDensity } = scanBorder(game, nation, (owner) => owner === player.id);
-      if (enemy < 0 || enemyDensity * 100 > ownDensity * params.boldnessPercent) continue;
-      game.apply(nation.id, { type: "attack", target: capitalAim(game, enemy), troops: armed() });
-      return true;
+      if (!near || !goes(player.id)) continue;
+      if (strike(nation, player.id, armed())) return true;
     }
     return false;
   }
@@ -933,4 +975,14 @@ function nationRatios(id: number): { trigger: number; reserve: number; expand: n
 /** Spreads a nation's looks at its neighbours over B-NATION-COURT. */
 function id7(id: number): number {
   return id * 7;
+}
+
+/** A draw in [0, 2^32) from the numbers given, the same on every client. */
+function hashRoll(...values: number[]): number {
+  let h = 0x811c9dc5;
+  for (const v of values) {
+    h = Math.imul(h ^ (v >>> 0), 0x01000193) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  }
+  return h;
 }

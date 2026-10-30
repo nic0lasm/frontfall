@@ -110,12 +110,19 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     run(1, [{ player: 3, order: { type: "attack", target: grid.index(35, 1), troops: 10 } }]);
     run(1, [{ player: 3, order: { type: "attack", target: grid.index(35, 0), troops: 10 } }]);
     expect(nationMood(game, 1, 3)).toBe("wary");
-    run(seconds(25));
-    expect(applied).toContainEqual({ player: 1, order: { type: "ally", target: 2 } });
-    expect(applied).not.toContainEqual({ player: 1, order: { type: "ally", target: 3 } });
     run(1, [{ player: 3, order: { type: "ally", target: 1 } }]);
     run(seconds(6));
     expect(messages).toContainEqual({ from: 1, to: 3, phrase: Phrase.Down });
+    // It asks one neighbour in B-NATION-ASK-ODDS at each decision, never Bea while wary of her.
+    const asked = (target: number) =>
+      applied.some(
+        ({ player, order }) => player === 1 && order.type === "ally" && order.target === target,
+      );
+    for (let i = 0; i < 300 && !asked(2); i++) {
+      run(seconds(1));
+      if (nationMood(game, 1, 3) === "wary") expect(asked(3)).toBe(false);
+    }
+    expect(asked(2)).toBe(true);
   });
 
   it("turn on a traitor at once, and say what it thinks of them", () => {
@@ -166,7 +173,8 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     }
     nation.troops = populationCap(game, nation);
     ada.troops = 100;
-    bea.troops = 1_000_000;
+    // Strong enough to keep the nation busy elsewhere, not so strong that it holds everything back (B-NATION-RETAIN).
+    bea.troops = 2000;
     run(1, [{ player: 2, order: { type: "ally", target: 1 } }]);
     run(seconds(6));
     expect(game.alliances).toHaveLength(1);

@@ -240,12 +240,22 @@ export class Game {
   readonly tradeShips: TradeShip[] = [];
   /**
    * What a computer player's difficulty does to its population, in percent:
-   * its cap and its growth (R-BOT-04). Set again by whoever installs the
+   * its starting troops, its cap, its growth and its gold (R-BOT-04, R-BOT-29). Set again by whoever installs the
    * player at the start of every game, so it is not part of the state.
    */
-  readonly popFactors = new Map<number, { readonly cap: number; readonly growth: number }>();
+  readonly popFactors = new Map<
+    number,
+    {
+      readonly cap: number;
+      readonly growth: number;
+      readonly start?: number;
+      readonly gold?: number;
+    }
+  >();
   /** Players run as bots (R-BOT-01), whose land prices differ (R-ATTACK-04); set with the bots, not part of the state. */
   readonly bots = new Set<number>();
+  /** City-states among the bots (R-BOT-29), which take no allies; set with them, not part of the state. */
+  readonly cityStates = new Set<number>();
   nextTradeShipId = 1;
   /** Warships, oldest first. Owned by the warship rules; read only elsewhere. */
   readonly warships: Warship[] = [];

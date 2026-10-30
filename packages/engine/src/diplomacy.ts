@@ -96,6 +96,7 @@ export const DiplomacyError = {
   NotAllied: "not allied with this player",
   Ally: "the tile belongs to an ally",
   Teammate: "teammates are allies for the whole game",
+  CityState: "city-states take no allies",
   Embargoed: "already under your embargo",
   NotEmbargoed: "not under your embargo",
   NoTrade: "the game has no ports, so no trade to cut off",
@@ -160,6 +161,9 @@ export function allyError(game: Game, player: Player, target: number): string | 
   if (target === player.id) return DiplomacyError.Self;
   if (!game.player(target)?.alive) return DiplomacyError.Player;
   if (sameTeam(game, player.id, target)) return DiplomacyError.Teammate;
+  // R-BOT-29: a city-state is nobody's ally.
+  if (game.cityStates.has(player.id) || game.cityStates.has(target))
+    return DiplomacyError.CityState;
   const alliance = allianceOf(game, player.id, target);
   if (alliance) {
     const voted = player.id === alliance.a ? alliance.renewA : alliance.renewB;

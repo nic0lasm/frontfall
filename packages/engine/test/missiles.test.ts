@@ -525,6 +525,8 @@ describe("nations and missiles (R-BOT-12)", () => {
       [2, grid.index(55, 16)],
       [1, grid.index(15, 10)],
       [1, grid.index(5, 2)],
+      // Cy may come to lead once the nation's attacks eat into Ada.
+      [3, grid.index(30, 10)],
     ] as const) {
       game.structures.push({
         id: game.nextStructureId++,
@@ -535,10 +537,10 @@ describe("nations and missiles (R-BOT-12)", () => {
         reloadAt: 0,
       });
     }
-    installNations(game, [2], "easy", 0);
+    installNations(game, [2], "normal", 0);
     const launches: number[] = [];
     let seen = 0;
-    const pause = NATION_DIFFICULTIES.easy.missilePauseSeconds * game.balance.ticksPerSecond;
+    const pause = NATION_DIFFICULTIES.normal.missilePauseSeconds * game.balance.ticksPerSecond;
     expect(pause).toBeGreaterThan(game.balance.siloReloadTicks);
     for (let i = 0; i < 1000 + 2 * pause && launches.length < 2; i++) {
       step();

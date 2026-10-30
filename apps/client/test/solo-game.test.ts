@@ -2,6 +2,7 @@ import { TileKind } from "@frontfall/engine";
 import { describe, expect, it } from "vitest";
 import { GENERATED_MAPS, generateMap } from "../src/game/maps.ts";
 import { HUMAN_ID, SoloGame, type SoloOptions } from "../src/game/solo-game.ts";
+import { CITY_STATES_PER_NATION, cityStateName } from "../src/game/simulation.ts";
 
 const options: SoloOptions = {
   map: "skirmish",
@@ -35,7 +36,7 @@ describe("maps", () => {
 });
 
 describe("SoloGame", () => {
-  it("adds the map's nations after the bots, each on its tile (R-BOT-07)", () => {
+  it("adds the map's nations after the bots, each on its tile, then their city-states (R-BOT-07, R-BOT-29)", () => {
     const base = generateMap(options.map);
     const land = [...base.kinds.keys()].filter((tile) => base.kinds[tile] !== TileKind.Water);
     const home = land[Math.floor(land.length / 2)] as number;
@@ -48,7 +49,11 @@ describe("SoloGame", () => {
       [3, "Brask"],
       [4, "Corvan"],
       [5, "Norland"],
+      ...Array.from({ length: CITY_STATES_PER_NATION }, (_, i) => [6 + i, cityStateName(i)]),
     ]);
+    expect([...solo.game.cityStates]).toEqual(
+      Array.from({ length: CITY_STATES_PER_NATION }, (_, i) => 6 + i),
+    );
     while (update.phase === "spawn") update = solo.step([]);
     expect(solo.game.player(5)?.start).toBe(home);
     expect(solo.game.territory.ownerOf(home)).toBe(5);

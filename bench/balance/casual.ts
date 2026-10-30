@@ -25,13 +25,6 @@ export interface CasualPace {
   readonly minFillPercent?: number;
 }
 
-/** A player getting the hang of the game: an order every 3 s with 40 % of its troops. */
-export const INTERMEDIATE_PACE: CasualPace = {
-  everySeconds: 3,
-  ratioPercent: 40,
-  minFillPercent: 30,
-};
-
 /**
  * A stand-in for a casual human player, the one balance.md measures against:
  * an order every 5 s with 30 % of its troops, at free land first, then at

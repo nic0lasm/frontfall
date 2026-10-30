@@ -1,5 +1,11 @@
 import { DEFAULT_BALANCE, type Balance } from "./balance.ts";
-import { BOT_DIFFICULTIES, installBots, installNations, type BotDifficulty } from "./bots/index.ts";
+import {
+  BOT_DIFFICULTIES,
+  installBots,
+  installCityStates,
+  installNations,
+  type BotDifficulty,
+} from "./bots/index.ts";
 import { createGame } from "./create-game.ts";
 import {
   DISABLE_ALL,
@@ -38,6 +44,8 @@ export interface DesyncReport {
   bots: { ids: number[]; difficulty: BotDifficulty };
   /** Nations among the players, playing at the bots' difficulty; absent from reports of games without. */
   nations?: number[];
+  /** City-states among the players (R-BOT-29); absent from reports of games without. */
+  cityStates?: number[];
   /** Number of teams (R-MODE-02); absent from free-for-all games. */
   teams?: number;
   /** `Disable` bits of what the game left out (R-MODE-03); absent when it left nothing out. */
@@ -72,6 +80,7 @@ export function recreateGame(recorded: RecordedGame, terrain: Terrain): Game {
     ...(recorded.operator === undefined ? {} : { operator: recorded.operator }),
   });
   installBots(game, recorded.bots.ids, recorded.bots.difficulty);
+  installCityStates(game, recorded.cityStates ?? []);
   installNations(game, recorded.nations ?? [], recorded.bots.difficulty);
   return game;
 }
@@ -203,6 +212,13 @@ export function readGame(report: Record<string, unknown>): RecordedGame {
     ...(report.nations === undefined
       ? {}
       : { nations: readList(report.nations, "nations").map((id) => readInteger(id, "nation id")) }),
+    ...(report.cityStates === undefined
+      ? {}
+      : {
+          cityStates: readList(report.cityStates, "cityStates").map((id) =>
+            readInteger(id, "city-state id"),
+          ),
+        }),
     ...(report.teams === undefined ? {} : { teams: readTeams(report.teams) }),
     ...(report.disabled === undefined ? {} : { disabled: readDisabled(report.disabled) }),
     ...(report.rules === undefined ? {} : { rules: readRules(report.rules) }),

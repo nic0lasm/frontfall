@@ -17,6 +17,7 @@ import {
   type MapInfo,
 } from "../src/game/maps.ts";
 import { SoloGame } from "../src/game/solo-game.ts";
+import { CITY_STATES_PER_NATION } from "../src/game/simulation.ts";
 import { botLimit, onlineMaps } from "../src/ui/lobby.ts";
 
 const PAGE = "https://example.test/frontfall/";
@@ -121,10 +122,23 @@ describe("desync report", () => {
     expect(report.map).toMatchObject({ id: "europe", format: 1 });
     const nations = map.nations.map((_, i) => 6 + i);
     expect(nations.length).toBeGreaterThan(0);
-    expect(report.players.map((player) => player.id)).toEqual([1, 2, 3, 4, 5, ...nations]);
+    const cities = Array.from(
+      { length: nations.length * CITY_STATES_PER_NATION },
+      (_, i) => 6 + nations.length + i,
+    );
+    expect(report.players.map((player) => player.id)).toEqual([
+      1,
+      2,
+      3,
+      4,
+      5,
+      ...nations,
+      ...cities,
+    ]);
     expect(report.players[5]?.start).toBe(map.nations[0]?.tile);
     expect(report.bots).toEqual({ ids: [3, 4, 5], difficulty: "hard" });
     expect(report.nations).toEqual(nations);
+    expect(report.cityStates).toEqual(cities);
     expect(report.turns.map((turn) => turn.tick)).toEqual([3]);
     expect(report.hashes.map((entry) => entry.tick)).toEqual([0, 50, 100, 150, 200, 250]);
     expect(report.hashes[1]?.expected).toBe(report.hashes[1]?.local);

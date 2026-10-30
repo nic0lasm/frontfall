@@ -130,6 +130,7 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
     tiles: territory.tileCount(player.id),
     alive: player.alive,
     ...(player.capital === undefined ? {} : { capital: player.capital }),
+    ...(game.cityStates.has(player.id) ? { cityState: true as const } : {}),
   }));
   const update: GameUpdate = {
     you: you,

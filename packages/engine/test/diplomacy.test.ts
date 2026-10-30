@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { captureCost } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { installBots } from "../src/bots/bots.ts";
+import { installCityStates } from "../src/bots/city-states.ts";
 import { installNations } from "../src/bots/nations.ts";
 import { createGame } from "../src/create-game.ts";
 import {
@@ -425,7 +426,7 @@ describe("bots and alliances (R-BOT-10)", () => {
 });
 
 describe("nations and alliances (R-BOT-19)", () => {
-  it("accepts a player up to B-NATION-ALLIANCE-SIZE of its land, up to B-NATION-ALLIANCE-MAX allies", () => {
+  it("accepts most players early on (B-NATION-EARLY)", () => {
     // Ada, Bea and Cy hold as much land each: a bot would turn both down.
     const { game, ally, run } = newGame({ allianceRequestTicks: 100, winSharePercent: 100 });
     installNations(game, [2], "normal");
@@ -436,17 +437,24 @@ describe("nations and alliances (R-BOT-19)", () => {
     expect(isAllied(game, 3, 2)).toBe(true);
   });
 
-  it("lets the request of a player half again its size or more run out", () => {
-    const { game, grid, ally, run } = newGame({ allianceRequestTicks: 100, winSharePercent: 100 });
-    // Ada holds 600 tiles to Bea's 400.
-    for (let x = 20; x < 30; x++)
-      for (let y = 0; y < 20; y++) game.territory.setOwner(grid.index(x, y), 1);
-    for (let x = 40; x < 50; x++)
-      for (let y = 0; y < 20; y++) game.territory.setOwner(grid.index(x, y), 2);
+  it("accepts a player far stronger than itself, as a shield (B-NATION-THREAT)", () => {
+    const { game, ally, run } = newGame({ allianceRequestTicks: 100, winSharePercent: 100 });
     installNations(game, [2], "normal");
+    (game.player(1) as Player).troops = (game.player(2) as Player).troops * 3;
+    ally(1, 2);
+    run(60);
+    expect(isAllied(game, 1, 2)).toBe(true);
+  });
+
+  it("takes no ally when it is a city-state, and none takes it (R-BOT-29)", () => {
+    const { game, ally, run } = newGame({ allianceRequestTicks: 100, winSharePercent: 100 });
+    installCityStates(game, [2]);
     ally(1, 2);
     run(60);
     expect(isAllied(game, 1, 2)).toBe(false);
+    expect(orderError(game, game.player(1) as Player, { type: "ally", target: 2 })).toBe(
+      DiplomacyError.CityState,
+    );
   });
 });
 

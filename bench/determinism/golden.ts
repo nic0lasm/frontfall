@@ -1,9 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import {
+  CITY_STATES_PER_NATION,
   createGame,
   DEFAULT_BALANCE,
   DESYNC_REPORT_VERSION,
   installBots,
+  installCityStates,
   isAllied,
   installNations,
   loadMap,
@@ -112,6 +114,12 @@ function record(golden: Golden): DesyncReport {
     nations.push(players.length + 1);
     players.push({ id: players.length + 1, name, start: tile });
   }
+  // City-states come with the nations, as in the client (R-BOT-29).
+  const cityStates: number[] = [];
+  for (let i = 0; i < nations.length * CITY_STATES_PER_NATION; i++) {
+    cityStates.push(players.length + 1);
+    players.push({ id: players.length + 1, name: `City ${String(i + 1)}` });
+  }
   const game = createGame({
     terrain,
     seed: golden.seed,
@@ -121,6 +129,7 @@ function record(golden: Golden): DesyncReport {
     ...(golden.rules === undefined ? {} : { rules: golden.rules }),
   });
   installBots(game, bots, golden.difficulty);
+  installCityStates(game, cityStates);
   installNations(game, nations, golden.difficulty);
 
   // The scripted player: a start near the middle of the map, then a third of
@@ -201,6 +210,7 @@ function record(golden: Golden): DesyncReport {
     players,
     bots: { ids: bots, difficulty: golden.difficulty },
     ...(nations.length > 0 ? { nations } : {}),
+    ...(cityStates.length > 0 ? { cityStates } : {}),
     ...(golden.teams === undefined ? {} : { teams: golden.teams }),
     ...(golden.rules === undefined ? {} : { rules: golden.rules }),
     you: 1,

@@ -88,11 +88,10 @@ export {
 } from "./quick-messages.ts";
 export {
   installBots,
+  CITY_STATES_PER_NATION,
+  installCityStates,
   installNations,
-  NATION_FULL_PERCENT,
   NATION_WORK_PERCENT,
-  NATION_PILE_MAX,
-  NATION_PILE_SECONDS,
   NATION_THREAT_PERCENT,
   BOT_DIFFICULTIES,
   NATION_DIFFICULTIES,
