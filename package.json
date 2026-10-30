@@ -31,6 +31,7 @@
     "sim": "pnpm --filter @frontfall/bench sim",
     "balance": "pnpm --filter @frontfall/bench balance",
     "balance:doctrines": "pnpm --filter @frontfall/bench balance:doctrines",
+    "campaign": "pnpm --filter @frontfall/bench campaign",
     "determinism": "pnpm --filter @frontfall/bench determinism",
     "golden": "pnpm --filter @frontfall/bench golden",
     "load": "pnpm --filter @frontfall/bench load"
