@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
+import { minifyShader } from "../../tools/shader-minify.mjs";
 import { simulationBuild } from "../../tools/simulation-build.mjs";
 
 // The release is the version of the repository's root package.json, for the client and the server alike.
@@ -10,21 +11,18 @@ const { version } = JSON.parse(
 };
 
 /**
- * Shaders ship as text, so their comments and indentation would be downloaded
- * by every player: this drops them from the template strings marked glsl.
+ * Shaders ship as text, so their comments, indentation and spaces would be
+ * downloaded by every player: this minifies the template strings marked glsl.
  */
-function stripShaderComments(): Plugin {
+function minifyShaders(): Plugin {
   return {
-    name: "frontfall:strip-shader-comments",
+    name: "frontfall:minify-shaders",
     enforce: "pre",
     transform(code, id) {
       if (!id.endsWith(".ts") || !code.includes("/* glsl */")) return undefined;
-      return code.replace(/\/\* glsl \*\/ `[^`]*`/g, (shader) =>
-        shader
-          .replace(/\/\*[^]*?\*\//g, (comment) => (comment === "/* glsl */" ? comment : ""))
-          .replace(/[ \t]*\/\/[^\n]*/g, "")
-          .replace(/\n\s*(?=\n)/g, "")
-          .replace(/\n[ \t]+/g, "\n"),
+      return code.replace(
+        /\/\* glsl \*\/ `([^`]*)`/g,
+        (_shader, body: string) => `/* glsl */ \`${minifyShader(body)}\``,
       );
     },
   };
@@ -75,7 +73,7 @@ function preloadMenuInputs(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [stripShaderComments(), preloadMenuInputs()],
+  plugins: [minifyShaders(), preloadMenuInputs()],
   // Relative URLs: the same build works at / and behind a path prefix such as /frontfall/.
   base: "./",
   define: {

@@ -12,6 +12,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### Changed
 
 - **Missiles that count.** The land a missile strikes now stays unusable for 30 seconds, so neither you nor anyone else can take it back at once, and the strike kills three times as many of the soldiers there as before. The heavy missile covers a much wider area, half as wide again, leaves the land unusable for a minute and a half, and costs 3,000,000 gold instead of 1,500,000. Nations fire half as often, so the game is no harder.
+- **Smoother coasts and borders.** Zoomed in, coastlines are drawn as smooth curves instead of steps of tiles, and the borders between countries bend softly instead of following the squares of the map; a country's reach over the ground around it is a little wider, so lone tiles and thin necks round off too.
 - **A clearer tutorial.** The first steps are now six instead of eight, each in short sentences with one thing to do: place your start, expand, set the share of troops with the slider, build a city, build a fort, offer an alliance. The control a step asks for is ringed on screen (the slider, the City or Fort button, or the build button on a phone), and moving the slider moves the guide on. After you place your start, the guide says to wait for the countdown instead of asking you to expand too early. Ships and ports are left to the help, which now also explains fronts (H or ?), and the tutorial game now plays at easy.
 
 ### Fixed

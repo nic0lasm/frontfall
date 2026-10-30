@@ -62,12 +62,15 @@ const PALETTE_WIDTH = 256;
 
 /**
  * Reach of a tile's vote on who owns the points around it, in tiles: wide
- * enough that borders round off over a tile and a half; and a stronger
- * vote close to the tile's centre, so a lone tile, which its neighbours
- * would outvote, keeps a patch of its own.
+ * enough that borders round off over two tiles; and a stronger vote close to
+ * the tile's centre, so a lone tile, which its neighbours would outvote, keeps
+ * a patch of its own.
  */
-const KERNEL = 1.5;
-const CORE = 0.8;
+const KERNEL = 1.97;
+const CORE = 1.05;
+
+/** Tiles per pixel above which each tile takes its own owner, with no vote. */
+const VOTE_PIXEL = 0.95;
 
 /** Each row is tracked as at most 32 column chunks, one bit each. */
 const CHUNKS_PER_ROW = 32;
@@ -137,6 +140,8 @@ const fragmentShader = /* glsl */ `
   uniform float groundLevel;
   uniform uint highlight;
   uniform uint hovered;
+  uniform sampler2D heightMap;
+  uniform vec2 viewport;
 
   /** The column on the map, across the seam of a map that wraps; a float division, as % is undefined below 0. */
   int wrapColumn(int x) {
@@ -188,6 +193,54 @@ const fragmentShader = /* glsl */ `
       mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
   }
 
+  vec4 cubicWeights(float v) {
+    vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
+    vec4 s = n * n * n;
+    float x = s.x;
+    float y = s.y - 4.0 * s.x;
+    float z = s.z - 4.0 * s.y + 6.0 * s.x;
+    return vec4(x, y, z, 6.0 - x - y - z) * (1.0 / 6.0);
+  }
+
+  /** The ground's alpha through a cubic B-spline (four bilinear taps): no tile steps in the coast distance. */
+  float coastAlphaSmooth(vec2 at, float lod) {
+    vec2 coord = at - 0.5;
+    vec2 fxy = fract(coord);
+    coord -= fxy;
+    vec4 xc = cubicWeights(fxy.x);
+    vec4 yc = cubicWeights(fxy.y);
+    vec4 c = coord.xxyy + vec2(-0.5, 1.5).xyxy;
+    vec4 s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+    vec4 off = (c + vec4(xc.yw, yc.yw) / s) / worldSize.xxyy;
+    float a0 = textureLod(ground, off.xz, lod).a;
+    float a1 = textureLod(ground, off.yz, lod).a;
+    float a2 = textureLod(ground, off.xw, lod).a;
+    float a3 = textureLod(ground, off.yw, lod).a;
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
+    return mix(mix(a3, a2, sx), mix(a1, a0, sx), sy);
+  }
+
+  /** A hash without sin(), which loses its bits for large arguments on many GPUs and turns noise built on it into rings. */
+  float hs(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  float nz(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = p - i;
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hs(i), hs(i + vec2(1.0, 0.0)), u.x), mix(hs(i + vec2(0.0, 1.0)), hs(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+
+  /** Offset applied to where ownership is read, so the stairs of the tile grid turn into soft bends; gone once a tile is under a pixel. */
+  vec2 ownerWarp(vec2 p, float pixel) {
+    float k = 1.0 - smoothstep(0.3, ${String(VOTE_PIXEL)}, pixel);
+    return k * (0.9 * (vec2(nz(p * 0.45), nz(p * 0.45 + 17.3)) - 0.5) + 0.22 * (vec2(nz(p * 1.3 + 3.0), nz(p * 1.3 + 11.0)) - 0.5));
+  }
+
   void main() {
   #ifdef SPHERE
     // Where the ray meets the unit sphere. Off the planet the root is clamped
@@ -229,11 +282,17 @@ const fragmentShader = /* glsl */ `
     // tiles instead of along their edges, and a lone tile still keeps a round
     // patch. Water has no vote: the coast, drawn from the ground, ends a
     // country wherever it runs.
+    vec2 ato = at + ownerWarp(at, pixel);
     uint owner;
-    ivec2 tile = wrapTile(ivec2(floor(at)));
+    ivec2 tile = wrapTile(ivec2(floor(ato)));
     float ownerEdge = 2.0;
     float contactEdge = 2.0;
-    if (pixel > 0.5) {
+    // Distance to another owner's land (and to a player's) over a few tiles,
+    // beyond the vote's reach; 9 where none is near, a real distance rather
+    // than a marker, so wide lines never mistake it for a border.
+    float ownerWide = 9.0;
+    float contactWide = 9.0;
+    if (pixel > ${String(VOTE_PIXEL)}) {
       // Zoomed out, a tile is under two pixels and curves would hardly show,
       // for the dearest part of the shader: each tile takes its own owner and
       // borders follow its edges, as on the flat map.
@@ -242,10 +301,10 @@ const fragmentShader = /* glsl */ `
         ownerAt(tile + ivec2(0, 1)), ownerAt(tile - ivec2(0, 1)));
       bvec4 other = notEqual(around, uvec4(owner));
       bvec4 touch = bvec4(vec4(other) * vec4(greaterThan(around, uvec4(0u))));
-      ownerEdge = edgeDistance(fract(at), other);
-      contactEdge = edgeDistance(fract(at), touch);
+      ownerEdge = edgeDistance(fract(ato), other);
+      contactEdge = edgeDistance(fract(ato), touch);
     } else {
-      vec2 p = at - 0.5;
+      vec2 p = ato - 0.5;
       ivec2 base = ivec2(floor(p)) - 1;
       // The four columns and rows of the sixteen tiles, wrapped once each
       // rather than once per tile: this loop is most of the shader's work.
@@ -268,7 +327,7 @@ const fragmentShader = /* glsl */ `
         int count = 0;
         for (int k = 0; k < 16; k++) {
           ivec2 cell = base + ivec2(k % 4, k / 4);
-          vec2 offset = at - (vec2(cell) + 0.5);
+          vec2 offset = ato - (vec2(cell) + 0.5);
           float d2 = dot(offset, offset);
           float wide = max(0.0, 1.0 - d2 / ${String(KERNEL * KERNEL)});
           float near = max(0.0, 1.0 - d2 / ${String(CORE * CORE)});
@@ -314,11 +373,33 @@ const fragmentShader = /* glsl */ `
       }
     }
 
+    // A ring of sixteen samples around the point, 1 to 3 tiles out: how far
+    // the nearest land of another owner, or of another player, lies, beyond
+    // the reach of the vote. Only where the vote is off and lines are wider
+    // than a tile's own edges reach.
+    if (owner != 0u && pixel > ${String(VOTE_PIXEL)}) {
+      ivec2 offs[16] = ivec2[16](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
+        ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3));
+      for (int k = 0; k < 16; k++) {
+        ivec2 c = ivec2(floor(ato)) + offs[k];
+        uint o = ownerAt(c);
+        if (o == owner) continue;
+        // From the point to the tile's square.
+        vec2 gap = max(max(vec2(c) - ato, ato - (vec2(c) + 1.0)), 0.0);
+        float d = length(gap);
+        ownerWide = min(ownerWide, d);
+        if (o != 0u) contactWide = min(contactWide, d);
+      }
+    }
+
     // The ground, filtered between tile centres so hills and coasts are smooth.
     // Its level of detail follows the zoom, given rather than derived, because
-    // the globe's columns jump at the antimeridian.
-    vec4 groundSample = textureLod(ground, at / worldSize, max(0.0, log2(pixel)));
-    float coast = coastDistance(groundSample.a);
+    // the globe's columns jump at the antimeridian. Zoomed in, the coast
+    // distance goes through a cubic B-spline, so it has no steps of tiles.
+    float groundLod = max(0.0, log2(pixel));
+    vec4 groundSample = textureLod(ground, at / worldSize, groundLod);
+    float coastAlpha = pixel < 1.0 ? coastAlphaSmooth(at, groundLod) : groundSample.a;
+    float coast = coastDistance(coastAlpha);
     float coastPixels = coast / max(fwidth(coast), 1e-4);
     // Land above the coast, with an edge one pixel soft.
     float landCover = clamp(coastPixels + 0.5, 0.0, 1.0);
@@ -367,7 +448,13 @@ const fragmentShader = /* glsl */ `
   #ifdef FLAT
     float edge = ownerEdge;
   #else
-    float edge = min(ownerEdge, max(coast, 0.0));
+    // Zoomed out, the lines are wider than the tile's own edge distances reach.
+    float edge = min(pixel > ${String(VOTE_PIXEL)} ? min(ownerEdge, ownerWide) : ownerEdge, max(coast, 0.0));
+  #endif
+  #ifdef FLAT
+    float contactDistance = contactEdge;
+  #else
+    float contactDistance = pixel > ${String(VOTE_PIXEL)} ? min(contactEdge, contactWide) : contactEdge;
   #endif
 
     if (owner != 0u) {
@@ -401,7 +488,7 @@ const fragmentShader = /* glsl */ `
       vec3 ridgeColor = wide ? lineColor : mix(ownerColor, vec3(1.0), 0.45);
       float contactWidth = 1.7 * width;
       float border = 1.0 - smoothstep(width - pixel, width, edge);
-      float contact = 1.0 - smoothstep(contactWidth - pixel, contactWidth, contactEdge);
+      float contact = 1.0 - smoothstep(contactWidth - pixel, contactWidth, contactDistance);
       // An ally's rim is as wide, in dashes about eight pixels long.
       float dash = allied ? step(0.5, fract((at.x + at.y) / (16.0 * pixel))) : 1.0;
       vec3 owned = mix(fillColor, lineColor, border * dash);
@@ -413,7 +500,7 @@ const fragmentShader = /* glsl */ `
         float rim = (1.0 - smoothstep(rimWidth - pixel, rimWidth, edge)) * (1.0 - border);
         owned = mix(owned, mix(ownerColor, vec3(1.0), 0.6), rim * dash);
       }
-      owned = mix(owned, mix(lineColor * 0.5, ridgeColor, smoothstep(0.4 * contactWidth, 0.5 * contactWidth, contactEdge)), contact * dash);
+      owned = mix(owned, mix(lineColor * 0.5, ridgeColor, smoothstep(0.4 * contactWidth, 0.5 * contactWidth, contactDistance)), contact * dash);
       float age = now - texelFetch(takenAt, tile, 0).r;
       // Land taken in the last moments marks the front of an attack, the
       // strongest signal on the map: its edge turns to ember and light stripes
@@ -483,6 +570,8 @@ export class TerritoryLayer {
   readonly groundTexture: THREE.DataTexture;
   /** When each tile last changed hands, in seconds on the layer's clock. */
   readonly takenAtTexture: THREE.DataTexture;
+  /** The height the ground is lit from, one byte a tile, filtered smooth (terrain-colors). */
+  readonly heightTexture: THREE.DataTexture;
   private readonly takenAt: Float32Array;
   /** The globe camera's rays, read by the shader on a sphere. */
   private readonly rays = {
@@ -524,6 +613,7 @@ export class TerritoryLayer {
     );
     this.ownerTexture.internalFormat = "R16UI";
 
+    const heights = new Uint8Array(width * height);
     this.groundTexture = new THREE.DataTexture(
       bakeTerrainColors({
         width,
@@ -532,9 +622,17 @@ export class TerritoryLayer {
         relief: options.relief ?? new Uint8Array(width * height),
         wrapsX,
         latitudes: options.latitudes,
+        heightOut: heights,
       }),
       width,
       height,
+    );
+    this.heightTexture = new THREE.DataTexture(
+      heights,
+      width,
+      height,
+      THREE.RedFormat,
+      THREE.UnsignedByteType,
     );
     this.groundTexture.colorSpace = THREE.SRGBColorSpace;
     this.wrapsX = wrapsX;
@@ -558,6 +656,7 @@ export class TerritoryLayer {
     for (const texture of [
       this.ownerTexture,
       this.groundTexture,
+      this.heightTexture,
       this.takenAtTexture,
       this.paletteTexture,
     ]) {
@@ -568,13 +667,15 @@ export class TerritoryLayer {
       texture.unpackAlignment = 1;
       texture.needsUpdate = true;
     }
-    // The ground alone is filtered: smooth between tile centres, and averaged
-    // over the tiles under a pixel when zoomed out.
+    // The ground and its height are filtered: smooth between tile centres, and
+    // averaged over the tiles under a pixel when zoomed out.
     if (!options.flat) {
-      this.groundTexture.magFilter = THREE.LinearFilter;
-      this.groundTexture.minFilter = THREE.LinearMipmapLinearFilter;
-      this.groundTexture.generateMipmaps = true;
-      this.groundTexture.wrapS = wrapsX ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+      for (const texture of [this.groundTexture, this.heightTexture]) {
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.generateMipmaps = true;
+        texture.wrapS = wrapsX ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+      }
     }
 
     const sphere = options.surface === "sphere";
@@ -586,6 +687,8 @@ export class TerritoryLayer {
       uniforms: {
         owners: { value: this.ownerTexture },
         ground: { value: this.groundTexture },
+        heightMap: { value: this.heightTexture },
+        viewport: { value: new THREE.Vector2(1, 1) },
         takenAt: { value: this.takenAtTexture },
         palette: { value: this.paletteTexture },
         worldSize: { value: new THREE.Vector2(width, height) },
@@ -703,6 +806,12 @@ export class TerritoryLayer {
   setHovered(owner: number): void {
     const hovered = this.mesh.material.uniforms.hovered;
     if (hovered) hovered.value = owner;
+  }
+
+  /** Size of the drawing buffer in pixels, for effects laid on the screen; set before each draw. */
+  setViewport(width: number, height: number): void {
+    const viewport = this.mesh.material.uniforms.viewport;
+    if (viewport) (viewport.value as THREE.Vector2).set(width, height);
   }
 
   /** Whether the glint runs along attack fronts; off for players who ask for less motion. */
@@ -888,6 +997,7 @@ export class TerritoryLayer {
     this.mesh.material.dispose();
     this.ownerTexture.dispose();
     this.groundTexture.dispose();
+    this.heightTexture.dispose();
     this.takenAtTexture.dispose();
     this.paletteTexture.dispose();
   }
