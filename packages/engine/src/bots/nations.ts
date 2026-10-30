@@ -401,7 +401,14 @@ export function installNations(
         continue;
       }
       const common = feared && other !== top && nation.id !== top && score >= 0;
-      if (score < MOOD_FRIENDLY && !asked && !common) continue;
+      // B-NATION-COURT-PLAYERS: a smaller player who has not attacked it.
+      const offered =
+        nationParams.courtPlayersSeconds > 0 &&
+        game.tick >= nationParams.courtPlayersSeconds * balance.ticksPerSecond &&
+        !nationSet.has(other) &&
+        score >= 0 &&
+        theirs < ours;
+      if (score < MOOD_FRIENDLY && !asked && !common && !offered) continue;
       // The friendliest first, the lowest number among equals.
       if (best === NEUTRAL || score > bestScore) {
         best = other;

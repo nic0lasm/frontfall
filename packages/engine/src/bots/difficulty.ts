@@ -42,6 +42,8 @@ export interface NationParameters {
   reservePercent: number;
   /** B-NATION-HUNT, in % of all ownable land from which the leading player is attacked first; 0 never */
   huntPercent: number;
+  /** B-NATION-COURT-PLAYERS, in seconds of play from which it offers an alliance to a smaller player who has not attacked it; 0 never */
+  courtPlayersSeconds: number;
   /** B-NATION-MISSILE-PAUSE, in seconds from one of its missiles to the next */
   missilePauseSeconds: number;
   /** B-NATION-GRUDGE: whether it turns on a player it is hostile to once settled (R-BOT-22); a traitor always */
@@ -61,6 +63,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     holdPercent: 60,
     reservePercent: 25,
     huntPercent: 0,
+    courtPlayersSeconds: 300,
     missilePauseSeconds: 600,
     grudge: false,
     betrayLandPercent: 30,
@@ -70,10 +73,11 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     intervalSeconds: 1,
     attackRatioPercent: 20,
     graceSeconds: 600,
-    oddsPercent: 90,
-    holdPercent: 30,
+    oddsPercent: 80,
+    holdPercent: 50,
     reservePercent: 40,
     huntPercent: 20,
+    courtPlayersSeconds: 0,
     missilePauseSeconds: 120,
     grudge: true,
     betrayLandPercent: 50,
@@ -87,6 +91,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     holdPercent: 30,
     reservePercent: 40,
     huntPercent: 20,
+    courtPlayersSeconds: 0,
     missilePauseSeconds: 60,
     grudge: true,
     betrayLandPercent: 70,
