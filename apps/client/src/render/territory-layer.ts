@@ -241,6 +241,77 @@ const fragmentShader = /* glsl */ `
     return k * (0.9 * (vec2(nz(p * 0.45), nz(p * 0.45 + 17.3)) - 0.5) + 0.22 * (vec2(nz(p * 1.3 + 3.0), nz(p * 1.3 + 11.0)) - 0.5));
   }
 
+  float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+  /** An sRGB colour given in 0 to 255, in the linear light the shader works in. */
+  vec3 srgb3(float r, float g, float b) { return pow(vec3(r, g, b) / 255.0, vec3(2.2)); }
+
+  float heightAt(vec2 p, float lod) { return textureLod(heightMap, p / worldSize, lod).r; }
+
+  /** The height map through a cubic B-spline (four bilinear taps): smooth slopes, no tile kinks in the lighting. */
+  float heightCubic(vec2 at, float lod) {
+    vec2 coord = at - 0.5;
+    vec2 fxy = fract(coord);
+    coord -= fxy;
+    vec4 xc = cubicWeights(fxy.x);
+    vec4 yc = cubicWeights(fxy.y);
+    vec4 c = coord.xxyy + vec2(-0.5, 1.5).xyxy;
+    vec4 s = vec4(xc.xz + xc.yw, yc.xz + yc.yw);
+    vec4 off = (c + vec4(xc.yw, yc.yw) / s) / worldSize.xxyy;
+    float a0 = textureLod(heightMap, off.xz, lod).r;
+    float a1 = textureLod(heightMap, off.yz, lod).r;
+    float a2 = textureLod(heightMap, off.xw, lod).r;
+    float a3 = textureLod(heightMap, off.yw, lod).r;
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
+    return mix(mix(a3, a2, sx), mix(a1, a0, sx), sy);
+  }
+
+  /** Relief height: the baked hills, plus ridged detail on the mountains, in ranges that run together (octaves fade when a pixel gets too big for them). */
+  float reliefH(vec2 p, float lod, float pixel) {
+    float h = heightCubic(p, lod + 0.6);
+    float m = smoothstep(0.30, 0.68, h);
+    float f1 = smoothstep(2.5, 7.0, 9.0 / pixel);
+    float f2 = smoothstep(2.5, 7.0, 4.0 / pixel);
+    // Ridges only where there are mountains, hills only on the foothills.
+    if (m > 0.0) {
+      vec2 q = vec2(0.906 * p.x + 0.423 * p.y, -0.423 * p.x + 0.906 * p.y);
+      q += 7.0 * (vec2(nz(p * 0.085), nz(p * 0.085 + 9.3)) - 0.5);
+      float n1 = nz(q * vec2(0.06, 0.024)) * 0.7 + nz(q * vec2(0.13, 0.05) + 2.0) * 0.3;
+      float r1 = 1.0 - abs(2.0 * n1 - 1.0);
+      r1 = r1 * r1 * r1 * r1;
+      float n2 = nz(q * vec2(0.15, 0.06) + 3.7) * 0.6 + nz(q * vec2(0.33, 0.13)) * 0.4;
+      float r2 = 1.0 - abs(2.0 * n2 - 1.0);
+      r2 = r2 * r2;
+      h += (0.30 * r1 * f1 + 0.07 * r2 * f2) * m;
+    } else if (h > 0.08 && f2 > 0.0) {
+      h += (nz(p * 0.33 + 4.0) - 0.5) * 0.06 * f2 * smoothstep(0.08, 0.35, h);
+    }
+    return h;
+  }
+
+  /** Share of the nearby screen (rings of 1.5 to 9 px) held by another owner or the sea: 0 inside, about 0.5 on a straight border. */
+  float ringShare(vec2 at, uint owner, float pixel) {
+    // Far from any border all eight points of the outer ring agree: nothing nearer to measure.
+    float outside = 0.0;
+    for (int k = 0; k < 8; k++) {
+      float a = float(k) * 0.7853982 + 1.17;
+      outside += ownerAt(ivec2(floor(at + vec2(cos(a), sin(a)) * 9.0 * pixel))) != owner ? 1.0 : 0.0;
+    }
+    if (outside == 0.0) return 0.0;
+    float acc = 0.0;
+    for (int r = 0; r < 4; r++) {
+      float rad = (r == 0 ? 1.5 : (r == 1 ? 3.5 : (r == 2 ? 6.0 : 9.0))) * pixel;
+      float m = 0.0;
+      for (int k = 0; k < 8; k++) {
+        float a = float(k) * 0.7853982 + float(r) * 0.39;
+        m += ownerAt(ivec2(floor(at + vec2(cos(a), sin(a)) * rad))) != owner ? 1.0 : 0.0;
+      }
+      acc += m / 8.0;
+    }
+    return acc / 4.0;
+  }
+
   void main() {
   #ifdef SPHERE
     // Where the ray meets the unit sphere. Off the planet the root is clamped
@@ -418,6 +489,8 @@ const fragmentShader = /* glsl */ `
     if (hit < -rim) discard;
   #endif
 
+    vec3 color;
+  #ifdef FLAT
     // Open water is one calm colour that deepens slowly offshore. Along every
     // coast runs a crisp band of shallows, about a tile wide close up and a
     // few pixels zoomed out, edged with a fine line of foam.
@@ -442,20 +515,11 @@ const fragmentShader = /* glsl */ `
     sea = mix(sea, foamColor, foam * 0.6);
     // The shore is a tone lighter, so coasts read at any zoom.
     vec3 land = groundSample.rgb * (1.0 + 0.16 * detail) * (1.0 + 0.18 * (1.0 - smoothstep(0.0, max(0.35, 2.0 * pixel), max(coast, 0.0))));
-    vec3 color = mix(sea, land, landCover);
+    color = mix(sea, land, landCover);
 
     // Distance in tiles to the edge of the owner's land: another owner's, or the sea.
-  #ifdef FLAT
     float edge = ownerEdge;
-  #else
-    // Zoomed out, the lines are wider than the tile's own edge distances reach.
-    float edge = min(pixel > ${String(VOTE_PIXEL)} ? min(ownerEdge, ownerWide) : ownerEdge, max(coast, 0.0));
-  #endif
-  #ifdef FLAT
     float contactDistance = contactEdge;
-  #else
-    float contactDistance = pixel > ${String(VOTE_PIXEL)} ? min(contactEdge, contactWide) : contactEdge;
-  #endif
 
     if (owner != 0u) {
       ivec2 entry = ivec2(int(owner % ${String(PALETTE_WIDTH)}u), int(owner / ${String(PALETTE_WIDTH)}u));
@@ -508,25 +572,7 @@ const fragmentShader = /* glsl */ `
       // the strip behind it glows ember and pulses (steady with less motion).
       // Zoomed out, where a tile is under a pixel and edges vanish, the strip
       // takes the stripes instead.
-    #ifdef FLAT
       float front = 1.0 - smoothstep(fadeSeconds, frontSeconds, age);
-    #else
-      // Blended between tile centres, so the burning strip has no steps and
-      // fades from the newest land, at the front, to the oldest behind it.
-      // Zoomed out, where a tile is under a pixel, the tile's own will do.
-      float front = 1.0 - smoothstep(fadeSeconds, frontSeconds, age);
-      if (pixel <= 1.0) {
-        vec2 q = at - 0.5;
-        ivec2 c = ivec2(floor(q));
-        vec2 u = q - vec2(c);
-        int x0 = wrapColumn(c.x);
-        int x1 = wrapColumn(c.x + 1);
-        int y0 = clampRow(c.y);
-        int y1 = clampRow(c.y + 1);
-        front = mix(mix(frontOf(ivec2(x0, y0)), frontOf(ivec2(x1, y0)), u.x),
-          mix(frontOf(ivec2(x0, y1)), frontOf(ivec2(x1, y1)), u.x), u.y);
-      }
-    #endif
       if (front > 0.0) {
         float march = fract((at.x + at.y) / (14.0 * pixel) - now * 1.6 * frontMotion);
         vec3 stripes = step(0.5, march) > 0.0 ? vec3(1.0, 0.96, 0.86) : frontColor;
@@ -540,6 +586,210 @@ const fragmentShader = /* glsl */ `
       // A tile taken a moment ago fades in, so fronts creep instead of jumping each tick.
       color = mix(color, owned, smoothstep(0.0, fadeSeconds, age) * landCover);
     }
+  #else
+    // The map as a table of stained glass: lit relief, each country a tint of
+    // translucent glass in a dark lead line, fronts as embers, a living sea.
+    float zoomedOut = smoothstep(0.4, 1.5, pixel);
+    float lod = max(0.0, log2(pixel));
+    float t = now * frontMotion;
+    float coastIn = max(coast, 0.0);
+    float depth = max(-coast, 0.0);
+    float age = now - texelFetch(takenAt, tile, 0).r;
+    float fadeIn = smoothstep(0.0, fadeSeconds, age);
+    // Direction of an attack here: out of the owner's land toward the border.
+    float edgeL = min(pixel > ${String(VOTE_PIXEL)} ? min(ownerEdge, ownerWide) : ownerEdge, coastIn);
+    vec2 gradient = vec2(dFdx(edgeL), -dFdy(edgeL));
+    vec2 inward = length(gradient) > 1e-5 ? normalize(gradient) : vec2(0.0, 1.0);
+    // Distances come with 2 as "nothing near": make that a real far value.
+    float oe = ownerEdge > 1.99 ? 9.0 : ownerEdge;
+    float ce = contactEdge > 1.99 ? 9.0 : contactEdge;
+    float lineOwn = pixel > ${String(VOTE_PIXEL)} ? min(oe, ownerWide) : oe;
+    float lineContact = pixel > ${String(VOTE_PIXEL)} ? min(ce, contactWide) : ce;
+    float fineFade = 1.0 - smoothstep(0.5, 1.4, pixel);
+
+    // Land: patchy plains, canopy forests, lit ridges.
+    float hm = 0.0;
+    float shade = 1.0;
+    float forest = 0.0;
+    float canopy = 0.5;
+    vec3 albedo = groundSample.rgb;
+    vec3 landColor = albedo;
+    if (landCover > 0.0) {
+      float eN = clamp(pixel, 0.12, 0.5);
+      float h0 = reliefH(at, lod, pixel);
+      float hx = reliefH(at + vec2(eN, 0.0), lod, pixel);
+      float hy = reliefH(at + vec2(0.0, eN), lod, pixel);
+      hm = smoothstep(0.30, 0.68, h0);
+      vec3 normal = normalize(vec3(-(hx - h0) / eN * 13.0, -(hy - h0) / eN * 13.0, 1.0));
+      vec3 sun = normalize(vec3(-0.62, -0.62, 0.50));
+      float lit = dot(normal, sun) / sun.z;
+      float cavity = pixel > 1.0 ? 0.0 : 0.25 * (heightAt(at + vec2(2.0 * eN, 0.0), lod) + heightAt(at - vec2(2.0 * eN, 0.0), lod)
+        + heightAt(at + vec2(0.0, 2.0 * eN), lod) + heightAt(at - vec2(0.0, 2.0 * eN), lod) - 4.0 * heightAt(at, lod));
+      shade = clamp(1.0 + (lit - 1.0) * mix(0.85, 2.3, hm) - cavity * 3.5, 0.4, 1.5);
+      vec3 base = groundSample.rgb;
+      float baseLight = luma(base);
+      float v1 = nz(at * 0.11) * 0.6 + nz(at * 0.31) * 0.4;
+      float v2 = fineFade > 0.0 ? nz(at * 1.15) * fineFade : 0.0;
+      albedo = base * (0.78 + 0.44 * v1) * (0.92 + 0.16 * v2);
+      albedo = mix(albedo, albedo * vec3(1.14, 1.02, 0.78), 0.55 * smoothstep(0.45, 0.8, nz(at * 0.06 + 3.0)));
+      forest = (1.0 - smoothstep(0.05, 0.1, baseLight)) * smoothstep(0.9, 1.25, base.g / max(base.r, 0.01));
+      canopy = forest > 0.0 && fineFade > 0.0 ? nz(at * 2.4) * 0.55 + nz(at * 6.3) * 0.45 : 0.5;
+      albedo *= mix(1.0, 0.62 + 0.75 * mix(0.5, canopy, fineFade), forest);
+      albedo = mix(albedo, albedo * vec3(0.86, 1.1, 0.9), forest * 0.5);
+      // Mountains: rock in the valleys and on the slopes, pale crests, a little snow on the highest.
+      float crest = clamp((h0 - heightCubic(at, lod + 0.6)) / 0.3, 0.0, 1.0);
+      float steep = 1.0 - normal.z;
+      vec3 rock = srgb3(98.0, 104.0, 114.0);
+      vec3 rockLight = srgb3(176.0, 172.0, 164.0);
+      albedo = mix(albedo, mix(rock, rockLight, crest), hm * (0.42 + 0.3 * smoothstep(0.04, 0.2, steep)));
+      albedo *= 1.0 - 0.22 * hm * (1.0 - crest);
+      albedo = mix(albedo, srgb3(226.0, 232.0, 238.0), hm * smoothstep(0.62, 0.95, crest) * (0.45 + 0.55 * nz(at * 0.5)) * 0.85);
+      landColor = albedo * shade;
+      landColor *= 1.0 + 0.2 * detail * fineFade;
+      landColor *= 1.0 + 0.2 * (1.0 - smoothstep(0.0, max(0.3, 1.6 * pixel), coastIn));
+    }
+
+    // Sea: four tones of depth, a slow swell, glints, surf and two waves creeping in.
+    vec3 seaColor = vec3(0.0);
+    if (landCover < 1.0) {
+      seaColor = mix(srgb3(34.0, 112.0, 134.0), srgb3(18.0, 66.0, 92.0), smoothstep(0.0, max(1.4, 4.5 * pixel), depth));
+      float shelfWidth = max(1.4, 4.5 * pixel);
+      seaColor = mix(seaColor, srgb3(12.0, 40.0, 62.0), smoothstep(0.5 * shelfWidth, 2.2 * shelfWidth + 3.0, depth));
+      seaColor = mix(seaColor, srgb3(7.0, 22.0, 38.0), smoothstep(8.0, 40.0, depth));
+      seaColor *= 1.0 - 0.32 * exp(-depth / max(0.4, 1.4 * pixel));
+      float swell = nz(at * 0.22 + t * vec2(0.05, 0.02)) + nz(at * 0.5 - t * vec2(0.03, 0.06)) - 1.0;
+      seaColor *= 1.0 + 0.16 * swell * (1.0 - smoothstep(0.25, 1.1, pixel)) * smoothstep(0.6, 4.0, depth);
+      if (pixel < 1.2 && depth > 0.8) {
+        float cell = max(0.5, 9.0 * pixel);
+        vec2 gp = at / cell + vec2(t * 0.05, 0.0);
+        vec2 gid = floor(gp);
+        float gh = hs(gid + 11.0);
+        if (gh > 0.78) {
+          vec2 gpos = vec2(hs(gid + 2.3), hs(gid + 5.9)) * 0.7 + 0.15;
+          float gd = length((fract(gp) - gpos) * vec2(1.0, 2.2));
+          float twinkle = 0.5 + 0.5 * sin(t * (1.2 + 2.0 * gh) + gh * 60.0);
+          seaColor += vec3(0.7, 0.85, 1.0) * (1.0 - smoothstep(0.0, 0.12, gd)) * pow(twinkle, 3.0) * 0.55 * (1.0 - smoothstep(0.6, 1.2, pixel)) * smoothstep(0.8, 3.0, depth);
+        }
+      }
+      float foamEdge = max(0.07, 1.25 * pixel);
+      float foamBreak = 0.55 + 0.9 * nz(at * 1.3 + t * vec2(0.12, 0.05));
+      float surf = (1.0 - smoothstep(0.35 * foamEdge, foamEdge, depth)) * min(1.0, foamBreak + 0.35);
+      surf *= mix(1.0, 0.55, smoothstep(0.5, 1.2, pixel));
+      float spacing = max(0.55, 11.0 * pixel);
+      float phase = fract(depth / spacing - t * 0.11);
+      float wave = exp(-phase * 15.0) * smoothstep(0.0, 0.04, phase) * (1.0 - smoothstep(0.0, 2.6 * spacing, depth)) * smoothstep(0.25 * spacing, 0.7 * spacing, depth);
+      wave *= smoothstep(0.45, 0.95, foamBreak) * (1.0 - smoothstep(0.6, 1.5, pixel));
+      seaColor = mix(seaColor, foamColor * 1.05, clamp(surf * 0.85 + wave * 0.55, 0.0, 1.0));
+      seaColor += foamColor * 0.045 * exp(-depth / max(0.7, 1.6 * pixel));
+    }
+    color = mix(seaColor, landColor, landCover);
+
+    if (owner != 0u) {
+      ivec2 entry = ivec2(int(owner % ${String(PALETTE_WIDTH)}u), int(owner / ${String(PALETTE_WIDTH)}u));
+      vec4 paletteTexel = texelFetch(palette, entry, 0);
+      vec3 ownerColor = paletteTexel.rgb;
+      // Allies of the player are flagged in the palette's alpha (setAllies).
+      bool allied = paletteTexel.a < 0.75;
+      bool pointed = owner == hovered;
+      bool mine = owner == highlight;
+      bool wide = mine || allied || pointed;
+      float ownerLight = luma(ownerColor);
+      // Distance to the nearest border in screen pixels: exact close up, from
+      // rings of samples when zoomed out, where the vote is off.
+      float toBorder = min(min(oe, ownerWide), coastIn) / max(pixel, 1e-4);
+      float toFront = min(oe, ownerWide) / max(pixel, 1e-4);
+      float ringMix = smoothstep(0.22, 0.5, pixel);
+      float ring = ringMix > 0.0 ? 10.0 * (1.0 - clamp(2.0 * ringShare(ato, owner, pixel), 0.0, 1.0)) : 10.0;
+      float dpx = mix(toBorder, min(ring, toBorder), ringMix);
+      float dFront = mix(toFront, min(ring, toFront + 4.0), ringMix);
+      float prox = pow(1.0 - clamp(dpx / (mine ? 14.0 : 10.0), 0.0, 1.0), 1.5);
+      // The owner's colour is a translucent tint over the lit land, deeper in
+      // the heart, brighter at the rim, a little uneven from patch to patch.
+      float vn = nz(at * 0.05 + float(owner) * 5.3) * 0.6 + nz(at * 0.17 + float(owner) * 2.1) * 0.4;
+      vec3 glass = ownerColor * mix(vec3(0.9, 1.0, 1.1), vec3(1.1, 1.0, 0.86), vn) * (0.74 + 0.52 * vn) * (0.45 + 0.6 * shade);
+      vec3 fill = mix(albedo * shade * 1.25, glass, mix(0.58, 0.76, zoomedOut) * (1.0 - 0.22 * hm));
+      fill *= 1.0 + 0.2 * detail * fineFade + (fineFade > 0.0 ? 0.07 * (nz(at * 3.3) - 0.5) * fineFade : 0.0) + forest * (canopy - 0.5) * 0.3;
+      fill *= mix(0.9, 1.0, prox);
+      vec3 rimColor = mix(ownerColor, vec3(1.0), mine ? 0.5 : 0.18) * (mine ? 1.35 : 1.18);
+      fill = mix(fill, rimColor, (mine ? 0.68 : 0.58) * prox);
+      // A faint bevel: the rim catches the north-west light, the south-east one sinks.
+      fill *= 1.0 + 0.28 * dot(inward, vec2(0.707, 0.707)) * (1.0 - smoothstep(0.0, 3.5, dpx));
+      if (pointed) fill = mix(fill, vec3(1.0), 0.16);
+      // The lead line: crisp and dark, wider for the player, their allies and the land under the pointer.
+      float width = max(1.25 * pixel, min(0.14, 2.8 * pixel)) * (wide ? 1.35 : 1.0);
+      vec3 lineColor = mine ? mix(ownerColor, vec3(1.0), 0.85) : ownerColor * mix(0.22, 0.12, smoothstep(0.35, 0.75, ownerLight));
+      float border = 1.0 - smoothstep(width - pixel, width, lineOwn);
+      // The coast is a finer, colder line; a speck of land or a thin strip keeps its colour.
+      float landDepth = coastDistance(textureLod(ground, at / worldSize, lod + 2.0).a);
+      float coastLine = (1.0 - smoothstep(0.5 * width - pixel, 0.5 * width, coastIn)) * (1.0 - border) * smoothstep(0.3, 1.6, landDepth);
+      float dash = allied ? step(0.5, fract((at.x + at.y) / (16.0 * pixel))) : 1.0;
+      vec3 owned = mix(fill, lineColor, border * dash);
+      owned = mix(owned, mix(lineColor, vec3(0.03, 0.06, 0.09), 0.7), coastLine * 0.85);
+      // A hair of light just inside the dark line, so every country reads as cut glass.
+      float inner = (1.0 - smoothstep(0.0, pixel * 1.1, abs(lineOwn - (width + 1.25 * pixel)))) * (1.0 - border);
+      owned = mix(owned, mix(rimColor, vec3(1.0), 0.35), inner * 0.55 * dash * (mine ? 1.0 : 0.7));
+      // Between two players the line is firmer still.
+      float contactWidth = 1.9 * width;
+      owned = mix(owned, lineColor * 0.7, (1.0 - smoothstep(contactWidth - pixel, contactWidth, lineContact)) * dash);
+
+      // Fronts: a thin ember line with a soft glow, a darker strip behind it, sparks and smoke.
+      float front = 1.0 - smoothstep(fadeSeconds, frontSeconds, age);
+      if (pixel <= 1.0) {
+        vec2 q = at - 0.5;
+        ivec2 c = ivec2(floor(q));
+        vec2 u = q - vec2(c);
+        int x0 = wrapColumn(c.x);
+        int x1 = wrapColumn(c.x + 1);
+        int y0 = clampRow(c.y);
+        int y1 = clampRow(c.y + 1);
+        front = mix(mix(frontOf(ivec2(x0, y0)), frontOf(ivec2(x1, y0)), u.x),
+          mix(frontOf(ivec2(x0, y1)), frontOf(ivec2(x1, y1)), u.x), u.y);
+      }
+      if (dFront < 14.0) {
+        float reach = max(1.2, 3.0 * pixel);
+        vec2 spokes[8] = vec2[8](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0), vec2(0.7, 0.7), vec2(-0.7, 0.7), vec2(0.7, -0.7), vec2(-0.7, -0.7));
+        float sum = 0.0;
+        for (int k = 0; k < 8; k++) sum += frontOf(wrapTile(ivec2(floor(ato + spokes[k] * reach))));
+        front = max(front, min(1.0, sum * 0.3));
+      }
+      if (front > 0.01) {
+        // A front along a coast is mostly sea: keep it quieter there.
+        float fa = front * mix(0.3, 1.0, smoothstep(0.8, 3.0, coastIn / max(pixel, 1e-4)));
+        owned *= 1.0 - 0.5 * fa * exp(-dFront / 15.0);
+        vec3 ember = vec3(1.0, 0.2, 0.03);
+        vec3 hot = vec3(1.0, 0.62, 0.16);
+        float flicker = mix(0.92, 0.84 + 0.16 * sin(now * 7.0), frontMotion);
+        owned += ember * exp(-dFront / 3.6) * fa * 0.8 * flicker;
+        owned = mix(owned, ember, (1.0 - smoothstep(1.0, 2.5, dFront)) * fa * 0.95);
+        owned = mix(owned, hot, (1.0 - smoothstep(0.1, 0.9, dFront)) * fa * 0.9);
+        if (pixel > 0.03) {
+          // Sparks drift up from the burning line; smoke puffs rise and fade.
+          float cell = max(0.6, 10.0 * pixel);
+          vec2 sp = at / cell + vec2(0.0, t * 0.7);
+          vec2 cid = floor(sp);
+          float hv = hs(cid);
+          if (hv > 0.72) {
+            vec2 pos = vec2(hs(cid + 7.1), hs(cid + 3.3)) * 0.6 + 0.2;
+            float dd = length((fract(sp) - pos) * vec2(1.0, 1.2));
+            float life = 1.0 - fract(sp.y);
+            float spark = (1.0 - smoothstep(0.0, 0.26 + 0.1 * life, dd)) * (0.5 + 0.5 * sin(t * 6.0 + hv * 50.0)) * life;
+            owned += vec3(1.0, 0.55, 0.15) * spark * fa * exp(-dFront / 8.0) * 2.8;
+          }
+          float puffSize = max(1.5, 36.0 * pixel);
+          float pn = nz(at / puffSize + vec2(0.12 * t, 0.25 * t)) * 0.65 + nz(at / (puffSize * 0.5) + vec2(1.7, 0.4 * t)) * 0.35;
+          float puff = smoothstep(0.45, 0.75, pn) * exp(-max(dFront - 2.0, 0.0) / 13.0) * fa * smoothstep(0.03, 0.25, pixel);
+          owned = mix(owned, owned * vec3(0.5, 0.45, 0.45) + vec3(0.04, 0.025, 0.02), puff * 0.45);
+        }
+      }
+      // A tile taken a moment ago fades in, so fronts creep instead of jumping each tick.
+      color = mix(color, owned, fadeIn * landCover);
+    }
+  #ifndef SPHERE
+    // Vignette, at world zoom only: the map is an object on a dark table.
+    vec2 corner = gl_FragCoord.xy / max(viewport, vec2(1.0)) - 0.5;
+    color *= 1.0 - 0.42 * smoothstep(0.35, 0.95, length(corner * vec2(1.0, 1.15))) * smoothstep(0.35, 1.0, pixel);
+  #endif
+  #endif
   #ifdef SPHERE
     if (hit < 0.0) discard;
     // Darker toward the rim, so the planet reads as round.
