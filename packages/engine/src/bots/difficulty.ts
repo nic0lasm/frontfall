@@ -68,8 +68,8 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
   },
   normal: {
     intervalSeconds: 1,
-    attackRatioPercent: 40,
-    graceSeconds: 140,
+    attackRatioPercent: 20,
+    graceSeconds: 600,
     oddsPercent: 90,
     holdPercent: 30,
     reservePercent: 40,
@@ -81,8 +81,8 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
   },
   hard: {
     intervalSeconds: 1,
-    attackRatioPercent: 60,
-    graceSeconds: 115,
+    attackRatioPercent: 30,
+    graceSeconds: 600,
     oddsPercent: 100,
     holdPercent: 30,
     reservePercent: 40,
