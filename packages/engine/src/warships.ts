@@ -66,7 +66,7 @@ export function patrolRadius(game: Game): number {
  */
 export function atWar(game: Game, a: number, b: number): boolean {
   if (a === b || isAllied(game, a, b)) return false;
-  if (embargoed(game, a, b)) return true;
+  if (embargoed(game, a, b, true)) return true;
   const low = Math.min(a, b);
   const high = Math.max(a, b);
   return game.fights.some((f) => f.a === low && f.b === high && game.tick < f.until);
@@ -244,7 +244,7 @@ export function installWarships(game: Game): void {
   function embargoedSince(a: number, b: number): number {
     let since = Infinity;
     for (const e of game.embargoes) {
-      if ((e.from === a && e.to === b) || (e.from === b && e.to === a)) {
+      if (e.until === 0 && ((e.from === a && e.to === b) || (e.from === b && e.to === a))) {
         since = Math.min(since, e.since);
       }
     }

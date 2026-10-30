@@ -12,6 +12,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Changed
 
+- **Diplomacy takes a step.** Attack or land on a player and their ports shut to you for five minutes, unless you become allies first. They can keep the embargo longer or lift it. Gifts of troops and gold now go to allies and teammates only. An alliance can be renewed in its last 30 seconds instead of 60. Each row of the leaderboard says what a player is to you: at war, embargoed, hostile, wary, friendly or neutral.
 - **Keep playing after the game is decided.** Choosing "Keep watching" on the end screen no longer takes your orders away: if you still hold land, you can attack, build, trade and talk to the others while the game goes on. Only a player who has been wiped out just watches.
 - **A new economy, on the genre's classic footing.** Every number that drives growth, gold, trade, prices and computer players was rebuilt from the values the genre's reference game has used for years, so the game has a stable base to tune from. Fronts that collapse, the pace of attacks, workers, the palace and the mosque stay Frontfall's own.
   - **Population.** Everyone starts with room for 10,000 troops; land adds room ever more slowly as it grows, and each city adds 25,000. Troops grow slowly when your army is small, fastest a little under half your cap, and stop at it.

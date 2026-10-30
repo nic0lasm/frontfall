@@ -131,6 +131,8 @@ export interface Balance {
   warMemoryTicks: number;
   /** B-EMBARGO-NOTICE, in ticks an embargo must hold before trade ships can be taken */
   embargoNoticeTicks: number;
+  /** B-EMBARGO-AUTO, in ticks an embargo placed after an attack lasts */
+  embargoAutoTicks: number;
   /** B-COST-SILO, gold for a player's first missile silo */
   siloCost: number;
   /** B-COST-AIR-DEFENSE, gold for a player's first air defense */
@@ -277,6 +279,7 @@ export const DEFAULT_BALANCE: Balance = {
   warshipHealth: 1000,
   warMemoryTicks: 30 * 10,
   embargoNoticeTicks: 30 * 10,
+  embargoAutoTicks: 5 * 60 * 10,
   siloCost: 1_000_000,
   airDefenseCost: 1_500_000,
   longBuildTicks: 10 * 10,
@@ -295,7 +298,7 @@ export const DEFAULT_BALANCE: Balance = {
   airDefenseReloadTicks: 10 * 10,
   allianceRequestTicks: 20 * 10,
   allianceTicks: 300 * 10,
-  allianceRenewTicks: 60 * 10,
+  allianceRenewTicks: 30 * 10,
   allianceCooldownTicks: 30 * 10,
   traitorTicks: 30 * 10,
   traitorDefensePercent: 50,

@@ -1,4 +1,4 @@
-import { DiplomacyError, logEvent } from "./diplomacy.ts";
+import { DiplomacyError, isAllied, logEvent } from "./diplomacy.ts";
 import { populationCap, soldiers } from "./economy.ts";
 import type { Game, Player } from "./game.ts";
 import { atWar } from "./warships.ts";
@@ -13,6 +13,7 @@ export const GiftError = {
   Gold: "not enough gold",
   Full: "their troops are at their cap",
   War: "gifts are refused between players at war",
+  Ally: "gifts go to allies and teammates only",
 } as const;
 export type GiftError = (typeof GiftError)[keyof typeof GiftError];
 
@@ -41,6 +42,7 @@ export function giftError(
   if (gold > player.gold) return GiftError.Gold;
   if (gold === 0 && giftedTroops(game, to, troops) === 0) return GiftError.Full;
   if (atWar(game, player.id, target)) return GiftError.War;
+  if (!isAllied(game, player.id, target)) return GiftError.Ally;
   return undefined;
 }
 

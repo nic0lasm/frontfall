@@ -1,4 +1,5 @@
 import { Disable, type Game, type Player } from "./game.ts";
+import { NEUTRAL } from "./territory/territory-map.ts";
 import { percentOf } from "./integer-math.ts";
 
 /** Two players at peace until `until` (R-DIPLO-02, R-DIPLO-03). `a` is always the lower id. */
@@ -32,6 +33,8 @@ export interface Embargo {
   readonly from: number;
   readonly to: number;
   readonly since: number;
+  /** First tick an embargo placed after an attack is gone (R-DIPLO-09); 0 for one placed by order. */
+  until: number;
 }
 
 /**
@@ -185,9 +188,16 @@ export function betrayError(game: Game, player: Player, target: number): string 
   return isAllied(game, player.id, target) ? undefined : DiplomacyError.NotAllied;
 }
 
-/** Whether trade between two players is cut: an embargo of either on the other (R-DIPLO-05). */
-export function embargoed(game: Game, a: number, b: number): boolean {
-  return game.embargoes.some((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+/**
+ * Whether trade between two players is cut: an embargo of either on the other
+ * (R-DIPLO-05, R-DIPLO-09). Only embargoes by order put players at war (R-UNIT-04).
+ */
+export function embargoed(game: Game, a: number, b: number, byOrderOnly = false): boolean {
+  return game.embargoes.some(
+    (e) =>
+      ((e.from === a && e.to === b) || (e.from === b && e.to === a)) &&
+      (!byOrderOnly || e.until === 0),
+  );
 }
 
 /** Why `player` cannot start (`on` 1) or lift (`on` 0) an embargo on `target` now, or undefined. */
@@ -204,8 +214,10 @@ export function embargoError(
   if (sameTeam(game, player.id, target)) return DiplomacyError.Teammate;
   // Without ports there is no trade, and an embargo would only declare a war (R-MODE-03).
   if (on === 1 && !game.allows(Disable.Port)) return DiplomacyError.NoTrade;
+  // One that only ran from an attack can be kept for good, or lifted early.
   const held = game.embargoes.some((e) => e.from === player.id && e.to === target);
-  if (on === 1 && held) return DiplomacyError.Embargoed;
+  const kept = game.embargoes.some((e) => e.from === player.id && e.to === target && e.until === 0);
+  if (on === 1 && kept) return DiplomacyError.Embargoed;
   if (on === 0 && !held) return DiplomacyError.NotEmbargoed;
   return undefined;
 }
@@ -267,8 +279,11 @@ export function installDiplomacy(game: Game): void {
   game.onOrder((_, player, order) => {
     if (order.type !== "embargo") return false;
     const target = order.target;
-    if (order.on === 1) game.embargoes.push({ from: player.id, to: target, since: game.tick });
-    else removeWhere(game.embargoes, (e) => e.from === player.id && e.to === target);
+    const lasting = game.embargoes.find((e) => e.from === player.id && e.to === target);
+    if (order.on === 1 && lasting) lasting.until = 0;
+    else if (order.on === 1) {
+      game.embargoes.push({ from: player.id, to: target, since: game.tick, until: 0 });
+    } else removeWhere(game.embargoes, (e) => e.from === player.id && e.to === target);
     logEvent(game, {
       tick: game.tick,
       type: order.on === 1 ? "embargo" : "lifted",
@@ -278,10 +293,29 @@ export function installDiplomacy(game: Game): void {
     return true;
   });
 
+  // R-DIPLO-09: whoever attacks or lands on a player finds their ports shut to that player.
+  game.onApplied((_, player, order) => {
+    if (order.type !== "attack" && order.type !== "embark") return;
+    if (!game.allows(Disable.Port)) return;
+    const victim = game.territory.ownerOf(order.target);
+    if (victim === NEUTRAL || victim === player.id || !game.player(victim)?.alive) return;
+    if (embargoed(game, victim, player.id)) return;
+    game.embargoes.push({
+      from: victim,
+      to: player.id,
+      since: game.tick,
+      until: game.tick + balance.embargoAutoTicks,
+    });
+    logEvent(game, { tick: game.tick, type: "embargo", a: victim, b: player.id });
+  });
+
   game.onTick(() => {
     const tick = game.tick;
     const alive = (id: number) => game.player(id)?.alive === true;
-    removeWhere(game.embargoes, (e) => !alive(e.from) || !alive(e.to));
+    removeWhere(
+      game.embargoes,
+      (e) => !alive(e.from) || !alive(e.to) || (e.until !== 0 && tick >= e.until),
+    );
     for (const request of game.allianceRequests) {
       if (tick < request.expiresAt || !alive(request.from) || !alive(request.to)) continue;
       game.requestCooldowns.push({
@@ -319,6 +353,11 @@ export function installDiplomacy(game: Game): void {
       renewB: false,
     });
     game.alliances.sort((x, y) => x.a - y.a || x.b - y.b);
+    removeWhere(
+      game.embargoes,
+      (e) =>
+        e.until !== 0 && ((e.from === low && e.to === high) || (e.from === high && e.to === low)),
+    );
     logEvent(game, { tick: game.tick, type: "allied", a: low, b: high });
     for (const attack of game.attacks) {
       const against =

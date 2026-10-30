@@ -94,17 +94,18 @@ Since 0.9.5 the economy follows the long-standing reference of the genre, value 
 
 ## Warships
 
-| Key                |  Value | Unit        | Used by     | Notes                                                       |
-| ------------------ | -----: | ----------- | ----------- | ----------------------------------------------------------- |
-| `B-COST-WARSHIP`   | 250000 | gold        | `R-UNIT-04` | First warship; one more for each owned, up to `B-COST-MAX`  |
-| `B-WARSHIP-MAX`    |      4 | warships    | `R-UNIT-04` | Per player                                                  |
-| `B-WARSHIP-PATROL` |     30 | water tiles | `R-UNIT-04` | Around the patrol tile, on a map of 2^19 tiles; 60 on World |
-| `B-WARSHIP-RANGE`  |     12 | tiles       | `R-UNIT-04` | The same on every map                                       |
-| `B-WARSHIP-RELOAD` |      1 | s           | `R-UNIT-04` | Between two shots                                           |
-| `B-WARSHIP-DAMAGE` |    250 | health      | `R-UNIT-04` | A warship sinks at the fourth hit                           |
-| `B-WARSHIP-HEALTH` |   1000 | health      | `R-UNIT-04` |                                                             |
-| `B-WAR-MEMORY`     |     30 | s           | `R-UNIT-04` | A fight is remembered this long after it ends               |
-| `B-EMBARGO-NOTICE` |     30 | s           | `R-UNIT-04` | An embargo stands this long before trade ships can be taken |
+| Key                |  Value | Unit        | Used by      | Notes                                                       |
+| ------------------ | -----: | ----------- | ------------ | ----------------------------------------------------------- |
+| `B-COST-WARSHIP`   | 250000 | gold        | `R-UNIT-04`  | First warship; one more for each owned, up to `B-COST-MAX`  |
+| `B-WARSHIP-MAX`    |      4 | warships    | `R-UNIT-04`  | Per player                                                  |
+| `B-WARSHIP-PATROL` |     30 | water tiles | `R-UNIT-04`  | Around the patrol tile, on a map of 2^19 tiles; 60 on World |
+| `B-WARSHIP-RANGE`  |     12 | tiles       | `R-UNIT-04`  | The same on every map                                       |
+| `B-WARSHIP-RELOAD` |      1 | s           | `R-UNIT-04`  | Between two shots                                           |
+| `B-WARSHIP-DAMAGE` |    250 | health      | `R-UNIT-04`  | A warship sinks at the fourth hit                           |
+| `B-WARSHIP-HEALTH` |   1000 | health      | `R-UNIT-04`  |                                                             |
+| `B-WAR-MEMORY`     |     30 | s           | `R-UNIT-04`  | A fight is remembered this long after it ends               |
+| `B-EMBARGO-NOTICE` |     30 | s           | `R-UNIT-04`  | An embargo stands this long before trade ships can be taken |
+| `B-EMBARGO-AUTO`   |    300 | s           | `R-DIPLO-09` | An embargo placed after an attack lasts this long           |
 
 Warships fire only between players at war: a transport ship sailing for a coast makes its owner at war with the coast's owner from the moment it sails, so an escort draws the fire while the transport passes. Trade ships are taken only after an embargo has been announced for `B-EMBARGO-NOTICE`, so trade between players at peace is never at risk.
 
@@ -128,7 +129,7 @@ Like the other lengths, the range grows with the side of the map. At 500 tiles o
 | `B-ALLIANCE-REQUEST-TIMEOUT`  |    20 | s    | `R-DIPLO-01` |                                                           |
 | `B-ALLIANCE-REQUEST-COOLDOWN` |    30 | s    | `R-DIPLO-01` | From a request running out to the next to the same player |
 | `B-ALLIANCE-DURATION`         |   300 | s    | `R-DIPLO-03` | Fixed, so that no pact freezes a free-for-all             |
-| `B-ALLIANCE-RENEWAL`          |    60 | s    | `R-DIPLO-03` | Last part of an alliance in which both may renew it       |
+| `B-ALLIANCE-RENEWAL`          |    30 | s    | `R-DIPLO-03` | Last part of an alliance in which both may renew it       |
 | `B-TRAITOR-DURATION`          |    30 | s    | `R-DIPLO-04` |                                                           |
 | `B-TRAITOR-DEFENSE`           |    50 | %    | `R-DIPLO-04` | Of the usual price of a traitor's tile, after any fort    |
 

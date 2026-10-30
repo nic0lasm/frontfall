@@ -1,5 +1,5 @@
 import type { GameUpdate, PlayerView } from "../game/solo-game.ts";
-import { t } from "../i18n/index.ts";
+import { t, type MessageKey } from "../i18n/index.ts";
 import { h, setText, swatch } from "./dom.ts";
 
 /** The rows of the leaderboard in the HUD. */
@@ -41,6 +41,9 @@ export class LeaderList {
     const allies = new Set(diplomacy.allies.map((ally) => ally.id));
     const teammates = new Set(diplomacy.teammates);
     const traitors = new Set(diplomacy.traitors.map((traitor) => traitor.id));
+    const atWar = new Set(diplomacy.atWar);
+    const embargoed = new Set([...diplomacy.embargoes, ...diplomacy.embargoedBy]);
+    const moods = new Map(diplomacy.moods.map((entry) => [entry.id, entry.mood]));
     const rows = shown.map((player) => {
       let row = this.rows.get(player.id);
       if (!row) {
@@ -61,6 +64,17 @@ export class LeaderList {
       row.ally.hidden = !teammate && !allies.has(player.id);
       setText(row.ally, t(teammate ? "diplo.teammateBadge" : "diplo.allyBadge"));
       row.traitor.hidden = !traitors.has(player.id);
+      // One word for what the player is to you: war, then an embargo, then how a nation feels.
+      const status = row.button
+        ? atWar.has(player.id)
+          ? "war"
+          : embargoed.has(player.id)
+            ? "embargo"
+            : (moods.get(player.id) ?? (teammate || allies.has(player.id) ? "" : "neutral"))
+        : "";
+      row.status.hidden = status === "";
+      row.status.dataset["status"] = status;
+      setText(row.status, status === "" ? "" : t(`diplo.status.${status}` as MessageKey));
       return row.item;
     });
     for (const [id, row] of this.rows) {
@@ -85,6 +99,8 @@ interface LeaderRow {
   land: HTMLElement;
   ally: HTMLElement;
   traitor: HTMLElement;
+  /** What the player is to the one at this screen: war, embargo, mood or neutral. */
+  status: HTMLElement;
   /** Opens the player's menu; none on the row of the player at this screen. */
   button?: HTMLElement;
 }
@@ -107,11 +123,19 @@ function leaderRow(
     "data-i18n": "diplo.traitorBadge",
     hidden: true,
   });
+  const status = h("span", { class: "badge badge-status", hidden: true });
   ally.textContent = t("diplo.allyBadge");
   traitor.textContent = t("diplo.traitorBadge");
-  const content = [swatch(color), name, ally, traitor, land];
+  const content = [swatch(color), name, ally, traitor, status, land];
   if (you) {
-    return { item: h("li", { class: "leader you" }, ...content), name, land, ally, traitor };
+    return {
+      item: h("li", { class: "leader you" }, ...content),
+      name,
+      land,
+      ally,
+      traitor,
+      status,
+    };
   }
   const button = h(
     "button",
@@ -125,5 +149,5 @@ function leaderRow(
   button.addEventListener("click", () => {
     onPick(player.id);
   });
-  return { item: h("li", { class: "leader" }, button), name, land, ally, traitor, button };
+  return { item: h("li", { class: "leader" }, button), name, land, ally, traitor, status, button };
 }

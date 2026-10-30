@@ -903,6 +903,31 @@
   background: var(--ff-danger);
 }
 
+/* What a player is to you (ui/leader-list.ts): quiet when neutral, warm when it matters. */
+.badge-status {
+  background: var(--ff-night-600);
+  color: inherit;
+}
+
+.badge-status[data-status="war"],
+.badge-status[data-status="hostile"] {
+  background: var(--ff-danger);
+}
+
+.badge-status[data-status="embargo"],
+.badge-status[data-status="wary"] {
+  background: var(--ff-warning);
+  color: var(--ff-night-900);
+}
+
+.badge-status[data-status="friendly"] {
+  background: var(--ff-front);
+}
+
+.badge-status[data-status="neutral"] {
+  opacity: 0.65;
+}
+
 /* At the foot of the leaderboard, under the row it was opened from. */
 .player-menu {
   position: static;

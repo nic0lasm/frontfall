@@ -8,12 +8,14 @@ import {
   DIPLOMACY_LOG_SIZE,
   DiplomacyError,
   allianceOf,
+  embargoed,
   isAllied,
   isTraitor,
   requestBetween,
 } from "../src/diplomacy.ts";
 import type { Order, Player } from "../src/game.ts";
 import { orderError } from "../src/orders.ts";
+import { atWar } from "../src/warships.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
@@ -445,5 +447,48 @@ describe("nations and alliances (R-BOT-19)", () => {
     ally(1, 2);
     run(60);
     expect(isAllied(game, 1, 2)).toBe(false);
+  });
+});
+
+describe("embargoes after an attack (R-DIPLO-09)", () => {
+  const attack = (target: number): Order => ({ type: "attack", target, troops: 1000 });
+
+  it("shut the victim's ports to the attacker for B-EMBARGO-AUTO, then run out", () => {
+    const { game, grid, step, run } = newGame({ embargoAutoTicks: 40 });
+    step([{ player: 1, order: attack(grid.index(25, 5)) }]);
+    expect(embargoed(game, 1, 2)).toBe(true);
+    expect(game.embargoes).toHaveLength(1);
+    expect(game.embargoes[0]).toMatchObject({ from: 2, to: 1 });
+    expect(game.diplomacyEvents).toContainEqual({ tick: 0, type: "embargo", a: 2, b: 1 });
+    // A second attack does not stack another one.
+    step([{ player: 1, order: attack(grid.index(25, 6)) }]);
+    expect(game.embargoes).toHaveLength(1);
+    run(45);
+    expect(embargoed(game, 1, 2)).toBe(false);
+  });
+
+  it("leave land nobody owns alone, and do not put the players at war", () => {
+    const { game, grid, step } = newGame();
+    for (let tile = 0; tile < grid.size; tile++) game.territory.setOwner(tile, tile % 2 ? 0 : 1);
+    step([{ player: 1, order: attack(grid.index(1, 0)) }]);
+    expect(game.embargoes).toHaveLength(0);
+    const second = newGame();
+    second.step([{ player: 1, order: attack(second.grid.index(25, 5)) }]);
+    expect(atWar(second.game, 1, 3)).toBe(false);
+  });
+
+  it("end when the two become allies, and can be kept by an order of the victim", () => {
+    const { game, grid, step, ally } = newGame();
+    step([{ player: 1, order: attack(grid.index(25, 5)) }]);
+    ally(1, 2);
+    ally(2, 1);
+    expect(isAllied(game, 1, 2)).toBe(true);
+    expect(game.embargoes).toHaveLength(0);
+
+    const kept = newGame({ embargoAutoTicks: 20 });
+    kept.step([{ player: 1, order: attack(kept.grid.index(25, 5)) }]);
+    kept.step([{ player: 2, order: { type: "embargo", target: 1, on: 1 } }]);
+    kept.run(40);
+    expect(embargoed(kept.game, 1, 2)).toBe(true);
   });
 });

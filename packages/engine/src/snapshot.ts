@@ -188,7 +188,8 @@ function writeState(game: Game, out: SnapshotWriter): void {
   for (const c of game.requestCooldowns)
     for (const value of [c.from, c.to, c.until]) out.uint(value);
   out.uint(game.embargoes.length);
-  for (const e of game.embargoes) for (const value of [e.from, e.to, e.since]) out.uint(value);
+  for (const e of game.embargoes)
+    for (const value of [e.from, e.to, e.since, e.until]) out.uint(value);
   out.uint(game.quickCooldowns.length);
   for (const c of game.quickCooldowns) for (const value of [c.player, c.until]) out.uint(value);
   out.int(game.winner ?? -1);
@@ -342,7 +343,7 @@ function readState(game: Game, tick: number, from: SnapshotReader): void {
     game.requestCooldowns.push({ from: player(), to: player(), until: id() });
   }
   for (let n = from.count(); n > 0; n--) {
-    game.embargoes.push({ from: player(), to: player(), since: id() });
+    game.embargoes.push({ from: player(), to: player(), since: id(), until: id() });
   }
   for (let n = from.count(); n > 0; n--) {
     game.quickCooldowns.push({ player: player(), until: id() });

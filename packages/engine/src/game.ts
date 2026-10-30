@@ -543,6 +543,8 @@ export class Game {
       hash = mix(hash, e.from);
       hash = mix(hash, e.to);
       hash = mix(hash, e.since);
+      // Embargoes by order hash as they did before the automatic ones existed.
+      if (e.until !== 0) hash = mix(hash, e.until);
     }
     hash = mix(hash, this.winner ?? 0);
     // Free-for-all games hash as they did before teams existed.
@@ -801,6 +803,7 @@ function checkBalance(balance: Balance): void {
     "warshipRange",
     "warMemoryTicks",
     "embargoNoticeTicks",
+    "embargoAutoTicks",
     "siloCost",
     "airDefenseCost",
     "longBuildTicks",

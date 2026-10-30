@@ -60,6 +60,11 @@ function newGame(disabled = 0) {
   };
 }
 
+/** An alliance that outlasts the test, put in place as an order would have. */
+function ally(game: ReturnType<typeof newGame>["game"], a: number, b: number): void {
+  game.alliances.push({ a, b, until: game.tick + 1_000_000, renewA: false, renewB: false });
+}
+
 const gift = (target: number, troops: number, gold: number): Order => ({
   type: "gift",
   target,
@@ -70,6 +75,7 @@ const gift = (target: number, troops: number, gold: number): Order => ({
 describe("gifts (R-DIPLO-06)", () => {
   it("move troops and gold to another player at once, and every player is told", () => {
     const { game, ada, bea, step } = newGame();
+    ally(game, 1, 2);
     expect(step([{ player: 1, order: gift(2, 4000, 250_000) }])).toBe(1);
     expect(ada.troops).toBe(6000);
     expect(bea.troops).toBe(14_000);
@@ -80,6 +86,7 @@ describe("gifts (R-DIPLO-06)", () => {
 
   it("send no more troops than the receiver's population cap has room for", () => {
     const { game, ada, bea, step } = newGame();
+    ally(game, 1, 2);
     const room = populationCap(game, bea) - bea.troops;
     ada.troops = room + 5000;
     step([{ player: 1, order: gift(2, room + 5000, 0) }]);
@@ -101,7 +108,9 @@ describe("gifts (R-DIPLO-06)", () => {
     expect(orderError(game, ada, gift(2, -1, 5))).toBe(GiftError.Amount);
     step([{ player: 1, order: { type: "attack", target: grid.index(20, 5), troops: 1000 } }]);
     expect(orderError(game, ada, gift(2, 10, 0))).toBe(GiftError.War);
-    // Cy, out of the fight, still takes gifts from both.
+    // Cy, out of the fight, takes gifts only once allied.
+    expect(orderError(game, ada, gift(3, 10, 0))).toBe(GiftError.Ally);
+    ally(game, 1, 3);
     expect(orderError(game, ada, gift(3, 10, 0))).toBeUndefined();
     step([{ player: 2, order: { type: "embargo", target: 3, on: 1 } }]);
     expect(orderError(game, game.player(3) as Player, gift(2, 0, 10))).toBe(GiftError.War);

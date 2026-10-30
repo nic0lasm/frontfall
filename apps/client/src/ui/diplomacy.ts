@@ -302,7 +302,7 @@ export class DiplomacyPanel {
       });
     }
 
-    // Gifts go to anyone not at war with the player (R-DIPLO-06).
+    // Gifts go to allies and teammates (R-DIPLO-06).
     const war = diplomacy.atWar.includes(id);
     const you = update.players.find((p) => p.id === update.you);
     const share = this.actions.share();
@@ -310,6 +310,7 @@ export class DiplomacyPanel {
     // Troops go only where the receiver's cap has room for them.
     const room = player.cap > player.troops;
     for (const what of ["troops", "gold"] as const) {
+      if (!ally && !teammate) break;
       buttons.push({
         key: what === "troops" ? "diplo.sendTroops" : "diplo.sendGold",
         params: percent,
