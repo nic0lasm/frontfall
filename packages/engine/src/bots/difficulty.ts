@@ -54,14 +54,14 @@ export interface NationParameters {
 
 export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<NationParameters>>> = {
   easy: {
-    intervalSeconds: 5,
-    attackRatioPercent: 15,
-    graceSeconds: 300,
+    intervalSeconds: 8,
+    attackRatioPercent: 10,
+    graceSeconds: 600,
     oddsPercent: 80,
     holdPercent: 60,
     reservePercent: 25,
     huntPercent: 0,
-    missilePauseSeconds: 240,
+    missilePauseSeconds: 600,
     grudge: false,
     betrayLandPercent: 30,
     betrayTroopsPercent: 20,

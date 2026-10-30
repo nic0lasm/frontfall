@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- **Easy is really easy.** Easy nations are slower and calmer: they expand and decide more slowly, send smaller attacks, wait ten minutes before turning on you instead of five, and fire a missile every ten minutes instead of every four. A newcomer is no longer overrun by the whole map a few minutes in. Normal and hard are unchanged.
+
 ## [0.9.2] - 2026-10-30
 
 A new look and a livelier battlefield: the map as stained glass, ships, buildings and missiles drawn as real objects, volumetric explosions, fallout zones you can read, nations with a memory and a voice, and a server now in France.
