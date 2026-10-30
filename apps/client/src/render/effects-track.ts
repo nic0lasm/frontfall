@@ -3,7 +3,7 @@ import type { UnitMark } from "./renderer.ts";
 
 /*
  * What the combat effects draw and when (art-direction.md, Motion): a trail
- * behind a missile, a wake behind a ship, a flash where a missile lands, a
+ * behind a missile, a flash where a missile lands, a
  * splash where troops land, a ring at a port, sparks along an advancing
  * front. Everything here is read from what the renderer is already given,
  * never from the rules, so a replay or a golden is unaffected. No Three.js:
@@ -455,9 +455,9 @@ export class EffectTracker {
     }
   }
 
-  /** The trail of a missile, or the wake of a ship that sails far enough from the last mark. */
+  /** The trail of a missile; a ship's wake is painted with its hull (ship-layer.ts). */
   private trail(unit: Seen, now: number): void {
-    if (unit.kind === "trade") return;
+    if (unit.kind !== "missile" && unit.kind !== "heavyMissile") return;
     const spacing = Math.max(2, TRAIL_PIXELS * this.tilesPerPixel);
     let dx = unit.x - unit.trailX;
     // The short way across the seam of a wrapping map.
@@ -470,40 +470,22 @@ export class EffectTracker {
     if (!this.visible(unit.x, unit.y)) return;
     const x = unit.x + 0.5;
     const y = unit.y + 0.5;
-    if (unit.kind === "missile" || unit.kind === "heavyMissile") {
-      // A dotted arc that fades after the landing.
-      const big = unit.kind === "heavyMissile" ? 1.4 : 1;
-      this.emit({
-        x,
-        y,
-        dx: 0,
-        dy: 0,
-        birth: now,
-        life: 2.4,
-        size0: 1.1 * big,
-        size1: 0.6 * big,
-        minPixels: 3,
-        color: unit.color,
-        alpha: 0.75,
-        shape: "dot",
-      });
-    } else {
-      const big = unit.kind === "warship" ? 1.3 : 1;
-      this.emit({
-        x,
-        y,
-        dx: 0,
-        dy: 0,
-        birth: now,
-        life: 1.4,
-        size0: 0.9 * big,
-        size1: 2.4 * big,
-        minPixels: 3,
-        color: FOAM,
-        alpha: 0.32,
-        shape: "dot",
-      });
-    }
+    // A dotted arc that fades after the landing.
+    const big = unit.kind === "heavyMissile" ? 1.4 : 1;
+    this.emit({
+      x,
+      y,
+      dx: 0,
+      dy: 0,
+      birth: now,
+      life: 2.4,
+      size0: 1.1 * big,
+      size1: 0.6 * big,
+      minPixels: 3,
+      color: unit.color,
+      alpha: 0.75,
+      shape: "dot",
+    });
   }
 
   private ring(

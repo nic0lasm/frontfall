@@ -4,6 +4,7 @@ import type { CameraView } from "./camera.ts";
 import type { EffectsLayer } from "./effects-layer.ts";
 import { applyView } from "./orthographic.ts";
 import type * as Pieces from "./pieces.ts";
+import type * as Hulls from "./ship-layer.ts";
 import type {
   FalloutZone,
   MissileEnd,
@@ -137,9 +138,11 @@ export class MapView implements Renderer {
   private readonly camera = new THREE.OrthographicCamera();
   private readonly territory: TerritoryLayer;
   private readonly bufferSize = new THREE.Vector2();
-  private readonly ships: Marker;
-  private readonly tradeShips: Marker;
-  private readonly warships: Marker;
+  /** Ships as painted hulls, once their code is there; plates (below) stand in without it. */
+  private readonly hulls: Hulls.ShipLayer | undefined;
+  private readonly ships: Marker | undefined;
+  private readonly tradeShips: Marker | undefined;
+  private readonly warships: Marker | undefined;
   private readonly missiles: Marker;
   private readonly heavyMissiles: Marker;
   private readonly structures: Record<StructureMark["type"], StructureLayers>;
@@ -161,6 +164,7 @@ export class MapView implements Renderer {
     readonly options: RendererOptions,
     territories: typeof Territories,
     pieces?: typeof Pieces,
+    hulls?: typeof Hulls,
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: false });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -202,9 +206,21 @@ export class MapView implements Renderer {
       this.scene.add(layer.mesh);
       return layer;
     };
-    this.ships = unit("transport", SHIP_CAPACITY, SHIP_SIZES.transport.tiles, 8, 0.1, 1);
-    this.tradeShips = unit("trade", TRADE_CAPACITY, SHIP_SIZES.trade.tiles, 8, 0.1, 1);
-    this.warships = unit("warship", WARSHIP_CAPACITY, SHIP_SIZES.warship.tiles, 3, 0.15, 2);
+    if (hulls) {
+      this.hulls = new hulls.ShipLayer({
+        ...world,
+        capacity: SHIP_CAPACITY + TRADE_CAPACITY + WARSHIP_CAPACITY,
+        kinds: options.kinds,
+        flat: options.flat === true,
+        phone: options.phone === true,
+      });
+      this.hulls.mesh.position.copy(this.territory.mesh.position);
+      this.scene.add(this.hulls.mesh);
+    } else {
+      this.ships = unit("transport", SHIP_CAPACITY, SHIP_SIZES.transport.tiles, 8, 0.1, 1);
+      this.tradeShips = unit("trade", TRADE_CAPACITY, SHIP_SIZES.trade.tiles, 8, 0.1, 1);
+      this.warships = unit("warship", WARSHIP_CAPACITY, SHIP_SIZES.warship.tiles, 3, 0.15, 2);
+    }
     // Missiles are above everything else.
     this.missiles = unit("missile", MISSILE_CAPACITY, SHIP_SIZES.missile.tiles, 4, 0.4, 5);
     this.heavyMissiles = unit(
@@ -313,6 +329,7 @@ export class MapView implements Renderer {
   setMotion(moving: boolean): void {
     this.moving = moving;
     this.effects?.setMotion(moving);
+    this.hulls?.setMotion(moving);
     this.territory.setMotion(moving);
   }
 
@@ -333,6 +350,7 @@ export class MapView implements Renderer {
     let warships = 0;
     let missiles = 0;
     let heavy = 0;
+    const hulls: Record<Hulls.ShipKind, Hulls.Hull[]> = { trade: [], transport: [], warship: [] };
     for (const ship of ships) {
       // A ship leaving the sea is not drawn as a plate: it is for the layer that draws hulls.
       if (ship.state) continue;
@@ -340,17 +358,30 @@ export class MapView implements Renderer {
         if (missiles < MISSILE_CAPACITY) this.missiles.set(missiles++, ship.x, ship.y, ship.color);
       } else if (ship.kind === "heavyMissile") {
         if (heavy < MISSILE_CAPACITY) this.heavyMissiles.set(heavy++, ship.x, ship.y, ship.color);
+      } else if (this.hulls) {
+        const kind = ship.kind ?? "transport";
+        hulls[kind].push({
+          kind,
+          x: ship.x,
+          y: ship.y,
+          heading: ship.heading ?? 0,
+          speed: ship.speed ?? 0,
+          color: ship.color,
+          seed: (ship.id ?? 0) % 10,
+        });
       } else if (ship.kind === "trade") {
-        if (trade < TRADE_CAPACITY) this.tradeShips.set(trade++, ship.x, ship.y, ship.color);
+        if (trade < TRADE_CAPACITY) this.tradeShips?.set(trade++, ship.x, ship.y, ship.color);
       } else if (ship.kind === "warship") {
-        if (warships < WARSHIP_CAPACITY) this.warships.set(warships++, ship.x, ship.y, ship.color);
+        if (warships < WARSHIP_CAPACITY) this.warships?.set(warships++, ship.x, ship.y, ship.color);
       } else if (transports < SHIP_CAPACITY) {
-        this.ships.set(transports++, ship.x, ship.y, ship.color);
+        this.ships?.set(transports++, ship.x, ship.y, ship.color);
       }
     }
-    this.ships.count = transports;
-    this.tradeShips.count = trade;
-    this.warships.count = warships;
+    // The warships over the transports, and those over the trade ships.
+    this.hulls?.setHulls([...hulls.trade, ...hulls.transport, ...hulls.warship]);
+    if (this.ships) this.ships.count = transports;
+    if (this.tradeShips) this.tradeShips.count = trade;
+    if (this.warships) this.warships.count = warships;
     this.missiles.count = missiles;
     this.heavyMissiles.count = heavy;
     this.effects?.ships(ships, this.clock());
@@ -447,16 +478,17 @@ export class MapView implements Renderer {
         { tiles: SHIP_SIZES[kind].tiles, minPixels: PIECE_MIN_PIXELS[kind] },
         tilesPerPixel,
       );
-    this.ships.setScale(sized("transport"));
-    this.tradeShips.setScale(sized("trade"));
-    this.warships.setScale(sized("warship"));
+    this.ships?.setScale(sized("transport"));
+    this.tradeShips?.setScale(sized("trade"));
+    this.warships?.setScale(sized("warship"));
     this.missiles.setScale(sized("missile"));
     this.heavyMissiles.setScale(sized("heavyMissile"));
     this.missiles.update(this.camera.position.x);
     this.heavyMissiles.update(this.camera.position.x);
-    this.ships.update(this.camera.position.x);
-    this.tradeShips.update(this.camera.position.x);
-    this.warships.update(this.camera.position.x);
+    this.ships?.update(this.camera.position.x);
+    this.tradeShips?.update(this.camera.position.x);
+    this.warships?.update(this.camera.position.x);
+    this.hulls?.update(this.clock(), this.camera.position.x, tilesPerPixel);
     for (const { outline, fill, size, minPixels } of Object.values(this.structures)) {
       const scale = Math.max(1, (minPixels * tilesPerPixel) / size);
       outline?.setScale(scale);
@@ -478,9 +510,10 @@ export class MapView implements Renderer {
     this.disposed = true;
     this.effects?.dispose();
     this.territory.dispose();
-    this.ships.dispose();
-    this.tradeShips.dispose();
-    this.warships.dispose();
+    this.hulls?.dispose();
+    this.ships?.dispose();
+    this.tradeShips?.dispose();
+    this.warships?.dispose();
     this.missiles.dispose();
     this.heavyMissiles.dispose();
     for (const { outline, fill } of Object.values(this.structures)) {

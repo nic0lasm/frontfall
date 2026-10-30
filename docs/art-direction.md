@@ -65,6 +65,17 @@ Rules:
 6. **Sizes.** 16 to 20 px at World zoom, 32 to 40 px up close, 28 px in menus. The Palace is drawn 20 % larger than other buildings.
 7. **No text on plates**, no numbers. Counts go in labels next to them.
 
+## Ships
+
+Ships are not plates: each is a hull seen from above, painted procedurally in one instanced draw call (`render/ship-layer.ts`, no image). Light comes from the upper left; a soft pillow shading is derived from the distance to the hull's edge, and a shadow falls on the water.
+
+1. **The kind is read from the silhouette.** Warship: slim and very pointed, steel with the owner's colour on a stripe, the rim and the turret caps. Transport: a blunt barge, owner deck, crates aft, troops forward, a ramp at the bow. Trade ship: long and pointed, owner-painted hull, stacks of containers, a white aft bridge.
+2. **Length on screen** is the hull's length in tiles (1.6, 2.5 and 3.5), never below 21, 27 and 34 CSS pixels (12 % more on a phone).
+3. **One detail ramp.** Between 30 and 84 px of length the far silhouette (the owner's colour whole, a wider hull of at least 9.5 px of beam, a clear bow, a pale outline against the dark sea, one mark per kind) turns into the full painting. Everything is interpolated; nothing switches.
+4. **Bow wave and wake** follow the speed of the ship: a V at the bow, two arms and a churned core behind it. The foam is fixed to the sea, so it stays where the ship passed, and it is cut where the water mask says land.
+5. **Profiles.** Auto and Quality draw the shading, the shadow and the two-octave foam noise. Saver draws the same hulls and wake with one octave and no shading or shadow. Reduced motion freezes the drift of the foam.
+6. Colour is still the only owner code; a second code is part of the accessibility work to come.
+
 ## Piece geometry
 
 The eight buildings (city, Micho Palace, capital, fort, port, silo, air defence, landmark) share one drawing, `apps/client/src/render/pieces-geo.ts`: flat parts with a material role (stone, metal, wood, gold, owner colour) and a level of detail. Level 0 is the silhouette alone and is kept at every size; level 1 (windows, crenels, flags) appears from about 30 px; level 2 only close up. Nothing in level 0 is thinner than 2.5 units of the 100-unit piece, so it survives at 24 px.
@@ -89,8 +100,8 @@ Motion explains what is happening; it never decorates.
 
 - Territory edges ease over about 150 ms when land is taken.
 - A front under attack pulses its ridge at 1 Hz; a quiet front stays still.
-- Ships and missiles move along their route with a short fading trail. Missiles leave a dotted arc that fades after landing. A missile that is stopped in the air bursts where it was, apart from the blast of a strike on its target.
-- Every ship carries a smoothed heading and a speed, and one that leaves the sea lingers a moment as docking, landing or sinking (`ShipMotion` in `ui/screen/ship-motion.ts`), so that the hull layer can turn it, wake it and sink it; the plates ignore these for now.
+- Missiles leave a dotted arc that fades after landing. A missile that is stopped in the air bursts where it was, apart from the blast of a strike on its target. Ships leave a wake of foam painted with their hull (see Ships): it stays fixed to the sea and fades over about two lengths.
+- Every ship carries a smoothed heading and a speed, and one that leaves the sea lingers a moment as docking, landing or sinking (`ShipMotion` in `ui/screen/ship-motion.ts`); the hulls turn and wake with the first two, and the three states are for the lives and deaths of a ship, still to be drawn.
 - New buildings drop onto their tile in 120 ms with a small bounce, and the plate shadow shortens as it lands.
 - Everything honours the reduced-motion setting: pulses and bounces become static states, trails stay.
 

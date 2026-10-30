@@ -91,6 +91,8 @@ export interface RendererOptions {
   readonly latitudes?: readonly [south: number, north: number] | undefined;
   /** The flat map: square tiles, without smooth coasts and borders, for older devices. */
   readonly flat?: boolean | undefined;
+  /** A phone, which asks for larger ships. */
+  readonly phone?: boolean | undefined;
   /** Owner of every tile, kept up to date by the caller and read in place. */
   readonly owners: Uint16Array;
   readonly maxOwner: number;
@@ -168,7 +170,7 @@ export function globeLoaded(): boolean {
 /** The renderer for a map; throws if WebGL 2 is missing or refused, or before loadGlobe has completed. */
 export function createRenderer(options: RendererOptions, kind: ViewKind = "flat"): Renderer {
   if (!lazy) throw new Error("the map's drawing code is not loaded (loadGlobe)");
-  return kind === "globe" ? new lazy.GlobeView(options) : new MapView(options, lazy, lazy);
+  return kind === "globe" ? new lazy.GlobeView(options) : new MapView(options, lazy, lazy, lazy);
 }
 
 /** The minimap of a game, once the chunk is there; none before, and the game goes on without it. */

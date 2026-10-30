@@ -23,6 +23,7 @@ import {
   SAVER,
   chooseProfile,
   learnedSaver,
+  isPhone,
   readDevice,
   rememberSaver,
 } from "../graphics.ts";
@@ -265,6 +266,7 @@ export class MapScene {
           relief: map.relief,
           latitudes: map.latitudes,
           flat: this.flat,
+          phone: isPhone(readDevice()),
           owners: this.owners,
           maxOwner: maxPlayer,
         },
