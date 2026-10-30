@@ -23,6 +23,8 @@ export interface BalanceSummary {
     readonly burstMax: number;
   };
   readonly casual?: {
+    /** Games won, or ended with the player first and past 40 % of the land */
+    readonly wonOrLed: number;
     readonly won: number;
     readonly alive: number;
     /** Minutes of play at elimination, median of the games it lost that way. */
@@ -132,7 +134,12 @@ export function summarize(reports: readonly GameReport[]): BalanceSummary {
 
   const casuals = reports.flatMap((r) => {
     const casual = r.players.find((p) => p.kind === "casual" || p.kind === "average");
-    return casual ? [{ casual, won: r.winner === casual.id }] : [];
+    if (!casual) return [];
+    // A win, or the lead with more than 40 % of the land when the run stops.
+    const most = Math.max(...r.players.map((p) => p.tiles));
+    const share = r.leaderSharePercent > 0 ? (casual.tiles * r.leaderSharePercent) / most : 0;
+    const led = casual.eliminatedAt === undefined && casual.tiles === most && share > 40;
+    return [{ casual, won: r.winner === casual.id, led: r.winner === casual.id || led }];
   });
   const lost = casuals.flatMap(({ casual }) =>
     casual.eliminatedAt === undefined ? [] : [casual.eliminatedAt],
@@ -152,6 +159,7 @@ export function summarize(reports: readonly GameReport[]): BalanceSummary {
       ? {
           casual: {
             won: casuals.filter((c) => c.won).length,
+            wonOrLed: casuals.filter((c) => c.led).length,
             alive: casuals.filter((c) => c.casual.eliminatedAt === undefined).length,
             ...(lost.length ? { eliminatedMedian: median(lost) } : {}),
           },

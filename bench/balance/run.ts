@@ -247,7 +247,7 @@ function print(s: BalanceSummary): void {
   }
   if (s.casual) {
     console.log(
-      `${values.average ? "average" : "casual"} player: won ${String(s.casual.won)}, alive at the end ${String(s.casual.alive)}` +
+      `${values.average ? "average" : "casual"} player: won ${String(s.casual.won)}, won or led ${String(s.casual.wonOrLed)}, alive at the end ${String(s.casual.alive)}` +
         (s.casual.eliminatedMedian === undefined
           ? ""
           : `, eliminated after ${round(s.casual.eliminatedMedian)} min (median)`),
