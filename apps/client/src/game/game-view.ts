@@ -145,6 +145,8 @@ export interface GameUpdate {
   missiles: MissileView[];
   /** Land under fallout (R-UNIT-06), as discs. */
   fallout: FalloutView[];
+  /** How the missiles that ended since the last update ended, oldest first. */
+  missileEvents: MissileEventView[];
   /** Every structure on the map. */
   structures: StructureView[];
   /** What the player at this screen can build next. */
@@ -345,15 +347,43 @@ export interface MissileView {
   player: number;
   heavy: boolean;
   tile: number;
-  /** Its target, and the owner of the target when it was last seen. */
+  /** Where it was launched from, its target, and the owner of the target when it was last seen. */
+  from: number;
   to: number;
   target: number;
+  /** Ticks it was launched and strikes at, to tell how far along its flight it is. */
+  launchedAt: number;
+  arrivesAt: number;
+}
+
+/**
+ * How a missile ended (R-UNIT-05): stopped in the air by an air defense or a
+ * shield landmark, come down on its target, or called off to spare an ally.
+ */
+export interface MissileEventView {
+  type: "intercepted" | "struck" | "spared";
+  id: number;
+  player: number;
+  heavy: boolean;
+  from: number;
+  to: number;
+  /** Where it stopped, or where it came down. */
+  tile: number;
+  /** Who stopped it, 0 when nobody did. */
+  by: number;
+  /** The air defense that stopped it; left out for a shield landmark. */
+  site?: number;
 }
 
 /** A disc of land under fallout (R-UNIT-06). */
 export interface FalloutView {
   tile: number;
   radius: number;
+  /** From a heavy missile, which lasts longer and reaches wider. */
+  heavy: boolean;
+  /** Ticks until the land can be taken again, and how long the fallout lasted in all. */
+  ticksLeft: number;
+  duration: number;
 }
 
 /** A trade ship at sea, where it is this tick. */

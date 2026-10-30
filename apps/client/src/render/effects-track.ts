@@ -45,6 +45,8 @@ const REFERENCE_TILES = 2 ** 19;
 
 const FOAM = "#CFE8F5";
 const FLASH = "#FFE2A8";
+/** The burst of a missile stopped in the air: cool, apart from the warm flash of a strike. */
+const AIR = "#BFE3FF";
 const GOLD = "#F2C14E";
 /** The ember of an active front (territory-layer.ts). */
 const EMBER = "#F25C2A";
@@ -331,11 +333,11 @@ export class EffectTracker {
   }
 
   private vanished(unit: Seen, now: number): void {
+    // A missile that vanishes leaves nothing of its own: how it ended arrives apart (struck, intercepted).
+    if (unit.kind === "missile" || unit.kind === "heavyMissile") return;
     if (!this.visible(unit.x, unit.y) || this.budget <= 0) return;
     this.budget--;
-    if (unit.kind === "missile" || unit.kind === "heavyMissile") {
-      this.landed(unit, now);
-    } else if (unit.kind === "transport") {
+    if (unit.kind === "transport") {
       this.landing(unit, now);
     } else if (unit.kind === "trade") {
       // A trade ship docks: a ring on the port, and a coin that floats up.
@@ -358,23 +360,23 @@ export class EffectTracker {
     }
   }
 
-  /** The flash, the shock ring and the sparks of a missile that has come down. */
-  private landed(unit: Seen, now: number): void {
-    const radius =
-      (unit.kind === "heavyMissile" ? HEAVY_MISSILE_RADIUS : MISSILE_RADIUS) * this.blast;
+  /** A missile has come down on its target: the flash, the shock ring and the sparks. */
+  struck(x: number, y: number, heavy: boolean, now: number): void {
+    if (!this.visible(x, y)) return;
+    const radius = (heavy ? HEAVY_MISSILE_RADIUS : MISSILE_RADIUS) * this.blast;
     if (!this.moving) {
       // Held still: a single disc that only fades.
-      this.emit(disc(unit.x, unit.y, now, 1.4, radius * 1.4, radius * 1.4, FLASH, 0.4, 8));
+      this.emit(disc(x, y, now, 1.4, radius * 1.4, radius * 1.4, FLASH, 0.4, 8));
       return;
     }
-    this.emit(disc(unit.x, unit.y, now, 0.4, radius * 0.6, radius * 1.5, FLASH, 0.9, 8));
-    this.ring(unit.x, unit.y, now, 1, radius * 0.4, radius * 2, FLASH, 0.95);
+    this.emit(disc(x, y, now, 0.4, radius * 0.6, radius * 1.5, FLASH, 0.9, 8));
+    this.ring(x, y, now, 1, radius * 0.4, radius * 2, FLASH, 0.95);
     for (let i = 0; i < 7; i++) {
       const angle = (i / 7) * Math.PI * 2 + this.random() * 0.8;
       const speed = radius * (0.6 + this.random() * 0.5);
       this.emit({
-        x: unit.x,
-        y: unit.y,
+        x,
+        y,
         dx: Math.cos(angle) * speed,
         dy: Math.sin(angle) * speed,
         birth: now,
@@ -387,6 +389,43 @@ export class EffectTracker {
         shape: "dot",
       });
     }
+  }
+
+  /** A missile was stopped in the air: a burst where it was, short of the blast a strike makes, and a ring on the site that did it. */
+  intercepted(
+    x: number,
+    y: number,
+    heavy: boolean,
+    site: { x: number; y: number } | undefined,
+    now: number,
+  ): void {
+    if (!this.visible(x, y)) return;
+    const radius = (heavy ? HEAVY_MISSILE_RADIUS : MISSILE_RADIUS) * this.blast * 0.35;
+    if (!this.moving) {
+      this.emit(disc(x, y, now, 1.2, radius, radius, AIR, 0.4, 8));
+      return;
+    }
+    this.emit(disc(x, y, now, 0.3, radius * 0.5, radius * 1.2, AIR, 0.85, 8));
+    this.ring(x, y, now, 0.7, radius * 0.4, radius * 1.8, AIR, 0.9);
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2 + this.random() * 0.8;
+      const speed = radius * (0.8 + this.random() * 0.6);
+      this.emit({
+        x,
+        y,
+        dx: Math.cos(angle) * speed,
+        dy: Math.sin(angle) * speed,
+        birth: now,
+        life: 0.5 + this.random() * 0.2,
+        size0: 1,
+        size1: 0.3,
+        minPixels: 3,
+        color: i % 2 === 0 ? AIR : "#FFFFFF",
+        alpha: 0.85,
+        shape: "dot",
+      });
+    }
+    if (site) this.ring(site.x, site.y, now, 0.8, 0.8, 3.6, AIR, 0.7);
   }
 
   /** A ring and a few drops where a transport reaches the shore. */

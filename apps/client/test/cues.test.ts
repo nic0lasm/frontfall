@@ -10,6 +10,7 @@ function update(changes: Record<string, unknown> = {}): GameUpdate {
     attacks: [],
     structures: [],
     missiles: [],
+    missileEvents: [],
     events: [],
     diplomacy: { allies: [], teammates: [], incoming: [] },
     ...changes,
@@ -101,10 +102,26 @@ describe("sound cues", () => {
       ],
     });
     expect(watcher.observe(flying)).toEqual([{ cue: "missile", own: true, tile: 10 }]);
-    expect(watcher.observe(update())).toEqual([
+    const down = update({
+      missileEvents: [
+        { type: "struck", id: 3, player: 1, tile: 99 },
+        { type: "struck", id: 4, player: 2, tile: 77 },
+      ],
+    });
+    expect(watcher.observe(down)).toEqual([
       { cue: "impact", own: true, tile: 99 },
       { cue: "impact", own: false, tile: 77 },
     ]);
+  });
+
+  it("does not hear an impact for a missile stopped in the air", () => {
+    const watcher = new CueWatcher();
+    watcher.observe(update());
+    watcher.observe(update({ missiles: [{ id: 3, player: 2, tile: 20, target: 77 }] }));
+    const stopped = update({
+      missileEvents: [{ type: "intercepted", id: 3, player: 2, tile: 40 }],
+    });
+    expect(watcher.observe(stopped)).toEqual([]);
   });
 
   it("marks a new alliance and a new request once each", () => {

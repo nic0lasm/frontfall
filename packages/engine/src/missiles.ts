@@ -37,6 +37,35 @@ export interface Fallout {
   readonly until: number;
 }
 
+/**
+ * What became of a missile, for interfaces to draw: stopped in the air
+ * ("intercepted"), come down ("struck"), or called off because the blast
+ * would have reached an ally's land ("spared"). `tile` is where it stopped
+ * or landed; `site` the air defense that stopped it, undefined for a shield
+ * landmark; `by` who stopped it, NEUTRAL otherwise.
+ */
+export interface MissileEvent {
+  readonly tick: number;
+  readonly type: "intercepted" | "struck" | "spared";
+  readonly id: number;
+  readonly player: number;
+  readonly size: MissileSize;
+  readonly from: number;
+  readonly to: number;
+  readonly tile: number;
+  readonly by: number;
+  readonly site?: number;
+}
+
+/** Events kept when nobody reads them, in a server, a bench or a replay. */
+export const MISSILE_LOG_SIZE = 64;
+
+function logMissile(game: Game, event: MissileEvent): void {
+  const log = game.missileEvents;
+  log.push(event);
+  if (log.length > MISSILE_LOG_SIZE) log.splice(0, log.length - MISSILE_LOG_SIZE);
+}
+
 /** Why a missile order is refused once its fields are known to be integers. */
 export const MissileError = {
   Early: "missiles come after the spawn phase",
@@ -218,13 +247,17 @@ export function installMissiles(game: Game): void {
     for (const missile of missiles) {
       if (intercepted(missile)) continue;
       if (tick + 1 >= missile.arrivesAt) {
+        const event = { tick, id: missile.id, player: missile.player, size: missile.size };
+        const ends = { from: missile.from, to: missile.to, tile: missile.to, by: NEUTRAL };
         // Land under the blast that became an ally's or a teammate's while it flew is spared, and the missile paid back.
         const launcher = game.player(missile.player);
         const radius = blastRadius(game, missile.size);
         if (blastHitsAlly(game, missile.player, missile.to, radius)) {
           if (launcher) launcher.gold += missileCost(game, missile.size);
+          logMissile(game, { ...event, ...ends, type: "spared" });
         } else {
           strike(missile);
+          logMissile(game, { ...event, ...ends, type: "struck" });
         }
         continue;
       }
@@ -236,17 +269,42 @@ export function installMissiles(game: Game): void {
   /** Gives every air defense in range its one try, then shield landmarks (R-LAND-02); whether one stopped the missile. */
   function intercepted(missile: Missile): boolean {
     const at = missileTile(game, missile, game.tick + 1);
-    if (byAirDefense(missile, at)) return true;
+    const stopped = byAirDefense(missile, at);
+    if (stopped) {
+      logIntercepted(missile, at, stopped.player, stopped.tile);
+      return true;
+    }
     if (game.terrain.landmarks.length === 0) return false;
     const previous =
       game.tick > missile.launchedAt ? missileTile(game, missile, game.tick) : undefined;
     const holder = shieldedBy(game, missile, at, previous);
     if (holder === NEUTRAL) return false;
     logEvent(game, { tick: game.tick, type: "stopped", a: holder, b: missile.player });
+    logIntercepted(missile, at, holder, undefined);
     return true;
   }
 
-  function byAirDefense(missile: Missile, at: number): boolean {
+  function logIntercepted(
+    missile: Missile,
+    at: number,
+    by: number,
+    site: number | undefined,
+  ): void {
+    logMissile(game, {
+      tick: game.tick,
+      type: "intercepted",
+      id: missile.id,
+      player: missile.player,
+      size: missile.size,
+      from: missile.from,
+      to: missile.to,
+      tile: at,
+      by,
+      ...(site === undefined ? {} : { site }),
+    });
+  }
+
+  function byAirDefense(missile: Missile, at: number): Structure | undefined {
     const radius = airDefenseRadius(game);
     const reach = radius * radius;
     for (const defense of game.structures) {
@@ -273,10 +331,10 @@ export function installMissiles(game: Game): void {
       if (draw % 100 < balance.airDefenseChancePercent) {
         defense.reloadAt = game.tick + balance.airDefenseReloadTicks;
         logEvent(game, { tick: game.tick, type: "stopped", a: defense.player, b: missile.player });
-        return true;
+        return defense;
       }
     }
-    return false;
+    return undefined;
   }
 
   function strike(missile: Missile): void {

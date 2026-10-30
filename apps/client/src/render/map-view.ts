@@ -4,7 +4,14 @@ import type { CameraView } from "./camera.ts";
 import type { EffectsLayer } from "./effects-layer.ts";
 import { applyView } from "./orthographic.ts";
 import type * as Pieces from "./pieces.ts";
-import type { Renderer, RendererOptions, StructureMark, UnitMark } from "./renderer.ts";
+import type {
+  FalloutZone,
+  MissileEnd,
+  Renderer,
+  RendererOptions,
+  StructureMark,
+  UnitMark,
+} from "./renderer.ts";
 import type * as Territories from "./territory-layer.ts";
 import type { TerritoryLayer } from "./territory-layer.ts";
 import { UnitLayer } from "./unit-layer.ts";
@@ -368,8 +375,16 @@ export class MapView implements Renderer {
     return this.effects?.alive(this.clock()) ?? false;
   }
 
-  setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean {
+  setFallout(zones: readonly FalloutZone[]): boolean {
     return this.territory.setFallout(zones);
+  }
+
+  missileStruck(end: MissileEnd): void {
+    this.effects?.missileStruck(end.x, end.y, end.heavy, this.clock());
+  }
+
+  missileIntercepted(end: MissileEnd): void {
+    this.effects?.missileIntercepted(end.x, end.y, end.heavy, end.site, this.clock());
   }
 
   setStructures(structures: readonly StructureMark[]): void {

@@ -4,7 +4,13 @@ import type { CameraView } from "./camera.ts";
 import { GlobeMarkers } from "./globe-markers.ts";
 import { GLOBE_FOV, globePose, globeRays } from "./globe-projection.ts";
 import { SHIP_SIZES, shipScale } from "./map-view.ts";
-import type { Renderer, RendererOptions, StructureMark, UnitMark } from "./renderer.ts";
+import type {
+  FalloutZone,
+  Renderer,
+  RendererOptions,
+  StructureMark,
+  UnitMark,
+} from "./renderer.ts";
 import { TerritoryLayer } from "./territory-layer.ts";
 
 /** Same limits as the flat map's (map-view.ts). */
@@ -161,7 +167,7 @@ export class GlobeView implements Renderer {
     this.heavyMissiles.count = heavy;
   }
 
-  setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean {
+  setFallout(zones: readonly FalloutZone[]): boolean {
     return this.territory.setFallout(zones);
   }
 

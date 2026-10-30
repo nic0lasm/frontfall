@@ -33,6 +33,35 @@ export interface UnitMark {
   readonly state?: "docking" | "landing" | "sinking";
   /** How far along that state the ship is, from 0 to 1. */
   readonly progress?: number;
+  /** A missile in flight: where it was launched from and where it is aimed, in tiles. */
+  readonly from?: { readonly x: number; readonly y: number };
+  readonly to?: { readonly x: number; readonly y: number };
+  /** How far along its flight a missile is, 0 at launch and 1 on arrival. */
+  readonly flown?: number;
+}
+
+/** How a missile ended, on the map: where, with what, and for whom. Tiles, y counted from the north. */
+export interface MissileEnd {
+  readonly x: number;
+  readonly y: number;
+  readonly heavy: boolean;
+  /** The colour of the player who launched it. */
+  readonly color: string;
+  readonly from: { readonly x: number; readonly y: number };
+  readonly to: { readonly x: number; readonly y: number };
+  /** The air defense that stopped it, when one did. */
+  readonly site?: { readonly x: number; readonly y: number };
+}
+
+/** A disc of land under fallout (R-UNIT-06), in tiles, with how long it lasts. */
+export interface FalloutZone {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  readonly heavy: boolean;
+  /** Seconds left as of the update, and the whole duration. */
+  readonly secondsLeft: number;
+  readonly seconds: number;
 }
 
 /** A structure to draw on its tile, y counted from the north. */
@@ -90,8 +119,12 @@ export interface Renderer {
   markAllChanged(): void;
   /** Transport and trade ships at sea, replacing the previous ones. */
   setShips(ships: readonly UnitMark[]): void;
-  /** Discs of land under fallout (R-UNIT-06), in tiles, replacing the previous ones; whether they changed. */
-  setFallout(zones: readonly { x: number; y: number; radius: number }[]): boolean;
+  /** Discs of land under fallout (R-UNIT-06), replacing the previous ones; whether the ground changed. */
+  setFallout(zones: readonly FalloutZone[]): boolean;
+  /** A missile was stopped in the air; a renderer without effects leaves it out. */
+  missileIntercepted?(end: MissileEnd): void;
+  /** A missile came down on its target; a renderer without effects leaves it out. */
+  missileStruck?(end: MissileEnd): void;
   /** A front gave way around `tile` (R-ATTACK-10); a renderer without effects leaves it out. */
   collapsed?(tile: number): void;
   /** A capital fell or was razed on `tile` (R-CAP-03, R-CAP-04); a renderer without effects leaves it out. */

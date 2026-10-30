@@ -53,9 +53,31 @@ describe("EffectTracker", () => {
     expect(particles[0]?.life).toBeGreaterThan(2);
     particles.length = 0;
     t.ships([], 0.3);
+    // Vanishing is not landing: the end of the missile arrives apart.
+    expect(particles).toEqual([]);
+    t.struck(14, 25, false, 0.3);
     // A flash, a shock ring and seven sparks.
     expect(particles).toHaveLength(9);
     expect(particles.filter((p) => p.shape === "ring")).toHaveLength(1);
+  });
+
+  it("bursts a missile stopped in the air apart from a strike, and rings the air defense", () => {
+    const { tracker: t, particles } = tracker();
+    t.intercepted(14, 25, false, { x: 18, y: 25 }, 0.3);
+    // A burst, a ring and five sparks, and the ring on the site.
+    expect(particles).toHaveLength(8);
+    expect(particles.filter((p) => p.shape === "ring")).toHaveLength(2);
+    const strike = tracker();
+    strike.tracker.struck(14, 25, false, 0.3);
+    // The first particle of each is its burst.
+    expect(particles[0]?.size1).toBeLessThan(strike.particles[0]?.size1 as number);
+  });
+
+  it("holds a strike or a stop to a single fading disc when motion is refused", () => {
+    const still = tracker(false);
+    still.tracker.struck(14, 25, true, 0);
+    still.tracker.intercepted(14, 25, true, undefined, 0);
+    expect(still.particles.map((p) => p.shape)).toEqual(["dot", "dot"]);
   });
 
   it("spaces a trail by distance, not by frames", () => {
@@ -84,6 +106,9 @@ describe("EffectTracker", () => {
     expect(particles).toHaveLength(2);
     particles.length = 0;
     t.ships([], 0.2);
+    // Only the transport's landing: the missile's end arrives apart.
+    expect(particles).toHaveLength(1);
+    t.struck(14, 25, false, 0.2);
     expect(particles).toHaveLength(2);
     for (const particle of particles) {
       expect(particle.shape).toBe("dot");

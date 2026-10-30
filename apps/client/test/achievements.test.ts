@@ -68,6 +68,7 @@ function update(changes: Partial<GameUpdate> & { tiles?: number } = {}): GameUpd
     warships: [],
     missiles: [],
     fallout: [],
+    missileEvents: [],
     structures: [],
     diplomacy: {
       allies: [],
@@ -145,7 +146,19 @@ describe("AchievementTracker", () => {
         tiles: 500,
         boats: [{ id: 1, player: 1, tile: 0, troops: 5 }],
         warships: [{ id: 1, player: 1, tile: 0, health: 3 }],
-        missiles: [{ id: 1, player: 1, heavy: false, tile: 0, to: 0, target: 2 }],
+        missiles: [
+          {
+            id: 1,
+            player: 1,
+            heavy: false,
+            tile: 0,
+            from: 0,
+            to: 0,
+            target: 2,
+            launchedAt: 0,
+            arrivesAt: 1,
+          },
+        ],
       }),
     );
     expect(fresh.sort()).toEqual(["admiral", "halfWorld", "missile", "setSail"]);
@@ -157,7 +170,19 @@ describe("AchievementTracker", () => {
       tracker.ids(
         update({
           boats: [{ id: 1, player: 2, tile: 0, troops: 5 }],
-          missiles: [{ id: 1, player: 3, heavy: true, tile: 0, to: 0, target: 1 }],
+          missiles: [
+            {
+              id: 1,
+              player: 3,
+              heavy: true,
+              tile: 0,
+              from: 0,
+              to: 0,
+              target: 1,
+              launchedAt: 0,
+              arrivesAt: 1,
+            },
+          ],
         }),
       ),
     ).toEqual([]);
@@ -187,7 +212,21 @@ describe("AchievementTracker", () => {
   it("does not call a slow win quick, nor a win after a missile clean", () => {
     const tracker = new Tracker(GAME);
     tracker.ids(
-      update({ missiles: [{ id: 1, player: 1, heavy: false, tile: 0, to: 0, target: 2 }] }),
+      update({
+        missiles: [
+          {
+            id: 1,
+            player: 1,
+            heavy: false,
+            tile: 0,
+            from: 0,
+            to: 0,
+            target: 2,
+            launchedAt: 0,
+            arrivesAt: 1,
+          },
+        ],
+      }),
     );
     const fresh = tracker.ids(update({ winner: 1, tick: 20 * 60 * 10 + 1 }));
     expect(fresh).toEqual([]);

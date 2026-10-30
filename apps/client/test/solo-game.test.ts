@@ -240,6 +240,12 @@ describe("SoloGame clicks", () => {
     while (update.missiles.length > 0) update = solo.step([]);
     expect(update.fallout).toHaveLength(1);
     expect(update.fallout[0]?.tile).toBe(target);
+    expect(update.fallout[0]).toMatchObject({
+      heavy: true,
+      duration: solo.game.balance.falloutTicks,
+    });
+    expect(update.fallout[0]?.ticksLeft).toBeGreaterThan(solo.game.balance.falloutTicks - 3);
+    expect(update.missileEvents).toMatchObject([{ type: "struck", heavy: true, tile: target }]);
     expect(territory.ownerOf(target)).toBe(0);
   });
 

@@ -103,7 +103,10 @@ const sea = {
   boats: [{ id: 1, player: 2, tile: 12 }],
   tradeShips: [{ id: 1, player: 3, tile: 20 }],
   warships: [],
-  missiles: [{ id: 1, player: 2, tile: 5, heavy: true }],
+  tick: 11,
+  missiles: [
+    { id: 1, player: 2, tile: 5, heavy: true, from: 0, to: 9, launchedAt: 8, arrivesAt: 14 },
+  ],
 } as unknown as GameUpdate;
 
 describe("ship motion", () => {
@@ -128,8 +131,8 @@ describe("ship motion", () => {
 
   it("glides each ship from its last tile, the short way across the seam", () => {
     const motion = new ShipMotion();
-    motion.tick({ ...sea, tick: 1, boats: [{ id: 1, player: 2, tile: 19 }] } as never, map, 10, 0);
-    motion.tick({ ...sea, tick: 2 }, map, 10, 100);
+    motion.tick({ ...sea, tick: 10, boats: [{ id: 1, player: 2, tile: 19 }] } as never, map, 10, 0);
+    motion.tick({ ...sea, tick: 11 }, map, 10, 100);
     const marks = motion.marks(0.5, 100, color);
     // From x 9 to x 2 on a map 10 wide: east across the seam, not 7 tiles west.
     expect(marks[0]).toMatchObject({ id: 1, x: 10.5, y: 1, color: "c2" });
@@ -140,6 +143,10 @@ describe("ship motion", () => {
       y: 0,
       color: MISSILE_COLOR,
       kind: "heavyMissile",
+      from: { x: 0, y: 0 },
+      to: { x: 9, y: 0 },
+      // 2.5 of its 6 ticks of flight, half way through the tick just played.
+      flown: 2.5 / 6,
     });
   });
 

@@ -162,6 +162,7 @@ export {
   missileTile,
   type Fallout,
   type Missile,
+  type MissileEvent,
 } from "./missiles.ts";
 export { Terrain, TileKind } from "./terrain.ts";
 export { installTrade, type TradeShip } from "./trade.ts";

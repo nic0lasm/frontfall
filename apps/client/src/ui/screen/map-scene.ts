@@ -11,6 +11,7 @@ import {
   fitsGlobe,
   FRONT_SECONDS,
   globeLoaded,
+  type MissileEnd,
   type Renderer,
   type StructureMark,
   type ViewKind,
@@ -382,6 +383,7 @@ export class MapScene {
     this.lightHovered();
     this.placeStructures(update);
     this.placeFallout(update);
+    this.placeMissileEnds(update);
     this.placeAllies(update);
     this.latest = update;
   }
@@ -530,16 +532,43 @@ export class MapScene {
   }
 
   private placeFallout(update: GameUpdate): void {
-    if (!this.view) return;
+    if (!this.view || !this.shown) return;
     const { width } = this.mapSize;
+    const { ticksPerSecond } = this.shown;
     const changed = this.view.setFallout(
-      update.fallout.map(({ tile, radius }) => ({
+      update.fallout.map(({ tile, radius, heavy, ticksLeft, duration }) => ({
         x: tile % width,
         y: Math.floor(tile / width),
         radius,
+        heavy,
+        secondsLeft: ticksLeft / ticksPerSecond,
+        seconds: duration / ticksPerSecond,
       })),
     );
     this.dirty ||= changed;
+  }
+
+  /** Missiles that were stopped in the air or came down since the last update: each starts its own effect. */
+  private placeMissileEnds(update: GameUpdate): void {
+    const view = this.view;
+    if (!view || !this.shown) return;
+    const { width } = this.mapSize;
+    const { firstNation, teams } = this.shown;
+    const at = (tile: number) => ({ x: tile % width, y: Math.floor(tile / width) });
+    for (const event of update.missileEvents) {
+      if (event.type === "spared") continue;
+      const end: MissileEnd = {
+        ...at(event.tile),
+        heavy: event.heavy,
+        color: colorOf(event.player, firstNation, teams),
+        from: at(event.from),
+        to: at(event.to),
+        ...(event.site === undefined ? {} : { site: at(event.site) }),
+      };
+      if (event.type === "struck") view.missileStruck?.(end);
+      else view.missileIntercepted?.(end);
+      this.dirty = true;
+    }
   }
 
   private placeAllies(update: GameUpdate): void {

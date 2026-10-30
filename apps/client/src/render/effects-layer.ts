@@ -204,6 +204,22 @@ export class EffectsLayer {
     this.tracker.fronts(tiles, this.options.map.owners, now);
   }
 
+  /** A missile came down at a point of the map: a flash, a shock ring and sparks. */
+  missileStruck(x: number, y: number, heavy: boolean, now: number): void {
+    this.tracker.struck(x, y, heavy, now);
+  }
+
+  /** A missile was stopped in the air: a cool burst there, and a ring on the air defense. */
+  missileIntercepted(
+    x: number,
+    y: number,
+    heavy: boolean,
+    site: { x: number; y: number } | undefined,
+    now: number,
+  ): void {
+    this.tracker.intercepted(x, y, heavy, site, now);
+  }
+
   /** A front gave way around `tile` (R-ATTACK-10): an ember shock ring and sparks. */
   collapsed(tile: number, now: number): void {
     this.tracker.collapsed(tile, now);

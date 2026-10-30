@@ -54,8 +54,8 @@ export class CueWatcher {
   /** Attacks of the player's under way, by id, with the player's land when each was first seen. */
   private readonly attacks = new Map<number, number>();
   private readonly structures = new Set<number>();
-  /** Missiles in flight, by id, with the tile they fly to. */
-  private readonly missiles = new Map<number, { player: number; to: number }>();
+  /** Missiles in flight, by id, to tell a launch from one already heard. */
+  private readonly missiles = new Set<number>();
   private readonly allies = new Set<number>();
   private readonly requests = new Set<number>();
   private tiles = 0;
@@ -109,13 +109,13 @@ export class CueWatcher {
     for (const missile of update.missiles) {
       flying.add(missile.id);
       if (this.missiles.has(missile.id)) continue;
-      this.missiles.set(missile.id, { player: missile.player, to: missile.target });
+      this.missiles.add(missile.id);
       if (missile.player === update.you) add("missile", true, missile.tile);
     }
-    for (const [id, missile] of this.missiles) {
-      if (flying.has(id)) continue;
-      this.missiles.delete(id);
-      add("impact", missile.player === update.you, missile.to);
+    for (const id of this.missiles) if (!flying.has(id)) this.missiles.delete(id);
+    // Only a missile that came down is heard to land: one stopped in the air is not.
+    for (const event of update.missileEvents) {
+      if (event.type === "struck") add("impact", event.player === update.you, event.tile);
     }
 
     const allied = new Set(update.diplomacy.allies.map((ally) => ally.id));

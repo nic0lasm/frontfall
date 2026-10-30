@@ -6,6 +6,7 @@ import type { Order, Player } from "../src/game.ts";
 import {
   MissileError,
   MissileSize,
+  airDefenseRadius,
   blastRadius,
   missileTile,
   type Missile,
@@ -204,6 +205,43 @@ describe("missiles (R-UNIT-05)", () => {
     expect(ada.gold).toBe(paid + balance.missileCost);
   });
 
+  it("tell interfaces how each one ended, with where it came from and where it went", () => {
+    const { game, grid, silo, step } = newGame();
+    const target = grid.index(50, 10);
+    game.missileEvents.length = 0;
+    step([{ player: 1, order: launch(target) }]);
+    const id = (game.missiles[0] as Missile).id;
+    expect(game.missileEvents).toEqual([]);
+    while (game.missiles.length > 0) step();
+    expect(game.missileEvents).toEqual([
+      {
+        tick: game.tick - 1,
+        type: "struck",
+        id,
+        player: 1,
+        size: MissileSize.Light,
+        from: silo,
+        to: target,
+        tile: target,
+        by: NEUTRAL,
+      },
+    ]);
+  });
+
+  it("tell a missile called off to spare an ally apart from one that struck", () => {
+    const { game, grid, step } = newGame();
+    const target = grid.index(50, 10);
+    step([{ player: 1, order: launch(target) }]);
+    game.territory.setOwner(grid.index(52, 10), 3);
+    step([
+      { player: 1, order: { type: "ally", target: 3 } },
+      { player: 3, order: { type: "ally", target: 1 } },
+    ]);
+    game.missileEvents.length = 0;
+    while (game.missiles.length > 0) step();
+    expect(game.missileEvents.map((e) => e.type)).toEqual(["spared"]);
+  });
+
   it("take the short way across the east-west seam", () => {
     const { game, grid, ada, step, build } = newGame({}, true);
     // A silo near the west edge, a target near the east edge: 6 tiles apart the short way.
@@ -303,6 +341,33 @@ describe("air defense (R-BUILD-05)", () => {
     step([{ player: 1, order: launch(target) }]);
     while (game.missiles.length > 0) step();
     expect(game.territory.ownerOf(target)).toBe(NEUTRAL);
+  });
+
+  it("reports a missile it stopped where it was in the air, not as a strike", () => {
+    const { game, grid, silo, step } = defended(100);
+    const target = grid.index(52, 12);
+    const defense = game.structures.find((s) => s.kind === StructureKind.AirDefense);
+    game.missileEvents.length = 0;
+    step([{ player: 1, order: launch(target) }]);
+    const id = (game.missiles[0] as Missile).id;
+    while (game.missiles.length > 0) step();
+    expect(game.missileEvents).toHaveLength(1);
+    const [event] = game.missileEvents;
+    expect(event).toMatchObject({
+      type: "intercepted",
+      id,
+      player: 1,
+      from: silo,
+      to: target,
+      by: 2,
+      site: defense?.tile,
+    });
+    // Short of the target: the stop is in the air, not at the foot of the blast.
+    expect(event?.tile).not.toBe(target);
+    expect(
+      grid.squaredDistance(event?.tile as number, defense?.tile as number),
+    ).toBeLessThanOrEqual(airDefenseRadius(game) * airDefenseRadius(game));
+    expect(game.missileEvents.some((e) => e.type === "struck")).toBe(false);
   });
 
   it("never stops a missile at 0 %, nor one of its owner or an ally", () => {

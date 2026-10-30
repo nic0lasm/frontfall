@@ -1,5 +1,6 @@
 import {
   MissileSize,
+  blastRadius,
   StructureKind,
   allianceOf,
   alliesOf,
@@ -165,10 +166,35 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       player: missile.player,
       heavy: missile.size === MissileSize.Heavy,
       tile: missileTile(game, missile, game.tick),
+      from: missile.from,
       to: missile.to,
       target: territory.ownerOf(missile.to),
+      launchedAt: missile.launchedAt,
+      arrivesAt: missile.arrivesAt,
     })),
-    fallout: game.fallout.map(({ tile, radius }) => ({ tile, radius })),
+    fallout: game.fallout.map(({ tile, radius, until }) => {
+      const heavy = radius === blastRadius(game, MissileSize.Heavy);
+      return {
+        tile,
+        radius,
+        heavy,
+        ticksLeft: Math.max(0, until - game.tick),
+        duration: heavy ? game.balance.falloutTicks : game.balance.lightFalloutTicks,
+      };
+    }),
+    missileEvents: game.missileEvents
+      .splice(0)
+      .map(({ type, id, player, size, from, to, tile, by, site }) => ({
+        type,
+        id,
+        player,
+        heavy: size === MissileSize.Heavy,
+        from,
+        to,
+        tile,
+        by,
+        ...(site === undefined ? {} : { site }),
+      })),
     structures: game.structures.map((structure) => ({
       id: structure.id,
       player: structure.player,

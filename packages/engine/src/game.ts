@@ -8,7 +8,7 @@ import type {
   Embargo,
   RequestCooldown,
 } from "./diplomacy.ts";
-import type { Fallout, Missile } from "./missiles.ts";
+import type { Fallout, Missile, MissileEvent } from "./missiles.ts";
 import { orderError } from "./orders.ts";
 import { Random } from "./random.ts";
 import type { SnapshotReader, SnapshotWriter } from "./snapshot-bytes.ts";
@@ -269,6 +269,11 @@ export class Game {
    * empty. No rule reads it back, so it is not part of the state hash.
    */
   readonly diplomacyEvents: DiplomacyEvent[] = [];
+  /**
+   * How each missile ended, oldest first, for interfaces to read and empty.
+   * No rule reads it back, so it is not part of the state hash.
+   */
+  readonly missileEvents: MissileEvent[] = [];
   /** Number of teams, 0 in a free-for-all (R-MODE-02). */
   readonly teams: number;
   /** `Disable` bits of what this game leaves out (R-MODE-03). */

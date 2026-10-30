@@ -47,6 +47,8 @@ interface Tracked {
   speed: number;
   /** It lands or docks on the next tick. */
   arriving: boolean;
+  /** A missile's route: its launch tile and aim, and the ticks it was launched and arrives at. */
+  flight?: { from: number; to: number; launchedAt: number; arrivesAt: number };
 }
 
 interface Ghost {
@@ -147,6 +149,11 @@ export class ShipMotion {
     for (const missile of update.missiles) {
       const kind = missile.heavy ? "heavyMissile" : "missile";
       see(MISSILE_IDS + missile.id, kind, missile.player, missile.tile, false);
+      const tracked = this.known.get(MISSILE_IDS + missile.id);
+      if (tracked) {
+        const { from, to, launchedAt, arrivesAt } = missile;
+        tracked.flight = { from, to, launchedAt, arrivesAt };
+      }
     }
     for (const [id, tracked] of this.known) {
       if (seen.has(id)) continue;
@@ -198,6 +205,7 @@ export class ShipMotion {
         ...(ship.kind === "transport" ? {} : { kind: ship.kind }),
         heading: ship.fromHeading + turn(ship.fromHeading, ship.toHeading) * progress,
         speed: ship.speed,
+        ...(ship.flight ? this.flight(ship.flight, progress) : {}),
       });
     }
     for (const ghost of this.ghosts) {
@@ -217,6 +225,20 @@ export class ShipMotion {
       });
     }
     return marks;
+  }
+
+  /** A missile's route, and how far along it is between the previous tick and the latest. */
+  private flight(
+    route: NonNullable<Tracked["flight"]>,
+    progress: number,
+  ): Pick<UnitMark, "from" | "to" | "flown"> {
+    const span = Math.max(1, route.arrivesAt - route.launchedAt);
+    const flown = (this.tickAt - 1 + progress - route.launchedAt) / span;
+    return {
+      from: { x: route.from % this.width, y: Math.floor(route.from / this.width) },
+      to: { x: route.to % this.width, y: Math.floor(route.to / this.width) },
+      flown: Math.min(1, Math.max(0, flown)),
+    };
   }
 
   /** Tiles from `from` to `to`, the short way across the seam of a wrapping map. */
