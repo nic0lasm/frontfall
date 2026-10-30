@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-30
+
+A new look and a livelier battlefield: the map as stained glass, ships, buildings and missiles drawn as real objects, volumetric explosions, fallout zones you can read, nations with a memory and a voice, and a server now in France.
+
 ### Added
 
 - **Nations with a memory and a voice.** Each nation now remembers what you do to it and tells you how it feels about you when you hover over it or open its menu: hostile, wary, neutral or friendly. Attacks, landings and missiles anger it, gifts, alliances and help against its enemies win it over, and time heals both. Nations talk with quick messages and emoji: they greet new neighbours, ask you to leave them alone, thank you for a gift, answer alliance requests with a thumbs up or down, and call on their allies to turn on the leader. They ask their friends and the neighbours of a runaway leader for alliances, heed your "Let's be allies" and "Help me!", attack whoever attacks their allies or send them troops, place an embargo on players they are hostile to, and never forgive a betrayal soon: the betrayed nation turns on the traitor at once. And they can betray too, at every level, rarely at easy: a nation eyes a much weaker ally on its border, grows wary of them in plain sight, gives a thumbs down, then says sorry and attacks. Grow, keep troops at home or stay in its good books, and it thinks twice.
@@ -522,7 +526,8 @@ The first playable beta: a solo game in the browser against bots on a map of the
 - The server trusts the `X-Client-IP` header only from a proxy on a private address, and accepts WebSocket connections without an `Origin` header, as sent by bots and tools.
 - A client that cannot read a turn asks for a reload instead of playing on out of step, and one that notices a gap in its turns rejoins to fetch the missing ones.
 
-[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/nic0lasm/frontfall/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/nic0lasm/frontfall/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/nic0lasm/frontfall/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nic0lasm/frontfall/compare/v0.7.0...v0.8.0
