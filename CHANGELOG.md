@@ -23,6 +23,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Fixed
 
+- **The privacy page says where the server is.** The game's server now runs at OVH in Gravelines, France, inside the European Union, instead of Canada; the privacy page, in English and in French, no longer mentions a transfer outside the Union.
+
 - **A missile stopped in the air no longer explodes on the ground.** When an air defense or a shield landmark stopped a missile, the game drew and played the same blast as for a strike, where the missile had been last seen. Now only a missile that comes down makes a blast, on its target; one that is stopped bursts in the air with a short, cooler flash and a ring on the air defense, and makes no impact sound.
 - **The menu shows sooner.** The page used to draw the pictures of the three quick maps before showing anything, which kept it blank for a fraction of a second on a laptop and longer on a phone; they now appear a moment after the menu. The page also starts downloading its language texts, the map list and its font together with its code instead of one after the other.
 - **One click is enough on the troop and worker sliders.** A press anywhere on the track now sets the value there, with a mouse or a finger, and keeps following while you drag: the middle reads 50 % without catching the handle, and a press no longer has to be repeated. The keyboard works as before.
