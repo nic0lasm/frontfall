@@ -11,6 +11,7 @@ export type Difficulty = "easy" | "normal" | "hard";
 /** What a click on the map does: attack by default, or build or demolish once picked in the HUD. */
 export type ClickMode =
   | "attack"
+  | "boat"
   | "city"
   | "palace"
   | "fort"

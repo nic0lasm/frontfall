@@ -23,6 +23,8 @@ export interface DiplomacyActions {
   onBetray(player: number): void;
   /** Starts (`on` true) or lifts an embargo on the player's trade (R-DIPLO-05). */
   onEmbargo(player: number, on: boolean): void;
+  /** Lands the attack ratio's share of the soldiers by boat on the tile, border or not (R-ATTACK-09). */
+  onLand(tile: number): void;
   /** Sends the player the attack ratio's share of the troops or of the gold (R-DIPLO-06). */
   onGift(player: number, what: "troops" | "gold"): void;
   /** The attack ratio, in percent: the share a gift sends. */
@@ -59,6 +61,8 @@ export class DiplomacyPanel {
     hidden: true,
   });
   private picked: number | undefined;
+  /** The tile a long press opened the menu on, which the boat button lands at. */
+  private pickedTile: number | undefined;
   /** The player menu asks once more before a betrayal. */
   private confirming = false;
   /** The player menu shows its quick messages. */
@@ -112,16 +116,17 @@ export class DiplomacyPanel {
   }
 
   /** Opens the menu of a player other than the one at this screen; focus goes to its first button. */
-  pick(player: number): void {
+  pick(player: number, tile?: number): void {
     const update = this.last;
     if (!update || player === update.you || player === 0) return;
     if (!update.players.some((p) => p.id === player && p.alive)) return;
     // A long press can also raise the browser's menu event: the same pick twice keeps its state.
-    if (this.picked === player) return;
+    if (this.picked === player && this.pickedTile === tile) return;
     if (this.picked === undefined && document.activeElement instanceof HTMLElement) {
       this.opener = document.activeElement;
     }
     this.picked = player;
+    this.pickedTile = tile;
     this.confirming = false;
     this.messaging = false;
     this.reporting = false;
@@ -136,6 +141,7 @@ export class DiplomacyPanel {
   close(): void {
     const inside = this.menu.contains(document.activeElement);
     this.picked = undefined;
+    this.pickedTile = undefined;
     this.confirming = false;
     this.messaging = false;
     this.reporting = false;
@@ -267,6 +273,20 @@ export class DiplomacyPanel {
         },
         enabled: playing && (asked || (!pending && !waiting)),
         className: "ask",
+      });
+    }
+
+    // A tile picked on their land: the boat lands there even along a shared border.
+    const landing = this.pickedTile;
+    if (landing !== undefined && !ally && !teammate) {
+      buttons.push({
+        key: "diplo.land",
+        action: () => {
+          this.actions.onLand(landing);
+          this.close();
+        },
+        enabled: playing,
+        className: "land",
       });
     }
 

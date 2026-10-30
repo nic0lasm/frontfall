@@ -143,6 +143,8 @@ export class GameScreen {
   private readonly pacer: TurnPacer;
   /** What a click on the map does, picked in the HUD. */
   private mode: ClickMode = "attack";
+  /** Shift was down when the last press began on the map. */
+  private shiftDown = false;
   /** Mode of each click the worker has not answered yet, oldest first: it answers each one, in order. */
   private readonly clicksInFlight: ClickMode[] = [];
   private readonly diplomacy: DiplomacyPanel;
@@ -238,6 +240,9 @@ export class GameScreen {
       onGift: (player, what) => {
         this.orders.gift(player, what);
       },
+      onLand: (tile) => {
+        this.land(tile);
+      },
       share: () => this.hud.ratio,
       onQuick: (player, phrase) => {
         this.orders.quick(player, phrase);
@@ -293,6 +298,14 @@ export class GameScreen {
     });
 
     this.input = this.createInput();
+    // Capture phase: the press is read before the input controller turns it into a click.
+    this.surface.addEventListener(
+      "pointerdown",
+      (event) => {
+        this.shiftDown = event.shiftKey;
+      },
+      true,
+    );
     if (options.record) {
       this.element.classList.add("watching");
       if (!replayBarClass) throw new Error("loadReplayBar() must complete before a replay starts");
@@ -386,7 +399,9 @@ export class GameScreen {
           // A refused build names what was refused: the oldest click in flight is the one answered.
           const sent = this.clicksInFlight[0];
           const action =
-            sent !== undefined && sent !== "attack" ? t(`hud.${sent}` as MessageKey) : undefined;
+            sent !== undefined && sent !== "attack" && sent !== "boat"
+              ? t(`hud.${sent}` as MessageKey)
+              : undefined;
           this.marks.show(tile, outcome, performance.now(), link !== undefined, action, note);
           this.afterClick(outcome);
         },
@@ -597,7 +612,7 @@ export class GameScreen {
         if (landmark && this.feed) {
           const at = this.scene.camera.tileToScreen(landmark.tile);
           this.feed.pinLandmark(landmark, at.x, at.y);
-        } else if (!this.replayBar) this.diplomacy.pick(this.scene.ownerAt(tile));
+        } else if (!this.replayBar) this.diplomacy.pick(this.scene.ownerAt(tile), tile);
       },
       onSecondary: () => {
         if (this.mode === "attack" || this.replayBar) return false;
@@ -718,15 +733,25 @@ export class GameScreen {
   }
 
   private commit(tile: number, finger: boolean): void {
+    // Shift-click attacks by boat, even from a shared border; only in attack mode.
+    const mode = this.shiftDown && this.mode === "attack" ? "boat" : this.mode;
     const reach = aimReach(this.scene.camera.scale, finger);
-    if (!this.orders.click(tile, this.mode, reach, this.scene.ownerAt(tile))) {
+    if (!this.orders.click(tile, mode, reach, this.scene.ownerAt(tile))) {
       this.marks.unpress(performance.now());
       return;
     }
     this.marks.clicked(tile, performance.now());
     // A build mode stays on until a structure goes up (afterClick): a click
     // made while the worker answers the one before is still a build click.
-    this.clicksInFlight.push(this.mode);
+    this.clicksInFlight.push(mode);
+  }
+
+  /** The player menu's boat button: the attack lands at the tile it was opened on. */
+  private land(tile: number): void {
+    const reach = aimReach(this.scene.camera.scale, true);
+    if (!this.orders.click(tile, "boat", reach, this.scene.ownerAt(tile))) return;
+    this.marks.clicked(tile, performance.now());
+    this.clicksInFlight.push("boat");
   }
 
   /** One structure per pick of the button: once a build click goes through, clicks attack again. */
