@@ -33,7 +33,10 @@ function newGame(disabled = 0) {
       spawnPhaseTicks: 0,
       buildTicks: 1,
       goldPerThousandTroops: 0,
-      growthBasisPoints: 0,
+      // Nothing grows and nobody deserts: troops stay where the tests put them.
+      growthBase: 0,
+      growthDivisor: Number.MAX_SAFE_INTEGER,
+      desertionBasisPoints: 0,
     },
     disabled,
   });
@@ -68,9 +71,8 @@ describe("gifts (R-DIPLO-06)", () => {
   it("move troops and gold to another player at once, and every player is told", () => {
     const { game, ada, bea, step } = newGame();
     expect(step([{ player: 1, order: gift(2, 4000, 250_000) }])).toBe(1);
-    // Plus the troop each grows a tick, far below its cap.
-    expect(ada.troops).toBe(6001);
-    expect(bea.troops).toBe(14_001);
+    expect(ada.troops).toBe(6000);
+    expect(bea.troops).toBe(14_000);
     expect(ada.gold).toBe(750_000);
     expect(bea.gold).toBe(1_250_000);
     expect(game.diplomacyEvents).toContainEqual({ tick: 0, type: "gift", a: 1, b: 2 });
@@ -82,7 +84,7 @@ describe("gifts (R-DIPLO-06)", () => {
     ada.troops = room + 5000;
     step([{ player: 1, order: gift(2, room + 5000, 0) }]);
     expect(bea.troops).toBe(populationCap(game, bea));
-    expect(ada.troops).toBe(5001);
+    expect(ada.troops).toBe(5000);
     expect(orderError(game, ada, gift(2, 100, 0))).toBe(GiftError.Full);
     // Gold still goes through.
     expect(orderError(game, ada, gift(2, 100, 1))).toBeUndefined();

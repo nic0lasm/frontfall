@@ -10,11 +10,13 @@ import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const grid = new WorldGrid(40, 20, { wrapsX: false });
 const terrain = new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains));
 const balance: Balance = {
   ...DEFAULT_BALANCE,
+  ...WHOLE_PRICES,
   spawnPhaseTicks: 2,
   spawnDistance: 5,
   spawnRadius: 2,
@@ -199,7 +201,8 @@ describe("computer players in capital mode (R-BOT-17)", () => {
         { id: 1, name: "Bot" },
         { id: 2, name: "Nation", start: BEA },
       ],
-      balance: { ...balance, capitalAlert: 40, winSharePercent: 100 },
+      // No encirclement: the nation, quick to fill the free land, would close a pocket round the bot.
+      balance: { ...balance, capitalAlert: 40, winSharePercent: 100, encircleMaxTiles: 1 },
       rules: { capitals: true },
     });
     installBots(game, [1], "normal");
@@ -210,14 +213,17 @@ describe("computer players in capital mode (R-BOT-17)", () => {
 
   it("aims a nation's attacks on a player at that player's capital, and takes it", () => {
     const game = duel();
+    // Such an attack may sweep the bot away within the tick it starts: its order tells where it aimed.
     let aimed = false;
+    game.onApplied((_, by, order) => {
+      aimed ||= by.id === 2 && order.type === "attack" && order.target === ADA;
+    });
     for (let t = 0; t < 3000 && game.winner === undefined; t++) {
       run(game);
       if (game.phase === "play" && t > 50) {
         const nation = player(game, 2);
         nation.troops = Math.max(nation.troops, 50_000);
       }
-      aimed ||= game.attacks.some((a) => a.player === 2 && a.target === 1 && a.aim === ADA);
     }
     expect(aimed).toBe(true);
     expect(game.winner).toBe(2);

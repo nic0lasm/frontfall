@@ -1,3 +1,4 @@
+import { cheapestTile } from "../attacks.ts";
 import { capitalAim, capitalAlertDistance, capitalThreat, capitalsStand } from "../capitals.ts";
 import { allyError, alliesOf, embargoError, isAllied, isTraitor } from "../diplomacy.ts";
 import { populationCap, soldiers } from "../economy.ts";
@@ -143,7 +144,6 @@ export function installNations(
   const retryTicks = RETRY_DECISIONS * interval;
   const graceTicks = graceSeconds * balance.ticksPerSecond;
   const pileTicks = NATION_PILE_SECONDS * balance.ticksPerSecond;
-  const reservePercent = nationParams.reservePercent;
   const topology = game.terrain.topology;
   // R-BOT-16: soldiers' reach along each neighbour's front, reused every decision.
   const facing = new Map<number, number>();
@@ -152,6 +152,9 @@ export function installNations(
   const nationSet = new Set(nations);
   for (const id of nations) {
     if (!game.player(id)) throw new RangeError(`unknown player ${String(id)}`);
+  }
+  for (const id of nations) {
+    game.popFactors.set(id, { cap: nationParams.capPercent, growth: nationParams.growthPercent });
   }
   const seaCooldowns: Cooldowns = new Map();
   const cityCooldowns: Cooldowns = new Map();
@@ -258,15 +261,19 @@ export function installNations(
         ? NATION_WORK_PERCENT
         : 0,
     );
-    const reserve = percentOf(cap, reservePercent);
+    // R-BOT-26: each nation has its own thresholds, drawn from its number.
+    const own = nationRatios(nation.id);
+    const reserve = percentOf(cap, own.reserve);
     // R-ECO-07: only soldiers leave; workers count towards the reserve at home.
-    const sendable = (): number =>
-      Math.min(
-        percentOf(soldiers(nation), nationParams.attackRatioPercent),
-        nation.troops - reserve,
-        soldiers(nation),
-      );
+    // Against a player, a nation sends what lies above its reserve.
+    const sendable = (): number => Math.max(0, Math.min(nation.troops - reserve, soldiers(nation)));
+    // Into free land, what lies above the smaller reserve of an expanding nation.
+    const expanding = (): number =>
+      Math.max(0, Math.min(nation.troops - percentOf(cap, own.expand), soldiers(nation)));
     const troops = sendable();
+    const freeTroops = expanding();
+    // R-BOT-26: a player is attacked only from the trigger share of the cap, but one time in ten whatever the army.
+    const triggered = nation.troops * 100 >= cap * own.trigger || game.random.nextInt(0, 10) === 0;
     // R-BOT-15: everyone back under arms before turning on a player.
     const armed = (): number => {
       work(nation, 0);
@@ -280,13 +287,13 @@ export function installNations(
       if (besieger !== NEUTRAL && nation.capital !== undefined) buildFort(nation, nation.capital);
       buildFort(nation, front);
       if (nation.troops * 100 <= cap * nationParams.holdPercent) return;
-      if (troops >= balance.neutralCost) {
+      if (troops >= cheapestTile(balance)) {
         game.apply(nation.id, { type: "attack", target: capitalAim(game, front), troops });
       }
       return;
     }
     // Less than the price of one tile would come straight back.
-    if (troops < balance.neutralCost) return;
+    if (Math.max(troops, freeTroops) < cheapestTile(balance)) return;
     // R-BOT-16: a front about to give way gets everything the nation can send.
     if (game.rules.collapsingFronts && press(nation, armed)) return;
 
@@ -296,7 +303,7 @@ export function installNations(
     const open: OwnerFilter | undefined =
       enemies.size === 0 ? undefined : (owner) => enemies.has(owner);
     // Its workers come back at once when it fights: its strength is all of its troops.
-    const ownDensity = divFloor(nation.troops, tiles);
+    const ownDensity = nation.troops;
     // R-BOT-22: a traitor first, at any time, then a player it is hostile to once settled.
     if (revenge(nation, ownDensity, full, settling, armed, open)) return;
     // R-BOT-24: an ally under attack next.
@@ -314,11 +321,15 @@ export function installNations(
     // R-BOT-17: an enemy capital within reach of its border is worth more than any other target.
     if (!settling && strikeCapital(nation, ownDensity, armed, accept)) return;
     const { neutral, enemy, enemyDensity } = scanBorder(game, nation, accept);
-    const odds = full ? params.boldnessPercent : nationParams.oddsPercent;
-    const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * odds;
-    // Free land is cheaper than a fight, unless the neighbour is much weaker.
-    const muchWeaker = weak && enemyDensity * 200 <= ownDensity * odds;
-    const target = neutral >= 0 && !muchWeaker ? neutral : weak ? enemy : -1;
+    const odds = nationParams.oddsPercent;
+    // R-BOT-26: easier nations let a human player be more often than they let each other be.
+    const goes =
+      enemy < 0 ||
+      nationSet.has(territory.ownerOf(enemy)) ||
+      game.random.nextInt(0, 100) < nationParams.humanPercent;
+    const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * odds && triggered && goes;
+    // R-BOT-26: free land comes first.
+    const target = neutral >= 0 ? neutral : weak ? enemy : -1;
     // R-BOT-18: scraps of a neighbour make no front; a larger prize may lie overseas.
     const scraps =
       enemy >= 0 &&
@@ -326,10 +337,10 @@ export function installNations(
       territory.tileCount(territory.ownerOf(enemy)) * 100 < tiles * NATION_SCRAPS_PERCENT;
     if (scraps && sail(game, nation, armed(), odds, seaCooldowns, retryTicks, accept)) return;
     if (target >= 0) {
-      const sent = target === enemy ? armed() : troops;
+      const sent = target === enemy ? armed() : freeTroops;
       const aim = target >= 0 && target === enemy ? capitalAim(game, target) : target;
       game.apply(nation.id, { type: "attack", target: aim, troops: sent });
-    } else sail(game, nation, troops, odds, seaCooldowns, retryTicks, accept);
+    } else if (triggered) sail(game, nation, troops, odds, seaCooldowns, retryTicks, accept);
   }
 
   /**
@@ -576,7 +587,7 @@ export function installNations(
         percentOf(soldiers(nation), NATION_GIFT_PERCENT),
         nation.troops - reserve,
       );
-      if (troops < balance.neutralCost) continue;
+      if (troops < cheapestTile(balance)) continue;
       if (giftError(game, nation, ally, troops, 0) !== undefined) continue;
       game.apply(nation.id, { type: "gift", target: ally, troops, gold: 0 });
       memory.lastGift.set(nation.id, game.tick + giftPauseTicks);
@@ -659,7 +670,7 @@ export function installNations(
         : scanBorder(game, nation, (owner) => owner === target).enemy;
     if (aim < 0) return false;
     const troops = armed();
-    if (troops < balance.neutralCost) return false;
+    if (troops < cheapestTile(balance)) return false;
     return game.apply(nation.id, { type: "attack", target: aim, troops });
   }
 
@@ -904,6 +915,19 @@ export function installNations(
     }
     if (best >= 0) game.apply(nation.id, { type: "build", structure: kind, tile: best });
   }
+}
+
+/**
+ * R-BOT-26: the shares of its population cap a nation acts on, each drawn
+ * from its number: it attacks a player from `trigger` of the cap and sends
+ * what lies above `reserve`; into free land it keeps only `expand`.
+ */
+function nationRatios(id: number): { trigger: number; reserve: number; expand: number } {
+  return {
+    trigger: 50 + ((id * 7919) % 11),
+    reserve: 30 + ((id * 104_729) % 11),
+    expand: 10 + ((id * 1_299_709) % 11),
+  };
 }
 
 /** Spreads a nation's looks at its neighbours over B-NATION-COURT. */

@@ -92,9 +92,11 @@ export function cityShare(game: Game, player: number): number {
 }
 
 /**
- * Gold the next structure of a kind costs a player: its base cost, times
- * B-COST-GROWTH for each one of that kind they already own (R-BUILD). Cities
- * and palaces grow together, a palace counting as two cities and costing
+ * Gold the next structure of a kind costs a player (R-BUILD): a city or a
+ * port its base cost times B-COST-GROWTH for each one of that kind they
+ * already own, up to B-COST-MAX; a fort or an air defense one base cost more
+ * for each, up to its own maximum; a silo always the same. Cities and
+ * palaces grow together, a palace counting as two cities and costing
  * what the next two would (R-BUILD-08); air defenses and mosques likewise (R-BUILD-09).
  */
 export function structureCost(game: Game, player: number, kind: StructureKind): number {
@@ -104,48 +106,37 @@ export function structureCost(game: Game, player: number, kind: StructureKind): 
 }
 
 function fullCost(game: Game, player: number, kind: StructureKind): number {
+  const { balance } = game;
   if (kind === StructureKind.City || kind === StructureKind.Palace) {
     const owned = cityShare(game, player);
-    const next = grownCost(game, game.balance.cityCost, owned);
+    const next = doublingCost(game, balance.cityCost, owned);
     if (kind === StructureKind.City) return next;
-    return Math.min(Number.MAX_SAFE_INTEGER, next + grownCost(game, next, 1));
+    return next + doublingCost(game, balance.cityCost, owned + 1);
   }
   if (kind === StructureKind.AirDefense || kind === StructureKind.Mosque) {
-    const next = grownCost(game, game.balance.airDefenseCost, airDefenseShare(game, player));
+    const owned = airDefenseShare(game, player);
+    const next = linearCost(balance.airDefenseCost, balance.airDefenseCostMax, owned);
     if (kind === StructureKind.AirDefense) return next;
-    return Math.min(Number.MAX_SAFE_INTEGER, next + grownCost(game, next, 1));
+    return next + linearCost(balance.airDefenseCost, balance.airDefenseCostMax, owned + 1);
   }
-  return grownCost(game, baseCost(game, kind), structureCount(game, player, kind));
+  // A silo always costs the same.
+  if (kind === StructureKind.Silo) return balance.siloCost;
+  const owned = structureCount(game, player, kind);
+  if (kind === StructureKind.Port) return doublingCost(game, balance.portCost, owned);
+  return linearCost(balance.fortCost, balance.fortCostMax, owned);
 }
 
-function grownCost(game: Game, base: number, owned: number): number {
-  const { costGrowthPercent } = game.balance;
+/** R-BUILD: base × B-COST-GROWTH for each one owned (a doubling), never past B-COST-MAX. */
+function doublingCost(game: Game, base: number, owned: number): number {
+  const { costGrowthPercent, costMax } = game.balance;
   let cost = base;
-  for (let i = 0; i < owned && cost < Number.MAX_SAFE_INTEGER; i++) {
-    cost = Math.min(Number.MAX_SAFE_INTEGER, mulDiv(cost, costGrowthPercent, 100));
-  }
-  return cost;
+  for (let i = 0; i < owned && cost < costMax; i++) cost = mulDiv(cost, costGrowthPercent, 100);
+  return Math.min(cost, costMax);
 }
 
-function baseCost(
-  game: Game,
-  kind: Exclude<
-    StructureKind,
-    | typeof StructureKind.City
-    | typeof StructureKind.Palace
-    | typeof StructureKind.AirDefense
-    | typeof StructureKind.Mosque
-  >,
-): number {
-  const balance = game.balance;
-  switch (kind) {
-    case StructureKind.Fort:
-      return balance.fortCost;
-    case StructureKind.Port:
-      return balance.portCost;
-    case StructureKind.Silo:
-      return balance.siloCost;
-  }
+/** R-BUILD: base for the first, then base more for each one owned, never past `max`. */
+function linearCost(base: number, max: number, owned: number): number {
+  return Math.min(max, base * (owned + 1));
 }
 
 /** B-BUILD-TIME, or B-BUILD-TIME-LONG for a silo, an air defense or a mosque. */

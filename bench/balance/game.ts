@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import {
   createGame,
+  goldIncome,
   DEFAULT_BALANCE,
   type GameRules,
   installBots,
@@ -9,10 +10,12 @@ import {
   loadMap,
   NEUTRAL,
   StructureKind,
+  tradeGold as shipGold,
   type Balance,
   type BotDifficulty,
   type MapDescription,
   type Order,
+  type Player,
   type PlayerSetup,
   type Terrain,
   type Turn,
@@ -246,7 +249,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
       arriving.push({
         from: ship.player,
         to: port.player,
-        gain: balance.tradeBase + balance.tradePerTile * ship.path.length,
+        gain: shipGold(ship.path.length),
       });
     }
     const orders: Order[] = casual ? casual.orders() : [];
@@ -275,15 +278,14 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
         if (!eliminatedAt.has(p.id)) eliminatedAt.set(p.id, playMinutes(game.tick));
         continue;
       }
-      add(troopGold, p.id, p.troops * balance.goldPerThousandTroops);
+      add(troopGold, p.id, goldIncome(game, p));
       const share = (game.territory.tileCount(p.id) * 100) / ownable;
       if (share > (peak.get(p.id) ?? 0)) peak.set(p.id, share);
     }
     const elapsed = game.tick - balance.spawnPhaseTicks;
     if (elapsed > 0 && elapsed % perMinute === 0) {
       const alive = game.players().filter((p) => p.alive);
-      const goldPerSecond = (troops: number): number =>
-        (troops * balance.goldPerThousandTroops * balance.ticksPerSecond) / goldDivisor;
+      const goldPerSecond = (p: Player): number => goldIncome(game, p) / 1000;
       const tradePerSecond = (id: number): number =>
         ((tradeGold.get(id) ?? 0) - (tradeAtMinuteStart.get(id) ?? 0)) / 60;
       const withPort = alive.filter((p) =>
@@ -295,8 +297,8 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
         alive: alive.length,
         leaderSharePercent: (leader.tiles * 100) / ownable,
         leader: leader.id,
-        leaderTroopGold: goldPerSecond(top?.troops ?? 0),
-        medianTroopGold: median(alive.map((p) => goldPerSecond(p.troops))),
+        leaderTroopGold: top ? goldPerSecond(top) : 0,
+        medianTroopGold: median(alive.map((p) => goldPerSecond(p))),
         leaderTradeGold: tradePerSecond(leader.id),
         medianTradeGold: median(withPort.map((p) => tradePerSecond(p.id))),
         missiles: missilesThisMinute,

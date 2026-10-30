@@ -1,7 +1,8 @@
+import { cheapestTile } from "../attacks.ts";
 import { capitalAim } from "../capitals.ts";
 import { populationCap } from "../economy.ts";
 import type { Game, Player } from "../game.ts";
-import { divFloor, percentOf } from "../integer-math.ts";
+import { percentOf } from "../integer-math.ts";
 import { BOT_DIFFICULTIES, type BotDifficulty } from "./difficulty.ts";
 import {
   RETRY_DECISIONS,
@@ -51,6 +52,7 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
   const bots = [...new Set(ids)].sort((a, b) => a - b);
   for (const id of bots) {
     if (!game.player(id)) throw new RangeError(`unknown player ${String(id)}`);
+    game.bots.add(id);
   }
   const seaCooldowns: Cooldowns = new Map();
   const cityCooldowns: Cooldowns = new Map();
@@ -80,10 +82,10 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
     const reserve = percentOf(populationCap(game, bot), params.reservePercent);
     const troops = Math.min(percentOf(bot.troops, params.attackRatioPercent), bot.troops - reserve);
     // Less than the price of one tile would come straight back.
-    if (troops < balance.neutralCost) return;
+    if (troops < cheapestTile(balance)) return;
 
     const { neutral, enemy, enemyDensity } = scanBorder(game, bot);
-    const ownDensity = divFloor(bot.troops, tiles);
+    const ownDensity = bot.troops;
     const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * params.boldnessPercent;
     // Free land is cheaper than a fight: while some is in reach, only a much weaker neighbour is worth attacking.
     const muchWeaker = weak && enemyDensity * 200 <= ownDensity * params.boldnessPercent;

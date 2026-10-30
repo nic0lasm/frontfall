@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
-import { installEconomy, populationCap } from "../src/economy.ts";
+import { installEconomy, populationCap, troopGrowth } from "../src/economy.ts";
 import { Game, type Player } from "../src/game.ts";
 import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
@@ -11,12 +11,11 @@ const balance: Balance = {
   // Gold counts below leave out the income every player earns (B-GOLD-BASE).
   goldBase: 0,
   spawnPhaseTicks: 0,
-  popPerTile: 100,
-  popPerCityPercent: 10,
-  growthBasisPoints: 1000,
-  growthFloorPercent: 100,
+  // No base population, so caps below are land and cities only: 10 tiles hold 100 × 10^0.6.
+  popBase: 0,
+  popLand: 100,
+  popPerCity: 250,
   goldPerThousandTroops: 5,
-  // No base population, so caps below are tiles and cities only.
   startTroops: 0,
 };
 
@@ -42,10 +41,10 @@ function newGame(overrides: Partial<Balance> = {}) {
 }
 
 describe("economy", () => {
-  it("caps population by territory and cities (R-ECO-01, R-BUILD-01)", () => {
+  it("caps population by the land's 0.6 power and by cities (R-ECO-01, R-BUILD-01)", () => {
     const { game, ada } = newGame({ cityLand: 1 });
-    expect(populationCap(game, ada)).toBe(1000);
-    // Two working cities add 10 % each of what the land holds.
+    expect(populationCap(game, ada)).toBe(398);
+    // Two working cities add B-POP-CITY each.
     for (const [id, tile] of [
       [1, 2],
       [2, 7],
@@ -59,54 +58,33 @@ describe("economy", () => {
         reloadAt: 0,
       });
     }
-    expect(populationCap(game, ada)).toBe(1200);
+    expect(populationCap(game, ada)).toBe(898);
   });
 
-  it("adds the map's starting troops as a base, so a fresh start grows (R-ECO-01)", () => {
-    const { game, ada } = newGame({ startTroops: 400 });
-    expect(populationCap(game, ada)).toBe(1400);
+  it("gives every player B-POP-BASE on top of their land (R-ECO-01)", () => {
+    const { game, ada } = newGame({ popBase: 400 });
+    expect(populationCap(game, ada)).toBe(798);
   });
 
-  it("counts land beyond B-POP-FALLOFF-SHARE for less (R-ECO-06)", () => {
-    // 10 of 100 tiles is 10 % of the land: past 5 %, each tile holds a quarter.
-    const { game, ada } = newGame({ popFalloffSharePercent: 5, popFalloffPercent: 25 });
-    expect(populationCap(game, ada)).toBe(5 * 100 + 5 * 25);
-    const within = newGame({ popFalloffSharePercent: 10, popFalloffPercent: 25 });
-    expect(populationCap(within.game, within.ada)).toBe(1000);
-    // Off by default.
-    const off = newGame({ popFalloffSharePercent: 5, popFalloffPercent: 100 });
-    expect(populationCap(off.game, off.ada)).toBe(1000);
-  });
-
-  it("grows troops fastest far from the cap and stops at it (R-ECO-02)", () => {
-    const { ada, run } = newGame();
-    // 10 % of the gap per second at 10 ticks per second: 1 % per tick.
-    run();
-    expect(ada.troops).toBe(10);
-    ada.troops = 900;
-    run();
-    expect(ada.troops).toBe(901);
-    ada.troops = 999;
-    run();
-    expect(ada.troops).toBe(1000);
-    run(5);
-    expect(ada.troops).toBe(1000);
-  });
-
-  it("grows a mid-sized army faster than an empty one under B-GROWTH-FLOOR (R-ECO-02)", () => {
-    const { ada, run } = newGame({ growthFloorPercent: 20 });
+  it("grows troops fastest well below the cap and stops at it (R-ECO-02)", () => {
+    const { ada, run } = newGame({ popLand: 10_000 });
     const gain = (troops: number) => {
       ada.troops = troops;
       run();
       return ada.troops - troops;
     };
-    // Cap 1000, 1 % of the gap per tick, weighted from 20 % (empty) to 100 % (full).
-    expect(gain(0)).toBe(2);
-    expect(gain(400)).toBe(3);
-    expect(gain(400)).toBeGreaterThan(gain(0));
-    expect(gain(400)).toBeGreaterThan(gain(900));
-    expect(gain(999)).toBe(1);
-    expect(gain(1000)).toBe(0);
+    // Cap 39,810: (1 + (10 × army)^0.73 / 40) of a tick, times the room left.
+    expect(troopGrowth(DEFAULT_BALANCE, 39_810, 0)).toBe(1);
+    expect(gain(0)).toBe(1);
+    expect(gain(1000)).toBe(21);
+    expect(gain(10_000)).toBe(84);
+    expect(gain(20_000)).toBe(92);
+    expect(gain(30_000)).toBe(61);
+    expect(gain(39_800)).toBe(1);
+    expect(gain(39_810)).toBe(0);
+    ada.troops = 39_809;
+    run(5);
+    expect(ada.troops).toBe(39_810);
   });
 
   it("keeps troops above the cap without growing them when nobody deserts", () => {
@@ -118,7 +96,7 @@ describe("economy", () => {
 
   it("lets B-DESERTION of the troops above the cap leave each second (R-ECO-02)", () => {
     // Cap 1000; 5 % of the excess per second is 0.5 % per tick.
-    const { ada, run } = newGame({ desertionBasisPoints: 500 });
+    const { ada, run } = newGame({ desertionBasisPoints: 500, popBase: 602 });
     ada.troops = 5000;
     run();
     expect(ada.troops).toBe(5000 - 20);
@@ -133,7 +111,7 @@ describe("economy", () => {
   });
 
   it("pays gold in whole coins without losing the fractions (R-ECO-03, R-ECO-04)", () => {
-    const { ada, run } = newGame({ popPerTile: 0, desertionBasisPoints: 0 });
+    const { ada, run } = newGame({ popLand: 0, desertionBasisPoints: 0 });
     // 1000 idle troops earn 5 gold per second: half a coin per tick.
     ada.troops = 1000;
     run();
@@ -145,7 +123,7 @@ describe("economy", () => {
   });
 
   it("pays every player B-GOLD-BASE a second on top, whatever their troops (R-ECO-03)", () => {
-    const { ada, run } = newGame({ goldBase: 500, popPerTile: 0, desertionBasisPoints: 0 });
+    const { ada, run } = newGame({ goldBase: 500, popLand: 0, desertionBasisPoints: 0 });
     ada.troops = 0;
     run(10);
     expect(ada.gold).toBe(500);

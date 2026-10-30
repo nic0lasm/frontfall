@@ -149,6 +149,12 @@ const BEFORE_LIGHT_FALLOUT = {
 export function readGame(report: Record<string, unknown>): RecordedGame {
   const map = readObject(report.map, "map");
   const balance = readObject(report.balance, "balance");
+  // Games from before the population, gold and land prices of 0.9.5 would play out otherwise today.
+  if (balance.popBase === undefined && balance.popPerTile !== undefined) {
+    throw new DesyncReportError(
+      "recorded under the economy of 0.9.4 or earlier, which this build no longer plays",
+    );
+  }
   for (const key of Object.keys(DEFAULT_BALANCE) as (keyof Balance)[]) {
     const expected = DEFAULT_BALANCE[key];
     // Records from before capital mode or landmarks leave their values out: they take the defaults.

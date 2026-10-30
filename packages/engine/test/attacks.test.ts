@@ -5,16 +5,15 @@ import { Game, type Order, type Player } from "../src/game.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
   spawnPhaseTicks: 0,
-  neutralCost: 10,
-  reliefCostTenths: [10, 20, 30],
+  ...WHOLE_PRICES,
   attackSpeedDivisor: 1000,
   // Fronts go straight for the aim, so tests can tell which tile is taken next.
   attackSpread: 0,
-  defenseDensityTenths: 10,
 };
 
 /** A 10 x 3 cylinder; columns given by the caller are owned by players. */

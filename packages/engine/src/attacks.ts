@@ -1,5 +1,6 @@
+import type { Balance } from "./balance.ts";
 import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
-import { divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
+import { detPow, divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
 import { isAllied, isTraitor, logEvent } from "./diplomacy.ts";
 import { soldiers } from "./economy.ts";
 import { capitalsStand, guardedByCapital } from "./capitals.ts";
@@ -236,8 +237,8 @@ export function installAttacks(game: Game): void {
     return false;
   }
 
-  const tileCost = (tile: number, defender: Player | undefined, attacker: number): number =>
-    captureCost(game, tile, defender, attacker);
+  const tileCost = (tile: number, defender: Player | undefined, attack: Attack): number =>
+    captureCost(game, tile, defender, attack.player, attack.troops);
 
   // R-ATTACK-06: a player calls back one of their own attacks, losing part of its troops.
   game.onOrder((_, player, order) => {
@@ -301,7 +302,7 @@ export function installAttacks(game: Game): void {
     for (const tile of tiles) {
       // Another attack, or an encirclement, may have taken it earlier in the tick.
       if (owners[tile] !== attack.target) continue;
-      const cost = tileCost(tile, defender, attack.player);
+      const cost = tileCost(tile, defender, attack);
       if (attack.troops < cost) {
         finish(attack);
         break;
@@ -371,7 +372,7 @@ export function installAttacks(game: Game): void {
       for (const tile of collapseFill.tiles()) {
         const cost = Math.max(
           1,
-          mulDiv(tileCost(tile, defender, attack.player), balance.collapseCostPercent, 100),
+          mulDiv(tileCost(tile, defender, attack), balance.collapseCostPercent, 100),
         );
         if (attack.troops < cost) break;
         attack.troops -= cost;
@@ -489,36 +490,102 @@ function cancelOpposingAttacks(attacks: Attack[]): void {
   }
 }
 
+/** Tile prices are worked out in thousandths of a troop, then rounded to whole troops tile by tile. */
+const MILLI = 1000;
+
 /**
- * Troops it costs `attacker` to take one tile (R-ATTACK-03, R-ATTACK-04,
- * R-MAP-06), more within reach of one of the defender's forts (R-BUILD-03),
- * of their capital (R-CAP-02) or of a fortress landmark they hold
- * (R-LAND-02): the strongest applies, not all. An attacker holding an assault
- * landmark pays less (R-LAND-02).
+ * Whole troops for a price of `milli` thousandths on `tile`: the fraction
+ * rounds up on that share of tiles, picked by a fixed hash of the tile, so a
+ * price of 1.6 costs 2 troops on six tiles in ten and every client agrees.
+ */
+function wholeTroops(tile: number, milli: number): number {
+  const whole = Math.floor(milli / MILLI);
+  const pick = (Math.imul(tile + 1, 0x9e3779b1) >>> 0) % MILLI;
+  return whole + (pick < milli - whole * MILLI ? 1 : 0);
+}
+
+/** The cheapest land there is: a plains tile nobody holds, in whole troops, rounded up. */
+export function cheapestTile(balance: Balance): number {
+  return Math.ceil((balance.tileWeightTenths[0] * balance.neutralSharePercent) / 1000);
+}
+
+const largeShares = new WeakMap<Game, Map<number, number>>();
+
+/**
+ * R-ATTACK-04: how far a territory of `tiles` is along the way to a huge one,
+ * from 0 to 1, halfway at B-LARGE-MID: a logistic of the land's logarithm.
+ */
+function largeShare(game: Game, tiles: number): number {
+  if (tiles <= 0) return 0;
+  let shares = largeShares.get(game);
+  if (!shares) {
+    shares = new Map();
+    largeShares.set(game, shares);
+  }
+  let share = shares.get(tiles);
+  if (share === undefined) {
+    if (shares.size > 50_000) shares.clear();
+    share = 1 / (1 + detPow(game.balance.largeMidTiles / tiles, 2.5));
+    shares.set(tiles, share);
+  }
+  return share;
+}
+
+/**
+ * Troops it costs `attacker` to take one tile with an attack of
+ * `attackTroops` (R-ATTACK-03, R-ATTACK-04, R-MAP-06). Unowned land costs a
+ * share of the tile's weight. A player's tile costs its weight times the odds
+ * the attack faces (the defender's soldiers per attacking troop, held between
+ * B-ODDS-MIN and B-ODDS-MAX; even odds when the attack is not known) times a
+ * base, lowered for huge territories on either side, plus the defender's
+ * soldiers on each tile. It costs more within reach of one of the defender's
+ * forts (R-BUILD-03), of their capital (R-CAP-02) or of a fortress landmark
+ * they hold (R-LAND-02): the strongest applies, not all. An attacker holding
+ * an assault landmark pays less (R-LAND-02).
  */
 export function captureCost(
   game: Game,
   tile: number,
   defender: Player | undefined,
   attacker: number = NEUTRAL,
+  attackTroops?: number,
 ): number {
-  const { balance, terrain } = game;
+  const { balance, terrain, territory } = game;
   const kind = terrain.kind(tile);
-  const relief =
-    balance.reliefCostTenths[kind === TileKind.Mountains ? 2 : kind === TileKind.Hills ? 1 : 0];
-  const density = defender ? defensePerTile(game, defender) : 0;
-  const base = balance.neutralCost + mulDiv(density, balance.defenseDensityTenths, 10);
-  let cost = Math.max(1, mulDiv(base, relief, 10));
+  const weight =
+    balance.tileWeightTenths[kind === TileKind.Mountains ? 2 : kind === TileKind.Hills ? 1 : 0] *
+    (MILLI / 10);
+  const bot = game.bots.has(attacker);
+  let cost: number;
+  if (!defender) {
+    cost = mulDiv(weight, bot ? balance.botNeutralSharePercent : balance.neutralSharePercent, 100);
+  } else {
+    const defending = soldiers(defender);
+    const tiles = territory.tileCount(defender.id);
+    const odds = Math.min(
+      balance.oddsMaxPercent / 100,
+      Math.max(balance.oddsMinPercent / 100, defending / Math.max(1, attackTroops ?? defending)),
+    );
+    const sizes =
+      (1 - (balance.largeAttackerPercent / 100) * largeShare(game, territory.tileCount(attacker))) *
+      (1 - (balance.largeDefenderPercent / 100) * largeShare(game, tiles));
+    const density = tiles === 0 ? 0 : defending / tiles;
+    cost = Math.floor(
+      (weight *
+        odds *
+        (balance.lossBaseThousandths * sizes + balance.lossDensityThousandths * density)) /
+        MILLI,
+    );
+    // Bots hold their land loosely against players and nations.
+    if (game.bots.has(defender.id) && !bot) cost = mulDiv(cost, balance.botDefensePercent, 100);
+  }
   const assaults = heldLandmarks(game, attacker, LandmarkEffect.Assault);
   if (assaults > 0) {
-    cost = Math.max(
-      1,
-      mulDiv(cost, Math.max(0, 100 - assaults * balance.landmarkAssaultPercent), 100),
-    );
+    cost = mulDiv(cost, Math.max(0, 100 - assaults * balance.landmarkAssaultPercent), 100);
   }
   // R-UNIT-06: land under fallout costs more to take, whoever held it.
   if (game.irradiated(tile)) cost = mulDiv(cost, balance.falloutCostPercent, 100);
-  if (!defender) return cost;
+  if (!defender) return wholeTroops(tile, cost);
   const fort = fortified(game, tile, defender.id) ? balance.fortStrengthPercent : 100;
   const capital = guardedByCapital(game, tile, defender.id) ? balance.capitalStrengthPercent : 100;
   const landmark = guardedByLandmark(game, tile, defender.id)
@@ -530,11 +597,12 @@ export function captureCost(
   if (game.hasBonus(defender.id, OperatorBonus.Defense)) cost *= OPERATOR_FACTOR;
   // R-DIPLO-04: a traitor's land is cheaper to take while the mark lasts.
   if (isTraitor(game, defender)) cost = mulDiv(cost, balance.traitorDefensePercent, 100);
+  let troops = wholeTroops(tile, cost);
   // R-CAP-02: the capital itself holds a share of its owner's whole army.
   if (capitalsStand(game) && defender.capital === tile) {
-    cost += percentOf(soldiers(defender), balance.capitalGarrisonPercent);
+    troops += percentOf(soldiers(defender), balance.capitalGarrisonPercent);
   }
-  return Math.max(1, cost);
+  return troops;
 }
 
 /** Troops a defender loses with one of their tiles: their density, less within reach of their forts (R-BUILD-03). */
@@ -544,7 +612,7 @@ export function defenderLoss(game: Game, tile: number, defender: Player): number
   return Math.min(defender.troops, loss);
 }
 
-/** A defender's soldiers spread over their land: what an attacker pays for on top of the land's price (R-ECO-07). */
+/** A defender's soldiers spread over their land, which the fronts weigh an attack against (R-ECO-07). */
 export function defensePerTile(game: Game, defender: Player): number {
   const tiles = game.territory.tileCount(defender.id);
   return tiles === 0 ? 0 : divFloor(soldiers(defender), tiles);

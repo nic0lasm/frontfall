@@ -172,7 +172,6 @@ export class Hud {
     retreatPenaltyPercent: 0,
     firstNation: Infinity,
     allianceRequestTicks: 200,
-    growthFloorPercent: 100,
     teams: [],
     disabled: 0,
     special: { collapsingFronts: false, capitals: false },
@@ -534,7 +533,6 @@ export class Hud {
 
   setRules(rules: GameRules): void {
     this.rules = { ...rules, ownableTiles: Math.max(1, rules.ownableTiles) };
-    this.population.setFloor(rules.growthFloorPercent);
     for (const [mode, button] of this.buildButtons) button.hidden = !offers(mode, rules.disabled);
     // Colours depend on the rules (nations): rows are made again.
     this.leaders.clear();
@@ -628,7 +626,7 @@ export class Hud {
       const soldiers = soldiersOf({ troops: human.troops, workShare: this.work });
       sent = formatCount(Math.floor((soldiers * this.ratio) / 100));
       const gold = (workShare: number): number =>
-        goldPerSecond({ troops: human.troops, workShare });
+        goldPerSecond({ troops: human.troops, workShare, cap: human.cap });
       extra = formatCount(Math.floor(gold(this.work) - gold(0)));
     }
     this.ratioValue.textContent = sent ? `${ratio} · ${sent}` : ratio;
@@ -645,7 +643,7 @@ export class Hud {
 
   /** Gold a second from the troops, with the share the slider shows. */
   private renderGold(human: PlayerView): void {
-    const rate = goldPerSecond({ troops: human.troops, workShare: this.work });
+    const rate = goldPerSecond({ troops: human.troops, workShare: this.work, cap: human.cap });
     this.goldRate.textContent = workText("goldRate", { rate: formatCount(Math.floor(rate)) });
   }
 
@@ -657,7 +655,7 @@ export class Hud {
     const attackHint = workText("attackHint");
     this.ratioInput.title = attackHint;
     this.ratioInput.labels?.[0]?.setAttribute("title", attackHint);
-    const hint = workText("workHint", { factor: DEFAULT_BALANCE.workGoldFactor });
+    const hint = workText("workHint", { percent: DEFAULT_BALANCE.workGoldPercent });
     this.workInput.title = hint;
     this.workInput.closest(".work-row")?.setAttribute("title", hint);
     this.goldRate.title = workText("goldRateHint");

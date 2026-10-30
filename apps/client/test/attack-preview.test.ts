@@ -5,13 +5,18 @@ import type { GameUpdate, PlayerView } from "../src/game/game-view.ts";
 
 const balance = {
   ...DEFAULT_BALANCE,
-  neutralCost: 10,
-  defenseDensityTenths: 10,
-  popPerTile: 40,
+  tileWeightTenths: [80, 100, 120] as const,
+  neutralSharePercent: 20,
+  lossBaseThousandths: 463,
+  lossDensityThousandths: 39,
+  oddsMinPercent: 60,
+  oddsMaxPercent: 200,
+  largeMidTiles: 300_000,
+  popLand: 200,
   traitorDefensePercent: 50,
-  goldPerThousandTroops: 5,
-  workGoldFactor: 4,
-  goldBase: 0,
+  goldPerThousandTroops: 0,
+  workGoldPercent: 150,
+  goldBase: 1000,
 };
 
 function player(id: number, troops: number, tiles: number, workShare = 0): PlayerView {
@@ -28,20 +33,21 @@ function update(players: PlayerView[], diplomacy: Partial<GameUpdate["diplomacy"
 }
 
 describe("attack preview", () => {
-  it("prices unclaimed land at B-NEUTRAL-COST", () => {
+  it("prices unclaimed land at a share of the weight of plains", () => {
     const preview = attackPreview(update([player(1, 1000, 10)]), 0, 50, balance);
-    expect(preview).toEqual({ target: 0, troops: 500, perTile: 10, tiles: 50, capGain: 2000 });
+    // 500 / 1.6 tiles; 200 × (322^0.6 − 10^0.6) of cap for them.
+    expect(preview).toEqual({ target: 0, troops: 500, perTile: 1.6, tiles: 312, capGain: 5597 });
   });
 
-  it("adds the defender's soldiers per tile, which their workers do not raise (R-ECO-07)", () => {
+  it("prices a player's land by the odds and their soldiers per tile, which workers do not raise (R-ECO-07)", () => {
     const you = player(1, 1000, 10);
+    // 900 soldiers against 1000: 8 × 0.9 × (0.463 + 0.039 × 90).
     const idle = attackPreview(update([you, player(2, 900, 10)]), 2, 100, balance);
-    expect(idle?.perTile).toBe(100);
+    expect(idle?.perTile).toBe(28.6);
     expect(idle?.tiles).toBe(10);
+    // 450 soldiers: the odds floor of 0.6, then 8 × 0.6 × (0.463 + 0.039 × 45).
     const busy = attackPreview(update([you, player(2, 900, 10, 50)]), 2, 100, balance);
-    // 450 soldiers over 10 tiles: 45 a tile on top of 10.
-    expect(busy?.perTile).toBe(55);
-    // 18 tiles worth of troops, but only 10 to take.
+    expect(busy?.perTile).toBe(10.6);
     expect(busy?.tiles).toBe(10);
   });
 
@@ -53,8 +59,8 @@ describe("attack preview", () => {
       50,
       balance,
     );
-    // 600 soldiers, half of them sent; (10 + 20) / 2 a tile.
-    expect(preview).toMatchObject({ troops: 300, perTile: 15, tiles: 20 });
+    // 600 soldiers, half of them sent against 2000: odds of 2, 8 × 2 × (0.463 + 0.039 × 20) / 2.
+    expect(preview).toMatchObject({ troops: 300, perTile: 9.9, tiles: 30 });
   });
 
   it("has nothing to say about one's own land, an ally, a teammate, or before play", () => {
@@ -70,12 +76,14 @@ describe("attack preview", () => {
   });
 
   it("counts the base income every player earns (B-GOLD-BASE)", () => {
-    expect(goldPerSecond({ troops: 1000, workShare: 0 }, { ...balance, goldBase: 500 })).toBe(505);
+    expect(goldPerSecond({ troops: 1000, workShare: 0, cap: 4000 }, balance)).toBe(1000);
   });
 
-  it("splits soldiers and workers, and pays workers B-WORK-GOLD times", () => {
+  it("splits soldiers and workers, and pays B-WORK-GOLD more for the share of the cap at work", () => {
     expect(soldiersOf({ troops: 1001, workShare: 30 })).toBe(701);
-    expect(goldPerSecond({ troops: 1000, workShare: 0 }, balance)).toBe(5);
-    expect(goldPerSecond({ troops: 1000, workShare: 50 }, balance)).toBe(12.5);
+    // 500 workers fill an eighth of a cap of 4000: 150 % of an eighth more.
+    expect(goldPerSecond({ troops: 1000, workShare: 50, cap: 4000 }, balance)).toBe(1187.5);
+    // Never past the whole cap.
+    expect(goldPerSecond({ troops: 1000, workShare: 80, cap: 500 }, balance)).toBe(2500);
   });
 });

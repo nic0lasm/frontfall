@@ -235,7 +235,7 @@ describe("snapshots (#39)", () => {
   it("say what they hold in a header read before the state", () => {
     const bytes = reference.snapshots.get(500) as Uint8Array;
     expect(readSnapshotHeader(bytes)).toEqual({
-      format: 3,
+      format: 4,
       build: BUILD,
       setup: newGame().setupDigest(),
       tick: 500,

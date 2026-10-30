@@ -13,9 +13,10 @@ const TEXTS: Record<Language, Record<string, string>> = {
     attackValue: "{share} of your soldiers, {troops} troops sent",
     workValue: "{share} of your troops work, {rate} gold a second more",
     workHint:
-      "Share of your troops at home who work: {factor} times the gold of a soldier, but they neither attack nor defend.",
+      "Share of your troops at home who work: the more of your population cap works, the more gold, up to {percent} % more than the base income; workers neither attack nor defend.",
     goldRate: "+{rate}/s",
-    goldRateHint: "Gold you earn each second: the base income and your troops; trade comes on top.",
+    goldRateHint:
+      "Gold you earn each second: the base income, more for your workers; trade comes on top.",
     previewTiles: "≈ {count} tiles",
     previewTile: "≈ {count} tile",
     previewSend: "{troops} soldiers, {cost} a tile",
@@ -29,10 +30,10 @@ const TEXTS: Record<Language, Record<string, string>> = {
     attackValue: "{share} de vos soldats, {troops} troupes envoyées",
     workValue: "{share} de vos troupes travaillent, {rate} d'or par seconde en plus",
     workHint:
-      "Part de vos troupes à la maison qui travaillent : {factor} fois l'or d'un soldat, mais elles n'attaquent ni ne défendent.",
+      "Part de vos troupes à la maison qui travaillent : plus votre plafond de population travaille, plus vous gagnez d'or, jusqu'à {percent} % de plus que le revenu de base ; les ouvriers n'attaquent ni ne défendent.",
     goldRate: "+{rate}/s",
     goldRateHint:
-      "L'or que vous gagnez chaque seconde : le revenu de base et vos troupes, commerce en plus.",
+      "L'or que vous gagnez chaque seconde : le revenu de base, plus pour vos ouvriers ; commerce en plus.",
     previewTiles: "≈ {count} cases",
     previewTile: "≈ {count} case",
     previewSend: "{troops} soldats, {cost} par case",

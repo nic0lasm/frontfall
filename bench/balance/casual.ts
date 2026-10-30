@@ -1,8 +1,10 @@
 import {
+  cheapestTile,
   divFloor,
   isAllied,
   NEUTRAL,
   orderError,
+  populationCap,
   reachableCoasts,
   StructureKind,
   type Game,
@@ -19,10 +21,16 @@ const RATIO_PERCENT = 30;
 export interface CasualPace {
   readonly everySeconds: number;
   readonly ratioPercent: number;
+  /** The order waits until its troops fill this share of the population cap: what the population bar teaches. */
+  readonly minFillPercent?: number;
 }
 
 /** A player getting the hang of the game: an order every 3 s with 40 % of its troops. */
-export const INTERMEDIATE_PACE: CasualPace = { everySeconds: 3, ratioPercent: 40 };
+export const INTERMEDIATE_PACE: CasualPace = {
+  everySeconds: 3,
+  ratioPercent: 40,
+  minFillPercent: 30,
+};
 
 /**
  * A stand-in for a casual human player, the one balance.md measures against:
@@ -56,8 +64,11 @@ export class CasualPlayer {
     const orders: Order[] = [];
     const city = this.city();
     if (city) orders.push(city);
+    // Troops grow with the army and peak at about 40 % of the cap: an order that empties the army only slows it.
+    const fill = this.pace.minFillPercent ?? 0;
+    if (me.troops * 100 < populationCap(game, me) * fill) return orders;
     const troops = divFloor(me.troops * this.pace.ratioPercent, 100);
-    if (troops >= game.balance.neutralCost) {
+    if (troops >= cheapestTile(game.balance)) {
       const order = this.attack(troops);
       if (order) orders.push(order);
     }

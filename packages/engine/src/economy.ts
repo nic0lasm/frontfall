@@ -1,29 +1,39 @@
 import type { Balance } from "./balance.ts";
 import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
 import { logEvent } from "./diplomacy.ts";
-import { mulDiv, percentOf } from "./integer-math.ts";
+import { detPow, mulDiv, percentOf } from "./integer-math.ts";
 import { LandmarkEffect, withLandmarks } from "./landmarks.ts";
-import { spawnSettings } from "./spawn.ts";
 import { workingCities } from "./structures.ts";
 
 /**
- * R-ECO-01: the most troops a player's territory and cities can hold. A base
- * equal to the starting troops of the map comes on top, so a player who has
- * just spawned, or is down to a few tiles, still grows. Land beyond a share of
- * the map counts for less (R-ECO-06), so the largest empires stop refilling
- * as fast as they can be taken apart. Each working city adds a share of what
- * the land holds (R-BUILD-01), so a city is worth as much to a large empire
- * as to a small one.
+ * Troops of an army in the units of the growth curve (R-ECO-02), which counts
+ * ten times what the game shows for its troops, as the curve it follows does.
+ */
+const GROWTH_SCALE = 10;
+
+/** tiles^0.6 for land counts met again and again, kept apart from the tick. */
+const landPower = new Map<number, number>();
+
+function landRoot(tiles: number): number {
+  let root = landPower.get(tiles);
+  if (root === undefined) {
+    if (landPower.size > 50_000) landPower.clear();
+    root = detPow(tiles, 0.6);
+    landPower.set(tiles, root);
+  }
+  return root;
+}
+
+/**
+ * R-ECO-01: the most troops a player's territory and cities can hold: a base
+ * for everyone, the land's 0.6 power (so a large empire holds far fewer troops
+ * a tile than a small one), and a fixed amount for each working city.
  */
 export function populationCap(game: Game, player: Player): number {
-  const { popPerTile, popPerCityPercent, popFalloffSharePercent, popFalloffPercent } = game.balance;
-  const base = spawnSettings(game).troops;
+  const { popBase, popLand, popPerCity } = game.balance;
   const tiles = game.territory.tileCount(player.id);
-  // Past B-POP-FALLOFF-SHARE of the land, each tile holds only B-POP-FALLOFF of the usual troops.
-  const full = Math.min(tiles, mulDiv(game.terrain.ownableCount, popFalloffSharePercent, 100));
-  const land = full * popPerTile + mulDiv((tiles - full) * popPerTile, popFalloffPercent, 100);
-  const cities = workingCities(game, player);
-  const cap = base + land + mulDiv(land, cities * popPerCityPercent, 100);
+  const cap =
+    popBase + Math.floor(landRoot(tiles) * popLand) + workingCities(game, player) * popPerCity;
   // R-MODE-09: the operator's troop bonus doubles the cap.
   return game.hasBonus(player.id, OperatorBonus.Troops) ? cap * OPERATOR_FACTOR : cap;
 }
@@ -72,12 +82,10 @@ export function installEconomy(game: Game): void {
       }
       growTroops(game, player);
 
-      // R-ECO-07: a worker earns B-WORK-GOLD times what a soldier does.
-      const earning = goldEarning(game, player);
+      // R-ECO-03: the fixed income, more for the share of the cap at work (R-ECO-07).
+      const income = goldIncome(game, player);
       // R-MODE-09: the operator's test bonus doubles one player's income.
       const bonus = game.hasBonus(player.id, OperatorBonus.Gold) ? OPERATOR_FACTOR : 1;
-      // B-GOLD-BASE: gold per second for every player, in the same units.
-      const income = earning * game.balance.goldPerThousandTroops + game.balance.goldBase * 1000;
       const earned = income * bonus + player.goldRemainder;
       player.gold += Math.floor(earned / goldDivisor);
       player.goldRemainder = earned % goldDivisor;
@@ -86,35 +94,43 @@ export function installEconomy(game: Game): void {
 }
 
 /**
- * What a player's gold income is counted on (R-ECO-03): their troops, a
- * worker counting B-WORK-GOLD times (R-ECO-07), more for each gold landmark
- * they hold (R-LAND-02).
+ * A player's gold income, in thousandths of gold per second (R-ECO-03): the
+ * fixed income of every player (B-GOLD-BASE), more by B-WORK-GOLD for the
+ * share of their cap that works (R-ECO-07), and a little for each idle troop
+ * when a game sets B-GOLD-RATE. Each gold landmark they hold adds to it
+ * (R-LAND-02). Size alone adds nothing: land and cities raise the cap, so a
+ * given army works for less gold the larger the cap it fills.
  */
-export function goldEarning(game: Game, player: Player): number {
-  const earning = player.troops + workers(player) * (game.balance.workGoldFactor - 1);
+export function goldIncome(game: Game, player: Player): number {
+  const { goldBase, goldPerThousandTroops, workGoldPercent } = game.balance;
+  const cap = populationCap(game, player);
+  const fixed = goldBase * 1000;
+  const working =
+    cap > 0 ? mulDiv(fixed * workGoldPercent, Math.min(workers(player), cap), 100 * cap) : 0;
+  const idle = soldiers(player) * goldPerThousandTroops;
   return withLandmarks(
     game,
     player.id,
     LandmarkEffect.Gold,
     game.balance.landmarkGoldPercent,
-    earning,
+    fixed + working + idle,
   );
 }
 
 /**
  * R-ECO-02: troops an army of `troops` gains in one tick under `cap`. Zero at
- * the cap; an empty army grows at B-GROWTH-FLOOR of the rate and a larger one
- * faster, so growth peaks below the cap. Troops above the cap do not grow.
+ * the cap; an empty army gains B-GROWTH-BASE a tick and a larger one more,
+ * with the army's 0.73 power over B-GROWTH-DIVISOR, so growth peaks below
+ * the cap. Troops above the cap do not grow.
  */
 export function troopGrowth(balance: Balance, cap: number, troops: number): number {
   const gap = cap - troops;
   if (gap <= 0) return 0;
-  const { growthBasisPoints, growthFloorPercent, ticksPerSecond } = balance;
-  // Weight of the army in percent of the cap: B-GROWTH-FLOOR when empty, 100 when full.
-  const weight = growthFloorPercent * cap + (100 - growthFloorPercent) * troops;
-  const gain = mulDiv(gap * growthBasisPoints, weight, 10_000 * ticksPerSecond * 100 * cap);
+  const { growthBase, growthDivisor } = balance;
+  // (base + army^0.73 / divisor) of a tick, in proportion to the room left under the cap.
+  const pace = growthBase + detPow(troops * GROWTH_SCALE, 0.73) / growthDivisor;
   // At least one troop, or a player close to the cap would never reach it.
-  return Math.max(1, gain);
+  return Math.max(pace >= 1 ? 1 : 0, Math.floor((pace * gap) / cap));
 }
 
 function growTroops(game: Game, player: Player): void {
@@ -144,9 +160,9 @@ export function playerGrowth(game: Game, player: Player, cap: number): number {
     gain,
   );
   // R-MODE-09: and the growth.
-  const grown = game.hasBonus(player.id, OperatorBonus.Troops)
-    ? boosted * OPERATOR_FACTOR
-    : boosted;
+  const paced = game.popFactors.get(player.id);
+  const scaled = paced === undefined ? boosted : Math.max(1, mulDiv(boosted, paced.growth, 100));
+  const grown = game.hasBonus(player.id, OperatorBonus.Troops) ? scaled * OPERATOR_FACTOR : scaled;
   return Math.min(grown, cap - player.troops);
 }
 

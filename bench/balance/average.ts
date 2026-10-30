@@ -1,5 +1,6 @@
 import {
   capitalAim,
+  cheapestTile,
   divFloor,
   isAllied,
   MissileSize,
@@ -255,7 +256,7 @@ export class AveragePlayer {
     if (this.history.length > STUCK_ROUNDS) this.history.shift();
     const before = this.history[0] as number;
     const orders: Order[] = [];
-    const neutralCost = game.balance.neutralCost;
+    const neutralCost = cheapestTile(game.balance);
     if (neutral >= 0) {
       const troops = divFloor(me.troops * EXPAND_PERCENT, 100);
       if (troops >= neutralCost) orders.push({ type: "attack", target: neutral, troops });

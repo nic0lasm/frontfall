@@ -1,5 +1,6 @@
 export {
   captureCost,
+  cheapestTile,
   collapseDepth,
   defenderLoss,
   defensePerTile,
@@ -56,7 +57,7 @@ export {
   type GameRecord,
 } from "./game-record.ts";
 export {
-  goldEarning,
+  goldIncome,
   installEconomy,
   playerGrowth,
   populationCap,
@@ -166,7 +167,7 @@ export {
   type MissileEvent,
 } from "./missiles.ts";
 export { Terrain, TileKind } from "./terrain.ts";
-export { installTrade, type TradeShip } from "./trade.ts";
+export { installTrade, tradeGold, type TradeShip } from "./trade.ts";
 export {
   WarshipError,
   atWar,

@@ -10,10 +10,14 @@ import { StructureKind, installStructures } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 // No structures are installed: bots must not earn enough for a city before they could build one (B-GOLD-BASE).
 const balance: Balance = {
   ...DEFAULT_BALANCE,
+  ...WHOLE_PRICES,
+  // Caps of land alone, small enough for the few troops the tests hand out.
+  popBase: 0,
   spawnPhaseTicks: 10,
   spawnDistance: 12,
   goldBase: 0,
@@ -328,7 +332,8 @@ describe("bots", () => {
       expect(game.territory.isBorder(city.tile)).toBe(false);
       expect(grid.distance(city.tile, bot.start)).toBeLessThanOrEqual(2 * balance.buildSpacing);
     }
-    expect(bot.gold).toBe(10_000 - 750 - 1125);
+    // B-COST-GROWTH doubles the price of each city.
+    expect(bot.gold).toBe(10_000 - 1000 - 2000);
   });
   it("build their port on the ocean, not on a lake closer to their start (R-BOT-06)", () => {
     const grid = new WorldGrid(60, 30, { wrapsX: false });

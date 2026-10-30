@@ -19,7 +19,7 @@ import { summarize, type BalanceSummary } from "./summary.ts";
  *   pnpm balance -- --map world --bots normal:4,hard:4 --nations normal --casual
  *   pnpm balance -- --map world --bots normal:0 --nations hard --average
  *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule capitals
- *   pnpm balance -- --map europe --bots hard:11 --set tradeBase=4000 --json out.json
+ *   pnpm balance -- --map europe --bots hard:11 --set tradeMax=50 --json out.json
  *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule collapsingFronts
  */
 const { values } = parseArgs({
@@ -39,7 +39,7 @@ const { values } = parseArgs({
     seeds: { type: "string", default: "1-8" },
     minutes: { type: "string", default: "20" },
     jobs: { type: "string", default: String(availableParallelism()) },
-    // A balance value to try, as a field of Balance: --set tradeBase=4000.
+    // A balance value to try, as a field of Balance: --set tradeMax=50.
     set: { type: "string", multiple: true, default: [] },
     // Special rules to play with (R-MODE-08), by name: --rule collapsingFronts.
     rule: { type: "string", multiple: true, default: [] },

@@ -17,9 +17,11 @@ import { orderError } from "../src/orders.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
+  ...WHOLE_PRICES,
   // Troops set by hand above the cap stay put (B-DESERTION).
   desertionBasisPoints: 0,
   spawnPhaseTicks: 0,
@@ -394,6 +396,8 @@ describe("bots and alliances (R-BOT-10)", () => {
     for (let x = 40; x < 50; x++)
       for (let y = 0; y < 20; y++) game.territory.setOwner(grid.index(x, y), 2);
     installBots(game, [2], "normal");
+    // Cy is too strong for Bea to attack, so the sizes stay put.
+    (game.player(3) as Player).troops = 2_000_000;
     ally(1, 2);
     run(60);
     const alliance = allianceOf(game, 1, 2);

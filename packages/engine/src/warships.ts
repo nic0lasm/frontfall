@@ -5,6 +5,7 @@ import { DrawUsage, derivedRandom } from "./random.ts";
 import { spawnSettings } from "./spawn.ts";
 import { StructureKind, isReady, structureAt } from "./structures.ts";
 import { TileKind } from "./terrain.ts";
+import { tradeGold } from "./trade.ts";
 
 /** A warship on patrol (R-UNIT-04). */
 export interface Warship {
@@ -44,15 +45,12 @@ export const WarshipError = {
 } as const;
 export type WarshipError = (typeof WarshipError)[keyof typeof WarshipError];
 
-/** Gold the next warship costs a player: B-COST-WARSHIP, times B-COST-GROWTH for each one they own. */
+/** Gold the next warship costs a player: B-COST-WARSHIP for the first, that much more for each one they own, never past B-COST-MAX. */
 export function warshipCost(game: Game, player: number): number {
-  const { warshipCost: base, costGrowthPercent } = game.balance;
-  let cost = base;
-  for (const ship of game.warships) {
-    if (ship.player !== player) continue;
-    cost = Math.min(Number.MAX_SAFE_INTEGER, mulDiv(cost, costGrowthPercent, 100));
-  }
-  return cost;
+  const { warshipCost: base, costMax } = game.balance;
+  let owned = 0;
+  for (const ship of game.warships) if (ship.player === player) owned++;
+  return Math.min(costMax, base * (owned + 1));
 }
 
 /** Radius of a patrol on this map: B-WARSHIP-PATROL on a map of 2^19 tiles, growing like the spawn radius. */
@@ -237,7 +235,7 @@ export function installWarships(game: Game): void {
     const prize = trade[index];
     if (!prize) return false;
     trade.splice(index, 1);
-    owner.gold += balance.tradeBase + balance.tradePerTile * prize.path.length;
+    owner.gold += tradeGold(prize.path.length);
     logEvent(game, { tick: game.tick, type: "captured", a: ship.player, b: prize.player });
     return true;
   }

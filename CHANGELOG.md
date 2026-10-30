@@ -11,6 +11,14 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### Changed
 
 - **Keep playing after the game is decided.** Choosing "Keep watching" on the end screen no longer takes your orders away: if you still hold land, you can attack, build, trade and talk to the others while the game goes on. Only a player who has been wiped out just watches.
+- **A new economy, on the genre's classic footing.** Every number that drives growth, gold, trade, prices and computer players was rebuilt from the values the genre's reference game has used for years, so the game has a stable base to tune from. Fronts that collapse, the pace of attacks, workers, the palace and the mosque stay Frontfall's own.
+  - **Population.** Everyone starts with room for 10,000 troops; land adds room ever more slowly as it grows, and each city adds 25,000. Troops grow slowly when your army is small, fastest a little under half your cap, and stop at it.
+  - **Gold.** Every player earns 1,000 gold a second whatever their size. Putting troops to work adds up to one and a half times that again, in proportion to how much of your cap works; a huge idle army no longer earns anything by itself.
+  - **Trade.** Each port tries for a ship every second, more often when you have few ports, less often when the seas are crowded. A ship now pays far more for a long route: about 1,000 gold for a short hop, 52,500 for 300 tiles of sea, 125,000 for 1,000.
+  - **Prices.** Cities and ports cost 125,000 and double with each one, up to a million; forts cost 50,000 more each, up to 250,000; air defenses 1.5 million more each, up to 3 million; silos a million, missiles 750,000, heavy missiles 5 million, warships 250,000 more each.
+  - **Taking land.** Free land costs 1.6 troops a tile (2 on hills, 2.4 on mountains). A player's tile costs more when you attack with fewer troops than they hold and less with more, plus their soldiers per tile; huge empires pay less to attack and to be attacked, and bots' land is cheaper.
+  - **Nations.** They take free land first, then turn on a player once their army reaches half or more of their cap, and send what they have above a reserve. Easy nations hold fewer troops, grow a little slower and leave a human player alone three times in four; normal ones once in four. They no longer wait out a grace period.
+- **Games recorded before this version can no longer be replayed.** They were played under the old economy.
 
 ## [0.9.4] - 2026-10-30
 

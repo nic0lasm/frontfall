@@ -18,6 +18,8 @@ const balance: Balance = {
   buildTicks: 1,
   portCost: 1000,
   warshipCost: 10_000,
+  // Every roll for a trade ship succeeds (B-TRADE-ODDS).
+  tradeOdds: 1,
   warshipMax: 2,
   goldPerThousandTroops: 0,
   tradeIntervalTicks: 1000,
@@ -70,7 +72,7 @@ function newGame(overrides: Partial<Balance> = {}) {
 const buy = (port: number): Order => ({ type: "warship", port });
 
 describe("warships (R-UNIT-04)", () => {
-  it("are bought at the player's own ready port, B-COST-GROWTH dearer each, up to B-WARSHIP-MAX", () => {
+  it("are bought at the player's own ready port, one B-WARSHIP-COST dearer each, up to B-WARSHIP-MAX", () => {
     const { game, grid, ada, step, adaPort, beaPort } = newGame();
     expect(orderError(game, ada, buy(beaPort))).toBe("no ready port of yours on the tile");
     expect(orderError(game, ada, buy(grid.index(5, 5)))).toBe("no ready port of yours on the tile");
@@ -80,7 +82,7 @@ describe("warships (R-UNIT-04)", () => {
     const [ship] = game.warships;
     expect(ship).toMatchObject({ player: 1, health: 1000 });
     expect(game.terrain.kind(ship?.patrol ?? -1)).toBe(TileKind.Water);
-    expect(warshipCost(game, 1)).toBe(15_000);
+    expect(warshipCost(game, 1)).toBe(20_000);
     step([{ player: 1, order: buy(adaPort) }]);
     expect(orderError(game, ada, buy(adaPort))).toBe("too many warships");
     ada.gold = 0;
@@ -217,10 +219,11 @@ describe("warships (R-UNIT-04)", () => {
   it("are bought by a nation while an enemy transport sails for its coast (R-BOT-11)", () => {
     const { game, grid, step, run } = newGame();
     installNations(game, [2], "normal");
-    run(20);
+    // A normal nation decides every six seconds, first on tick 58: the ship sails a little before.
+    run(45);
     expect(game.warships).toHaveLength(0);
     step([{ player: 1, order: { type: "embark", target: grid.index(50, 3), troops: 5000 } }]);
-    run(game.balance.ticksPerSecond * 5);
+    run(game.balance.ticksPerSecond * 2);
     expect(game.warships.map((ship) => ship.player)).toEqual([2]);
   });
 });

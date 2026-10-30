@@ -13,18 +13,16 @@ export interface Balance {
   spawnRadius: number;
   /** B-START-TROOPS */
   startTroops: number;
-  /** B-POP-PER-TILE, troops of population cap per owned tile */
-  popPerTile: number;
-  /** B-POP-FALLOFF-SHARE, percent of all ownable land beyond which tiles add less to the cap */
-  popFalloffSharePercent: number;
-  /** B-POP-FALLOFF, percent of B-POP-PER-TILE that each tile beyond that share adds */
-  popFalloffPercent: number;
-  /** B-POP-PER-CITY, percent of the cap the player's land gives that each working city adds */
-  popPerCityPercent: number;
-  /** B-GROWTH-RATE, in basis points of the gap to the cap per second (320 = 3.2 %) */
-  growthBasisPoints: number;
-  /** B-GROWTH-FLOOR, percent of B-GROWTH-RATE that an empty army grows at; a full rate at any size is 100 */
-  growthFloorPercent: number;
+  /** B-POP-BASE, troops every player's cap holds whatever their land */
+  popBase: number;
+  /** B-POP-LAND, troops of cap for the land's 0.6 power: a player with n tiles holds n^0.6 times this */
+  popLand: number;
+  /** B-POP-PER-CITY, troops of cap each working city adds */
+  popPerCity: number;
+  /** B-GROWTH-BASE, troops a player gains each tick whatever their army */
+  growthBase: number;
+  /** B-GROWTH-DIVISOR, the army's 0.73 power divided by this is added to the growth of a tick */
+  growthDivisor: number;
   /** B-DESERTION, in basis points of the troops above the cap who leave each second (500 = 5 %) */
   desertionBasisPoints: number;
   /** B-GOLD-RATE, in thousandths of gold per idle troop per second (5 = 0.5 per 100) */
@@ -33,12 +31,14 @@ export interface Balance {
   goldBase: number;
   /** B-WORK-MAX, the largest share of troops at home, in %, a player may put to work */
   workMaxPercent: number;
-  /** B-WORK-GOLD, how many times a soldier's gold a worker earns */
-  workGoldFactor: number;
-  /** B-NEUTRAL-COST, troops per plains tile of unowned land */
-  neutralCost: number;
-  /** B-RELIEF-COST, in tenths, for plains, hills and mountains */
-  reliefCostTenths: readonly [number, number, number];
+  /** B-WORK-GOLD, percent more gold of the base income when the whole cap works */
+  workGoldPercent: number;
+  /** B-TILE-WEIGHT, in tenths of a troop, for plains, hills and mountains: what a tile's price is measured in */
+  tileWeightTenths: readonly [number, number, number];
+  /** B-NEUTRAL-SHARE, percent of a tile's weight that unowned land costs a player or a nation */
+  neutralSharePercent: number;
+  /** B-BOT-NEUTRAL-SHARE, percent of a tile's weight that unowned land costs a bot */
+  botNeutralSharePercent: number;
   /** B-ATTACK-SPEED: an attack takes 1 + isqrt(troops) / attackSpeedDivisor tiles per tick */
   attackSpeedDivisor: number;
   /** B-ATTACK-PACE, percent of its front's length an attack on a player at full strength takes per tick; 0 leaves only B-ATTACK-SPEED */
@@ -47,8 +47,20 @@ export interface Balance {
   attackPaceOddsTenths: number;
   /** B-ATTACK-SPREAD, tiles of distance to the aim that each side shared with the attacker's land is worth */
   attackSpread: number;
-  /** B-DEFENSE-DENSITY, in tenths: share of the defender's troops per tile added to the cost of a tile */
-  defenseDensityTenths: number;
+  /** B-LOSS-BASE, in thousandths: the part of a player's tile price that every tile costs, times its weight */
+  lossBaseThousandths: number;
+  /** B-LOSS-DENSITY, in thousandths: the part of a player's tile price per soldier of theirs on each tile, times its weight */
+  lossDensityThousandths: number;
+  /** B-ODDS-MIN and B-ODDS-MAX, percent: the defender's soldiers per attacking troop, held between these, scale a player's tile price */
+  oddsMinPercent: number;
+  oddsMaxPercent: number;
+  /** B-LARGE-MID, tiles: the size at which a large territory gets half its price bonus */
+  largeMidTiles: number;
+  /** B-LARGE-ATTACKER and B-LARGE-DEFENDER, percent: how far a huge attacker's, then a huge defender's, size lowers a tile's price */
+  largeAttackerPercent: number;
+  largeDefenderPercent: number;
+  /** B-BOT-DEFENSE, percent of the price a player or a nation pays for a bot's tile */
+  botDefensePercent: number;
   /** B-RETREAT-PENALTY, percent of the returning troops lost */
   retreatPenaltyPercent: number;
   /** B-ENCIRCLE-MAX, largest pocket in tiles captured at once by encirclement */
@@ -77,6 +89,12 @@ export interface Balance {
   portCost: number;
   /** B-COST-GROWTH, percent: each structure of a kind already owned multiplies the cost of the next by this */
   costGrowthPercent: number;
+  /** B-COST-MAX, gold no city, port or warship costs more than */
+  costMax: number;
+  /** B-COST-FORT-MAX, gold no fort costs more than */
+  fortCostMax: number;
+  /** B-COST-AIR-DEFENSE-MAX, gold no air defense costs more than */
+  airDefenseCostMax: number;
   /** B-BUILD-SPACING, smallest distance in tiles between two structures */
   buildSpacing: number;
   /** B-CITY-LAND, tiles of land each city beyond the first needs, on a map of 2^19 tiles */
@@ -93,10 +111,8 @@ export interface Balance {
   tradeIntervalTicks: number;
   /** B-TRADE-MAX, trade ships from one port at sea at once */
   tradeMax: number;
-  /** B-TRADE-BASE, gold each side earns from a trade ship that arrives */
-  tradeBase: number;
-  /** B-TRADE-PER-TILE, gold each side earns on top for each water tile of the route */
-  tradePerTile: number;
+  /** B-TRADE-ODDS: a port's roll for a ship succeeds one time in this many, before its owner's few ports, its misses and a crowded sea count */
+  tradeOdds: number;
   /** B-COST-WARSHIP, gold for a player's first warship */
   warshipCost: number;
   /** B-WARSHIP-MAX, warships a player may own at once */
@@ -201,24 +217,31 @@ export const DEFAULT_BALANCE: Balance = {
   spawnDistance: 30,
   spawnRadius: 3,
   startTroops: 2500,
-  popPerTile: 40,
-  popFalloffSharePercent: 20,
-  popFalloffPercent: 70,
-  popPerCityPercent: 5,
-  growthBasisPoints: 800,
-  growthFloorPercent: 20,
-  goldPerThousandTroops: 5,
-  goldBase: 500,
+  popBase: 10_000,
+  popLand: 200,
+  popPerCity: 25_000,
+  growthBase: 1,
+  growthDivisor: 40,
+  goldPerThousandTroops: 0,
+  goldBase: 1000,
   desertionBasisPoints: 500,
   workMaxPercent: 80,
-  workGoldFactor: 4,
-  neutralCost: 8,
-  reliefCostTenths: [10, 15, 25],
+  workGoldPercent: 150,
+  tileWeightTenths: [80, 100, 120],
+  neutralSharePercent: 20,
+  botNeutralSharePercent: 10,
   attackSpeedDivisor: 4,
   attackPacePercent: 20,
   attackPaceOddsTenths: 30,
   attackSpread: 4,
-  defenseDensityTenths: 10,
+  lossBaseThousandths: 463,
+  lossDensityThousandths: 39,
+  oddsMinPercent: 60,
+  oddsMaxPercent: 200,
+  largeMidTiles: 300_000,
+  largeAttackerPercent: 70,
+  largeDefenderPercent: 30,
+  botDefensePercent: 70,
   retreatPenaltyPercent: 25,
   encircleMaxTiles: 4000,
   collapseOddsTenths: 30,
@@ -229,20 +252,22 @@ export const DEFAULT_BALANCE: Balance = {
   boatMax: 3,
   boatRange: 1000,
   buildTicks: 5 * 10,
-  cityCost: 60_000,
-  fortCost: 30_000,
-  portCost: 100_000,
-  costGrowthPercent: 150,
+  cityCost: 125_000,
+  fortCost: 50_000,
+  portCost: 125_000,
+  costGrowthPercent: 200,
+  costMax: 1_000_000,
+  fortCostMax: 250_000,
+  airDefenseCostMax: 3_000_000,
   buildSpacing: 10,
   cityLand: 0,
   fortRadius: 25,
   fortStrengthPercent: 200,
   fortLossPercent: 50,
   tradeRange: 500,
-  tradeIntervalTicks: 10 * 10,
-  tradeMax: 3,
-  tradeBase: 2000,
-  tradePerTile: 20,
+  tradeIntervalTicks: 10,
+  tradeMax: 100,
+  tradeOdds: 100,
   warshipCost: 250_000,
   warshipMax: 4,
   warshipPatrol: 30,
@@ -252,12 +277,12 @@ export const DEFAULT_BALANCE: Balance = {
   warshipHealth: 1000,
   warMemoryTicks: 30 * 10,
   embargoNoticeTicks: 30 * 10,
-  siloCost: 800_000,
-  airDefenseCost: 1_000_000,
+  siloCost: 1_000_000,
+  airDefenseCost: 1_500_000,
   longBuildTicks: 10 * 10,
   siloReloadTicks: 30 * 10,
-  missileCost: 600_000,
-  heavyMissileCost: 3_000_000,
+  missileCost: 750_000,
+  heavyMissileCost: 5_000_000,
   missileRadius: 12,
   heavyMissileRadius: 45,
   missileSpeed: 8,

@@ -8,6 +8,7 @@ import { orderError } from "../src/orders.ts";
 import { loadSnapshot, saveSnapshot } from "../src/snapshot.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
@@ -17,17 +18,18 @@ const balance: Balance = {
   desertionBasisPoints: 0,
   spawnPhaseTicks: 0,
   // No population cap: troops stay where the tests put them.
-  popPerTile: 0,
+  popBase: 0,
+  popLand: 0,
+  popPerCity: 0,
   startTroops: 0,
   goldPerThousandTroops: 5,
   workMaxPercent: 80,
-  workGoldFactor: 4,
-  neutralCost: 10,
-  defenseDensityTenths: 10,
+  ...WHOLE_PRICES,
+  tileWeightTenths: [100, 100, 100],
 };
 
 /** Ada holds the left half of a 10 x 2 strip, Bea the right half. */
-function newGame() {
+function newGame(overrides: Partial<Balance> = {}) {
   const grid = new WorldGrid(10, 2, { wrapsX: false });
   const setup = {
     terrain: new Terrain(grid, new Uint8Array(grid.size).fill(TileKind.Plains)),
@@ -36,7 +38,7 @@ function newGame() {
       { id: 1, name: "Ada" },
       { id: 2, name: "Bea" },
     ],
-    balance,
+    balance: { ...balance, ...overrides },
   };
   const create = () => {
     const game = new Game(setup);
@@ -80,17 +82,25 @@ describe("work share (R-ECO-07)", () => {
     expect(orderError(game, ada, { type: "work", share: 0 })).toBeUndefined();
   });
 
-  it("pays a worker B-WORK-GOLD times a soldier's gold", () => {
-    const idle = newGame();
-    const busy = newGame();
+  it("pays B-WORK-GOLD more of the base income for the share of the cap at work", () => {
+    // A cap of 4000 that troops do not grow into.
+    const paid = {
+      goldBase: 1000,
+      goldPerThousandTroops: 0,
+      popBase: 4000,
+      growthBase: 0,
+      growthDivisor: Number.MAX_SAFE_INTEGER,
+    };
+    const idle = newGame(paid);
+    const busy = newGame(paid);
     for (const { ada } of [idle, busy]) ada.troops = 1000;
     busy.work(50);
     idle.run();
     idle.run(9);
     busy.run(9);
-    // 1000 soldiers earn 5 gold a second; 500 soldiers and 500 workers, 2.5 + 10.
-    expect(idle.ada.gold).toBe(5);
-    expect(busy.ada.gold).toBe(12);
+    // 500 workers fill an eighth of the cap: 150 % of an eighth more than 1000 a second.
+    expect(idle.ada.gold).toBe(1000);
+    expect(busy.ada.gold).toBe(1187);
   });
 
   it("sends soldiers only, by land and by sea", () => {

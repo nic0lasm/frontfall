@@ -4,7 +4,7 @@ import { SnapshotError, SnapshotReader, SnapshotWriter, checksum } from "./snaps
 import type { StructureKind } from "./structures.ts";
 
 /** Version of the snapshot format of docs/engine.md; a reader refuses any other. */
-export const SNAPSHOT_FORMAT = 3;
+export const SNAPSHOT_FORMAT = 4;
 
 /**
  * Most bytes a snapshot may take. The state grows with the map and how

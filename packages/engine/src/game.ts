@@ -238,6 +238,14 @@ export class Game {
   nextStructureId = 1;
   /** Trade ships at sea, oldest first. Owned by the trade rules; read only elsewhere. */
   readonly tradeShips: TradeShip[] = [];
+  /**
+   * What a computer player's difficulty does to its population, in percent:
+   * its cap and its growth (R-BOT-04). Set again by whoever installs the
+   * player at the start of every game, so it is not part of the state.
+   */
+  readonly popFactors = new Map<number, { readonly cap: number; readonly growth: number }>();
+  /** Players run as bots (R-BOT-01), whose land prices differ (R-ATTACK-04); set with the bots, not part of the state. */
+  readonly bots = new Set<number>();
   nextTradeShipId = 1;
   /** Warships, oldest first. Owned by the warship rules; read only elsewhere. */
   readonly warships: Warship[] = [];
@@ -752,7 +760,9 @@ function checkBalance(balance: Balance): void {
     "boatMax",
     "boatRange",
     "tradeRange",
+    "growthDivisor",
     "tradeIntervalTicks",
+    "tradeOdds",
     "warshipPatrol",
     "warshipReloadTicks",
     "warshipDamage",
@@ -778,6 +788,14 @@ function checkBalance(balance: Balance): void {
     "portCost",
     "buildTicks",
     "tradeMax",
+    "costMax",
+    "fortCostMax",
+    "airDefenseCostMax",
+    "popBase",
+    "popLand",
+    "popPerCity",
+    "growthBase",
+    "workGoldPercent",
     "warshipCost",
     "warshipMax",
     "warshipRange",
@@ -797,8 +815,6 @@ function checkBalance(balance: Balance): void {
     "missileTroopsPercent",
     "airDefenseRadius",
     "airDefenseReloadTicks",
-    "tradeBase",
-    "tradePerTile",
     "allianceRenewTicks",
     "allianceCooldownTicks",
     "traitorTicks",
@@ -831,9 +847,6 @@ function checkBalance(balance: Balance): void {
     balance.workMaxPercent > 100
   ) {
     throw new RangeError("balance workMaxPercent must be from 0 to 100");
-  }
-  if (!Number.isSafeInteger(balance.workGoldFactor) || balance.workGoldFactor < 1) {
-    throw new RangeError("balance workGoldFactor must be a positive integer");
   }
   for (const key of ["capitalSpoilsPercent", "capitalRazePercent"] as const) {
     if (!Number.isSafeInteger(balance[key]) || balance[key] < 0 || balance[key] > 100) {

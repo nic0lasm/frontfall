@@ -7,12 +7,13 @@ import { orderError } from "../src/orders.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
   spawnPhaseTicks: 0,
-  neutralCost: 10,
-  reliefCostTenths: [10, 10, 10],
+  ...WHOLE_PRICES,
+  tileWeightTenths: [100, 100, 100],
   attackSpeedDivisor: 1000,
   boatSpeed: 2,
 };
@@ -181,7 +182,7 @@ describe("transport ships (R-UNIT-02, R-ATTACK-09)", () => {
   });
 
   it("loses the troops when they cannot pay for the beach", () => {
-    const { grid, game, run, embark } = newGame(islands, { neutralCost: 500 });
+    const { grid, game, run, embark } = newGame(islands, { tileWeightTenths: [5000, 5000, 5000] });
     run([embark(2, grid.index(0, 1), 100)]);
     run();
     expect(game.boats).toHaveLength(0);

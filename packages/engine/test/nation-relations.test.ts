@@ -31,6 +31,8 @@ function strip() {
       spawnPhaseTicks: 0,
       attackSpeedDivisor: 1000,
       encircleMaxTiles: 1,
+      // Caps small enough for the few troops the tests hand out: 4834 for 60 tiles.
+      popBase: 2500,
     },
   });
   installAttacks(game);
@@ -62,6 +64,7 @@ function strip() {
   return { grid, game, nation, ada, bea, messages, applied, run, seconds };
 }
 
+// A hard nation decides every five seconds: the waits below give it one decision at least.
 describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
   it("grow wary of an attacker, tell them so, and heal with time", () => {
     const { game, grid, nation, ada, messages, run, seconds } = strip();
@@ -71,7 +74,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     run(1, [{ player: 2, order: { type: "attack", target: grid.index(25, 1), troops: 100 } }]);
     run(1, [{ player: 2, order: { type: "attack", target: grid.index(25, 0), troops: 100 } }]);
     expect(nationMood(game, 1, 2)).toBe("wary");
-    run(seconds(3));
+    run(seconds(6));
     expect(messages).toContainEqual({ from: 1, to: 2, phrase: Phrase.LeaveMe });
     // Twenty points heal in two minutes.
     run(seconds(120));
@@ -87,7 +90,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     run(1, [{ player: 2, order: { type: "gift", target: 1, troops: 0, gold: 50_000 } }]);
     run(1, [{ player: 2, order: { type: "gift", target: 1, troops: 0, gold: 50_000 } }]);
     expect(nationMood(game, 1, 2)).toBe("friendly");
-    run(seconds(3));
+    run(seconds(6));
     expect(messages).toContainEqual({ from: 1, to: 2, phrase: Phrase.Thanks });
   });
 
@@ -106,7 +109,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     expect(applied).toContainEqual({ player: 1, order: { type: "ally", target: 2 } });
     expect(applied).not.toContainEqual({ player: 1, order: { type: "ally", target: 3 } });
     run(1, [{ player: 3, order: { type: "ally", target: 1 } }]);
-    run(seconds(3));
+    run(seconds(6));
     expect(messages).toContainEqual({ from: 1, to: 3, phrase: Phrase.Down });
   });
 
@@ -116,14 +119,14 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     ada.troops = 5000;
     bea.troops = 500;
     run(1, [{ player: 2, order: { type: "ally", target: 1 } }]);
-    run(seconds(2));
+    run(seconds(6));
     expect(game.alliances).toHaveLength(1);
     expect(messages).toContainEqual({ from: 1, to: 2, phrase: Phrase.Up });
     applied.length = 0;
     nation.troops = populationCap(game, nation);
     run(1, [{ player: 2, order: { type: "betray", target: 1 } }]);
     expect(nationMood(game, 1, 2)).toBe("hostile");
-    run(seconds(2));
+    run(seconds(6));
     expect(messages).toContainEqual({ from: 1, to: 2, phrase: Phrase.Angry });
     // Ada is no weaker than the nation and Bea is weaker: the traitor still comes first.
     const attacks = applied.filter(({ player, order }) => player === 1 && order.type === "attack");
@@ -138,10 +141,10 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     // Bea is too strong to attack: the nation keeps its troops at home.
     bea.troops = 1_000_000;
     run(1, [{ player: 2, order: { type: "ally", target: 1 } }]);
-    run(seconds(2));
+    run(seconds(6));
     expect(game.alliances).toHaveLength(1);
     run(1, [{ player: 2, order: { type: "quick", target: 1, phrase: Phrase.Help } }]);
-    run(seconds(2));
+    run(seconds(6));
     const gifts = applied.filter(
       ({ player, order }) => player === 1 && order.type === "gift" && order.target === 2,
     );
@@ -160,7 +163,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     ada.troops = 100;
     bea.troops = 1_000_000;
     run(1, [{ player: 2, order: { type: "ally", target: 1 } }]);
-    run(seconds(2));
+    run(seconds(6));
     expect(game.alliances).toHaveLength(1);
     run(seconds(150));
     const down = messages.findIndex((m) => m.from === 1 && m.to === 2 && m.phrase === Phrase.Down);

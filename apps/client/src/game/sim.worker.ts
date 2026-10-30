@@ -116,7 +116,6 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
     maxDurationTicks,
     retreatPenaltyPercent,
     allianceRequestTicks,
-    growthFloorPercent,
   } = game.game.balance;
   // The page draws the terrain too: it gets its own copy of the kinds, and
   // the relief, which only drawing uses.
@@ -139,7 +138,6 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
         special: game.game.rules,
         operator: game.game.operator,
         allianceRequestTicks,
-        growthFloorPercent,
       },
     },
     [view.kinds.buffer, view.relief.buffer],

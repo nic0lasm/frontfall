@@ -27,6 +27,7 @@ const balance: Balance = {
   spawnPhaseTicks: 0,
   buildTicks: 1,
   longBuildTicks: 2,
+  cityCost: 1000,
   siloCost: 1000,
   airDefenseCost: 1000,
   missileCost: 500,
@@ -42,7 +43,9 @@ const balance: Balance = {
   airDefenseRadius: 8,
   airDefenseReloadTicks: 15,
   goldPerThousandTroops: 0,
-  growthBasisPoints: 0,
+  // Nothing grows: troops stay where the tests put them.
+  growthBase: 0,
+  growthDivisor: Number.MAX_SAFE_INTEGER,
 };
 
 /**
@@ -286,10 +289,9 @@ describe("fallout (R-UNIT-06)", () => {
     expect(game.territory.ownerOf(target)).toBe(NEUTRAL);
     expect(game.irradiated(target)).toBe(true);
     expect(game.fallout).toHaveLength(1);
-    const usual = captureCost(game, grid.index(10, 10), undefined, 2);
-    expect(captureCost(game, target, undefined, 2)).toBe(
-      Math.floor((usual * game.balance.falloutCostPercent) / 100),
-    );
+    // 1.6 troops a plains tile, B-FALLOUT-COST times that under fallout, rounded tile by tile.
+    const burnt = (16 * game.balance.falloutCostPercent) / 1000;
+    expect(Math.abs(captureCost(game, target, undefined, 2) - burnt)).toBeLessThan(1);
     // Bea can take the burnt land at once.
     bea.troops = 100_000;
     step([{ player: 2, order: { type: "attack", target, troops: 50_000 } }]);
@@ -460,9 +462,10 @@ describe("mosque (R-BUILD-09)", () => {
   });
 
   it("costs the next two air defenses, counts as two after, and goes with their disable bit", () => {
-    const { game } = newGame({ costGrowthPercent: 150 });
+    const { game } = newGame();
+    // Each air defense costs one B-AIR-DEFENSE-COST more than the last.
     expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(1000);
-    expect(structureCost(game, 1, StructureKind.Mosque)).toBe(1000 + 1500);
+    expect(structureCost(game, 1, StructureKind.Mosque)).toBe(1000 + 2000);
     game.structures.push({
       id: 99,
       player: 1,
@@ -472,7 +475,7 @@ describe("mosque (R-BUILD-09)", () => {
       reloadAt: 0,
     });
     expect(airDefenseShare(game, 1)).toBe(2);
-    expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(2250);
+    expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(3000);
     expect(disableBit(StructureKind.Mosque)).toBe(Disable.AirDefense);
   });
 });

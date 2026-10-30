@@ -34,8 +34,6 @@ export interface GameRules {
   readonly retreatPenaltyPercent: number;
   /** Lowest id of the map's nations, which take the colours of their own (`colorOf`); above every id without them. */
   readonly firstNation: number;
-  /** B-GROWTH-FLOOR: how fast an empty army grows, in percent of the full rate. */
-  readonly growthFloorPercent: number;
   /** B-ALLIANCE-REQUEST-TIMEOUT, in ticks. */
   readonly allianceRequestTicks: number;
   /** Team of each player by id in a team game (R-MODE-02), empty in a free-for-all. */

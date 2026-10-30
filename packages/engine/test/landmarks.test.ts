@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { captureCost } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { createGame } from "../src/create-game.ts";
-import { goldEarning, playerGrowth, populationCap } from "../src/economy.ts";
+import { goldIncome, playerGrowth, populationCap } from "../src/economy.ts";
 import type { Order, Player } from "../src/game.ts";
 import {
   guardedByLandmark,
@@ -87,13 +87,13 @@ describe("landmarks (R-LAND)", () => {
 
   it("raise the gold of a gold landmark's holder by B-LANDMARK-GOLD", () => {
     const { game, ada, take } = newGame("gold");
-    const before = goldEarning(game, ada);
+    const before = goldIncome(game, ada);
     take();
-    expect(goldEarning(game, ada)).toBe(Math.floor((before * 120) / 100));
+    expect(goldIncome(game, ada)).toBe(Math.floor((before * 120) / 100));
   });
 
   it("speed up the growth of a growth landmark's holder by B-LANDMARK-GROWTH, never past the cap", () => {
-    const { game, ada, take } = newGame("growth", { growthBasisPoints: 2000 });
+    const { game, ada, take } = newGame("growth");
     ada.troops = 1000;
     const plain = playerGrowth(game, ada, populationCap(game, ada));
     take();
@@ -111,12 +111,20 @@ describe("landmarks (R-LAND)", () => {
     expect(guardedByLandmark(game, near, ada.id)).toBe(true);
     expect(guardedByLandmark(game, far, ada.id)).toBe(false);
     expect(guardedByLandmark(game, near, bea.id)).toBe(false);
-    expect(captureCost(game, near, ada, bea.id)).toBe(captureCost(game, far, ada, bea.id) * 2);
+    // Prices in thousandths of a troop, rounded tile by tile: within one troop of double.
+    const guarded = captureCost(game, near, ada, bea.id);
+    expect(Math.abs(guarded - captureCost(game, far, ada, bea.id) * 2)).toBeLessThanOrEqual(1);
     expect(landmarkFortressRadius(game)).toBe(4);
   });
 
   it("make every tile cheaper for an assault landmark's holder by B-LANDMARK-ASSAULT", () => {
-    const { game, ada, bea, take } = newGame("assault", { neutralCost: 100 });
+    const { game, ada, bea, take } = newGame("assault", {
+      tileWeightTenths: [1000, 1000, 1000],
+      oddsMinPercent: 100,
+      oddsMaxPercent: 100,
+      lossBaseThousandths: 1000,
+      lossDensityThousandths: 0,
+    });
     const tile = grid.index(45, 10);
     const usual = captureCost(game, tile, bea, ada.id);
     take();

@@ -16,9 +16,11 @@ import {
 } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
+  ...WHOLE_PRICES,
   // Gold counts below leave out the income every player earns (B-GOLD-BASE).
   goldBase: 0,
   // Troops set by hand above the cap stay put (B-DESERTION).

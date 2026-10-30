@@ -6,12 +6,13 @@ import { loadSnapshot, saveSnapshot } from "../src/snapshot.ts";
 import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { WHOLE_PRICES } from "./whole-prices.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
   spawnPhaseTicks: 0,
-  neutralCost: 10,
-  reliefCostTenths: [10, 10, 10],
+  ...WHOLE_PRICES,
+  tileWeightTenths: [100, 100, 100],
   // One tile per tick, so a stretch giving way stands out.
   attackSpeedDivisor: 1000,
   attackSpread: 0,

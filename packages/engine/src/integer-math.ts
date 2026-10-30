@@ -44,3 +44,58 @@ export function isqrt(n: number): number {
   else if ((root + 1) * (root + 1) <= n) root++;
   return root;
 }
+
+const LN2 = 0.6931471805599453;
+
+/**
+ * Natural logarithm of a positive double, from additions, products and
+ * quotients only: those are exact to the last bit on every runtime, while
+ * Math.log and Math.pow may differ in the last bit between engines and would
+ * split the clients of a game (R-ECO-04).
+ */
+export function detLn(x: number): number {
+  if (!(x > 0)) throw new RangeError(`logarithm of ${String(x)}`);
+  let mantissa = x;
+  let exponent = 0;
+  while (mantissa >= 2) {
+    mantissa /= 2;
+    exponent++;
+  }
+  while (mantissa < 1) {
+    mantissa *= 2;
+    exponent--;
+  }
+  // ln m = 2 atanh((m - 1) / (m + 1)), with z at most 1/3 for m in [1, 2).
+  const z = (mantissa - 1) / (mantissa + 1);
+  const z2 = z * z;
+  let term = z;
+  let sum = 0;
+  for (let k = 1; k <= 31; k += 2) {
+    sum += term / k;
+    term *= z2;
+  }
+  return exponent * LN2 + 2 * sum;
+}
+
+/** e^y for a double, from basic operations only; see `detLn`. */
+export function detExp(y: number): number {
+  if (y > 700) return Number.MAX_VALUE;
+  if (y < -700) return 0;
+  // y = k ln 2 + r with |r| <= ln 2 / 2.
+  const k = Math.round(y / LN2);
+  const r = y - k * LN2;
+  let term = 1;
+  let sum = 1;
+  for (let n = 1; n <= 18; n++) {
+    term = (term * r) / n;
+    sum += term;
+  }
+  let scale = 1;
+  for (let i = 0; i < Math.abs(k); i++) scale = k > 0 ? scale * 2 : scale / 2;
+  return sum * scale;
+}
+
+/** x^power for x > 0, the same on every runtime; 0 for x = 0. */
+export function detPow(x: number, power: number): number {
+  return x === 0 ? 0 : detExp(power * detLn(x));
+}

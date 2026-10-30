@@ -5,7 +5,7 @@ import type { Order, Player } from "../src/game.ts";
 import { orderError } from "../src/orders.ts";
 import { StructureKind, structureCost } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
-import { tradeRange } from "../src/trade.ts";
+import { tradeGold, tradeRange } from "../src/trade.ts";
 import { WorldGrid } from "../src/world-grid.ts";
 
 const balance: Balance = {
@@ -89,7 +89,8 @@ describe("ports", () => {
 describe("trade", () => {
   /** Ada's port at (9, 10), Bea's at (30, 10): 20 water tiles apart, ready on tick 6. */
   function trading(overrides: Partial<Balance> = {}) {
-    const setup = newGame({ tradeIntervalTicks: 10, ...overrides });
+    // Every roll succeeds, so a ship leaves at each interval.
+    const setup = newGame({ tradeIntervalTicks: 10, tradeOdds: 1, ...overrides });
     setup.step([
       { player: 1, order: setup.port(9, 10) },
       { player: 2, order: setup.port(30, 10) },
@@ -108,9 +109,10 @@ describe("trade", () => {
     run(9);
     expect(ada.gold).toBe(0);
     run(1);
-    // Both ships arrive: each side is paid for its own and for the other's, 2000 + 20 × 20 each.
-    expect(ada.gold).toBe(2 * 2400);
-    expect(bea.gold).toBe(2 * 2400);
+    // Both ships arrive: each side is paid for its own and for the other's, 1016 each for 20 tiles.
+    expect(tradeGold(20)).toBe(1016);
+    expect(ada.gold).toBe(2 * 1016);
+    expect(bea.gold).toBe(2 * 1016);
   });
 
   it("keeps at most B-TRADE-MAX ships of one port at sea", () => {
@@ -167,11 +169,11 @@ describe("trade", () => {
     step([{ player: 2, order: { type: "demolish", tile: grid.index(30, 10) } }]);
     run(10);
     // Bea's ship still reaches Ada's port and pays both; Ada's finds no port.
-    expect(ada.gold).toBe(2400);
-    expect(bea.gold).toBe(2400);
+    expect(ada.gold).toBe(1016);
+    expect(bea.gold).toBe(1016);
     run(20);
     expect(game.tradeShips).toHaveLength(0);
-    expect(ada.gold).toBe(2400);
+    expect(ada.gold).toBe(1016);
   });
 
   it("sinks a fallen player's ships", () => {

@@ -71,7 +71,10 @@ describe("desync reports", () => {
       readDesyncReport({ ...JSON.parse(JSON.stringify(report)), ...patch });
     expect(broken({ version: 1 })).toThrow(/unsupported report version 1/);
     expect(broken({ seed: 1.5 })).toThrow(DesyncReportError);
-    expect(broken({ balance: { ...DEFAULT_BALANCE, popPerTile: "40" } })).toThrow(/popPerTile/);
+    expect(broken({ balance: { ...DEFAULT_BALANCE, popLand: "40" } })).toThrow(/popLand/);
+    const before: Record<string, unknown> = { ...DEFAULT_BALANCE, popPerTile: 40 };
+    delete before.popBase;
+    expect(broken({ balance: before })).toThrow(/economy of 0.9.4/);
     expect(broken({ bots: { ids: [2], difficulty: "brutal" } })).toThrow(/brutal/);
     expect(broken({ nations: ["x"] })).toThrow(/nation id/);
     expect(broken({ disabled: 64 })).toThrow(/disabled/);

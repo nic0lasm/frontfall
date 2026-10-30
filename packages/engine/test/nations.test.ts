@@ -6,10 +6,10 @@ import type { BotDifficulty } from "../src/bots/difficulty.ts";
 import {
   installBots,
   installNations,
-  NATION_FULL_PERCENT,
   NATION_DIFFICULTIES,
   NATION_WORK_PERCENT,
 } from "../src/bots/index.ts";
+import { installDiplomacy } from "../src/diplomacy.ts";
 import { installEconomy, populationCap } from "../src/economy.ts";
 import { Game, type GameRules, type Order, type Player } from "../src/game.ts";
 import { installSpawn, spawnSettings } from "../src/spawn.ts";
@@ -18,7 +18,13 @@ import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
 
-const balance: Balance = { ...DEFAULT_BALANCE, spawnPhaseTicks: 10, spawnDistance: 12 };
+const balance: Balance = {
+  ...DEFAULT_BALANCE,
+  spawnPhaseTicks: 10,
+  spawnDistance: 12,
+  // Caps small enough for the few troops the tests hand out: 4834 for 60 tiles.
+  popBase: 2500,
+};
 const intervalOf = (difficulty: BotDifficulty) =>
   NATION_DIFFICULTIES[difficulty].intervalSeconds * balance.ticksPerSecond;
 const interval = intervalOf("hard");
@@ -113,10 +119,13 @@ describe("nations", () => {
     adaAttacks(300);
     run(1);
     expect(game.attacks.some((attack) => attack.player === 2 && attack.target === 1)).toBe(true);
-    const targets = ordersOf(1).map((order) =>
-      order.type === "attack" ? grid.x(order.target) : -1,
+    // An easy nation lets a player be three times in four (R-BOT-26): it may take a few decisions.
+    run(4 * intervalOf("easy"));
+    const targets = ordersOf(1).flatMap((order) =>
+      order.type === "attack" ? [grid.x(order.target)] : [],
     );
-    expect(targets).toEqual([40]);
+    expect(targets.length).toBeGreaterThan(0);
+    for (const x of targets) expect(x).toBeGreaterThanOrEqual(40);
   });
 
   it("answer the attacker, and only the attacker, once strong enough (R-BOT-08)", () => {
@@ -138,7 +147,8 @@ describe("nations", () => {
     nation.troops = 2000;
     nation.gold = 100;
     ada.troops = 5000;
-    adaAttacks();
+    // A threat, but small enough that the front holds near x = 20 while the fort goes up.
+    adaAttacks(300);
     run(1);
     expect(game.structures.map((s) => [s.kind, s.player])).toEqual([[StructureKind.Fort, 1]]);
     // Behind the front at x = 20, so the first tiles lost do not take it.
@@ -164,12 +174,17 @@ describe("nations", () => {
   });
 
   it("put troops to work while full and left alone, and call them back when attacked (R-BOT-15)", () => {
-    const { game, nation, ada, bea, workOf, run, adaAttacks } = strip();
+    const { game, nation, ada, workOf, run, adaAttacks } = strip();
     installEconomy(game);
+    installDiplomacy(game);
+    // Allied with both neighbours, so the nation has nobody to attack.
+    for (const player of [2, 3]) {
+      run(1, [
+        { player, order: { type: "ally", target: 1 } },
+        { player: 1, order: { type: "ally", target: player } },
+      ]);
+    }
     const cap = populationCap(game, nation);
-    // Too dense to attack, so the nation keeps its troops at home.
-    ada.troops = 10 * cap;
-    bea.troops = 10 * cap;
     nation.troops = Math.floor(cap / 2);
     run(interval);
     expect(workOf(1)).toEqual([]);
@@ -177,6 +192,8 @@ describe("nations", () => {
     run(interval);
     expect(workOf(1)).toEqual([NATION_WORK_PERCENT]);
     expect(nation.workShare).toBe(NATION_WORK_PERCENT);
+    ada.troops = 10 * cap;
+    run(1, [{ player: 2, order: { type: "betray", target: 1 } }]);
     adaAttacks(nation.troops);
     run(interval);
     expect(workOf(1)).toEqual([NATION_WORK_PERCENT, 0]);
@@ -195,18 +212,16 @@ describe("nations", () => {
     expect(workOf(1)).toEqual([]);
   });
 
-  it("take a bot's odds once their army is full (B-NATION-FULL)", () => {
+  it("turn on a player only from their trigger share of the cap (R-BOT-26)", () => {
     const { game, ordersOf, run, nation, ada, bea } = strip();
     const cap = populationCap(game, nation);
-    // Just under full with neighbours a little denser, then full with neighbours as dense.
-    nation.troops = Math.floor((cap * NATION_FULL_PERCENT) / 100) - 1;
-    ada.troops = nation.troops + 120;
-    bea.troops = nation.troops + 120;
+    // Under half the cap, below every nation's trigger, with neighbours far weaker.
+    nation.troops = Math.floor((cap * 45) / 100);
+    ada.troops = 10;
+    bea.troops = 10;
     run(interval);
     expect(ordersOf(1)).toEqual([]);
     nation.troops = cap;
-    ada.troops = cap;
-    bea.troops = cap;
     run(interval);
     expect(ordersOf(1).map((order) => order.type)).toEqual(["attack"]);
   });
@@ -221,10 +236,14 @@ describe("nations", () => {
       nation.troops = 4000;
       ada.troops = 4000;
       bea.troops = 10;
-      run(intervalOf(difficulty));
-      const targets = ordersOf(1).map((order) =>
-        order.type === "attack" ? game.territory.ownerOf(order.target) : -1,
-      );
+      // An easy nation lets a player be three times in four (R-BOT-26): it may take a few decisions.
+      let targets: number[] = [];
+      for (let i = 0; i < 6 && targets.length === 0; i++) {
+        run(intervalOf(difficulty));
+        targets = ordersOf(1).flatMap((order) =>
+          order.type === "attack" ? [game.territory.ownerOf(order.target)] : [],
+        );
+      }
       expect(targets).toEqual([difficulty === "hard" ? 2 : 3]);
     }
     expect(NATION_DIFFICULTIES.easy.huntPercent).toBe(0);
@@ -276,9 +295,9 @@ describe("nations", () => {
     nation.troops = 9000;
     ada.troops = 1000;
     run(1, [{ player: 1, order: { type: "attack", target: grid.index(15, 1), troops: 3000 } }]);
-    // Bea is now much weaker than Ada.
+    // Bea is now much weaker than Ada. The nation decides once while the attack is under way.
     bea.troops = 10;
-    run(2 * interval);
+    run(interval);
     expect(game.attacks.some((attack) => attack.player === 1 && attack.target === 2)).toBe(true);
     const targets = ordersOf(1)
       .slice(1)
@@ -299,13 +318,15 @@ describe("nations", () => {
       for (let tile = 0; tile < grid.size; tile++) {
         if (grid.x(tile) >= 22 && grid.x(tile) < 40) game.territory.setOwner(tile, 3);
       }
-      // Ada is too dense for the nation's odds, yet the attack overwhelms her 3-tile front;
-      // what stays home is above the hard reserve (B-NATION-RESERVE).
+      // The attack overwhelms Ada's 3-tile front; what stays home is above the nation's
+      // reserve, but under its trigger share (R-BOT-26). It starts just before the
+      // nation decides, while Ada still holds more land than the nation.
       nation.troops = 5700;
       ada.troops = 7000;
       bea.troops = 7000;
+      run(interval - 11);
       run(1, [{ player: 1, order: { type: "attack", target: grid.index(15, 1), troops: 4000 } }]);
-      run(2 * interval);
+      run(interval);
       return ordersOf(1).filter((order) => order.type === "attack" && grid.x(order.target) < 20)
         .length;
     };
@@ -347,7 +368,8 @@ describe("nations", () => {
     run(interval);
     expect(apply.mock.calls.some(([id, order]) => id === 1 && order.type === "attack")).toBe(true);
     apply.mockClear();
-    // Once it is over, she is fair game without attacking first.
+    // Once it is over, she is fair game without attacking first, from the nation's trigger share.
+    nation.troops = 9000;
     run(100);
     expect(apply.mock.calls.some(([id, order]) => id === 1 && order.type === "attack")).toBe(true);
   });
@@ -382,14 +404,19 @@ describe("nations", () => {
         player,
         order: { type: "attack", target: grid.index(29, 1), troops: 4000 },
       }));
+      // The attacks start a little before the nations decide, so they are under way when nation 3 does.
+      for (let i = 0; i < 35; i++) game.step({ tick: game.tick, orders: [] });
       game.step({ tick: game.tick, orders });
-      // Every nation decides once; the attacks on Ada are still under way.
-      for (let i = 0; i < interval; i++) game.step({ tick: game.tick, orders: [] });
-      return game.attacks.filter((attack) => attack.player === 3 && attack.target === 4);
+      let joined = false;
+      for (let i = 0; i < interval; i++) {
+        game.step({ tick: game.tick, orders: [] });
+        joined ||= game.attacks.some((attack) => attack.player === 3 && attack.target === 4);
+      }
+      return joined;
     };
     // Nation 1 alone: nation 3 joins in. With nations 1 and 2 already on Ada, it does not.
-    expect(play([1]).length).toBeGreaterThan(0);
-    expect(play([1, 2])).toEqual([]);
+    expect(play([1])).toBe(true);
+    expect(play([1, 2])).toBe(false);
   });
 
   it("refuse unknown players", () => {

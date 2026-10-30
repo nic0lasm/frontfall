@@ -1,9 +1,9 @@
-import { captureCost, defensePerTile } from "../attacks.ts";
+import { captureCost } from "../attacks.ts";
 import { soldiers } from "../economy.ts";
 import { reachableCoasts } from "../boats.ts";
 import { allianceOf, alliesOf, canRenew, isAllied, isTraitor, sameTeam } from "../diplomacy.ts";
 import { Disable, type Game, type Player } from "../game.ts";
-import { divFloor, isqrt, mulDiv } from "../integer-math.ts";
+import { isqrt, mulDiv } from "../integer-math.ts";
 import {
   StructureKind,
   cityLimit,
@@ -81,7 +81,7 @@ export function scanBorder(game: Game, bot: Player, accept: OwnerFilter = anyone
       }
       const enemy = game.player(owner);
       if (!enemy?.alive || !accept(owner)) continue;
-      const density = defensePerTile(game, enemy);
+      const density = soldiers(enemy);
       if (scan.enemy < 0 || density < scan.enemyDensity) {
         scan.enemy = tile;
         scan.enemyDensity = density;
@@ -245,7 +245,7 @@ export function sail(
   let atSea = 0;
   for (const boat of game.boats) if (boat.player === bot.id) atSea++;
   if (atSea >= balance.boatMax) return false;
-  const ownDensity = divFloor(soldiers(bot), territory.tileCount(bot.id));
+  const ownDensity = soldiers(bot);
   // A coast just along the player's own shore is better reached by land.
   const elsewhere = (_: number, distance: number) => distance >= SEA_MIN_DISTANCE;
   let target = -1;
@@ -260,7 +260,7 @@ export function sail(
     }
     const enemy = game.player(owner);
     if (!enemy?.alive || isAllied(game, bot.id, owner) || !accept(owner)) continue;
-    const density = defensePerTile(game, enemy);
+    const density = soldiers(enemy);
     if (density * 100 > ownDensity * boldnessPercent) continue;
     // The ship must at least pay for the beach.
     if (troops <= captureCost(game, coast, enemy)) continue;
