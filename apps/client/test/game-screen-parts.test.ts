@@ -217,7 +217,10 @@ describe("orders", () => {
         latest: () => update as GameUpdate | undefined,
         held: () => held,
         ratio: () => 50,
-        tracker: { firstOrder: (now: number) => firstOrders.push(now) } as never,
+        tracker: {
+          firstOrder: (now: number) => firstOrders.push(now),
+          used: () => undefined,
+        } as never,
       },
     );
     return { orders, sent, firstOrders };

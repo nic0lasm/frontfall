@@ -35,6 +35,25 @@ export type Outcome = z.infer<typeof Outcome>;
 export const Device = z.enum(["phone", "tablet", "desktop"]);
 export type Device = z.infer<typeof Device>;
 
+/**
+ * What the player used during a game, one bit each, in this order: city, fort,
+ * port, silo, air defence, warship, transport boat, alliance, gift, embargo.
+ * Palaces and mosques count as cities. A bit says it happened at least once.
+ */
+export const USED_NAMES = [
+  "city",
+  "fort",
+  "port",
+  "silo",
+  "air_defense",
+  "warship",
+  "boat",
+  "ally",
+  "gift",
+  "embargo",
+] as const;
+export type UsedName = (typeof USED_NAMES)[number];
+
 export const GameReport = z
   .object({
     kind: z.literal("game"),
@@ -71,6 +90,18 @@ export const GameReport = z
     touch: z.boolean(),
     lang: z.enum(["en", "fr"]),
     view: z.enum(["flat", "globe"]),
+    /** Features used, as a bit set over USED_NAMES; absent from reports of pages before it. */
+    used: z
+      .number()
+      .int()
+      .min(0)
+      .max((1 << USED_NAMES.length) - 1)
+      .optional(),
+    /** Share of the claimed land the player held at its largest and when the game ended, in percent. */
+    peak: z.number().int().min(0).max(100).optional(),
+    share: z.number().int().min(0).max(100).optional(),
+    /** Median time the map took to draw a frame, in milliseconds; absent when it was not measured. */
+    frameMs: z.number().min(0).max(1000).optional(),
   })
   .strict();
 export type GameReport = z.infer<typeof GameReport>;

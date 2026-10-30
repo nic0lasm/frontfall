@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { UsageReport } from "@frontfall/protocol";
+import { USED_NAMES, type UsageReport } from "@frontfall/protocol";
 import { ClientErrors } from "./client-errors.ts";
 
 /**
@@ -67,6 +67,21 @@ export function firstOrderRange(seconds: number | undefined): string {
   if (upper === 0) return "0-10";
   if (upper < 0) return "120+";
   return `${String(bounds[upper - 1])}-${String(bounds[upper])}`;
+}
+
+/** Share of the land, in percent, in ranges of a fifth. */
+export function shareRange(percent: number): string {
+  if (percent >= 80) return "80+";
+  const start = Math.floor(percent / 20) * 20;
+  return `${String(start)}-${String(start + 19)}`;
+}
+
+/** Frame time in ranges around the 60, 30 and 20 images a second a game wants. */
+export function frameRange(ms: number): string {
+  if (ms <= 17) return "smooth";
+  if (ms <= 34) return "ok";
+  if (ms <= 50) return "slow";
+  return "bad";
 }
 
 export const botsRange = (bots: number): string => range(bots, [0, 1, 6, 21, 51]);
@@ -148,6 +163,32 @@ export class UsageStats {
       );
       // Who leaves at once and who is beaten at once, apart: the funnel of first games.
       if (report.minutes < 2) counts.push(["early", `${report.mode}.${report.outcome}`]);
+      // The few crossings that tell why games are lost: each pairs one setting with the outcome.
+      const outcome = report.outcome;
+      counts.push(
+        ["by_difficulty", `${report.difficulty}.${outcome}`],
+        ["by_map", `${map}.${outcome}`],
+        ["by_length", `${minutesRange(report.minutes)}.${outcome}`],
+        ["by_device", `${report.device}.${outcome}`],
+        ["by_nations", `${report.nations ? "on" : "off"}.${outcome}`],
+      );
+      if (report.used !== undefined) {
+        const used = report.used;
+        USED_NAMES.forEach((name, bit) => {
+          if (used & (1 << bit)) counts.push(["used", name], ["used_by", `${name}.${outcome}`]);
+        });
+        if (used === 0) counts.push(["used", "none"]);
+      }
+      if (report.peak !== undefined) counts.push(["peak", shareRange(report.peak)]);
+      if (report.share !== undefined)
+        counts.push(["share", `${outcome}.${shareRange(report.share)}`]);
+      if (report.frameMs !== undefined && report.frameMs > 0) {
+        const frame = frameRange(report.frameMs);
+        counts.push(
+          ["frame", `${report.view}.${frame}`],
+          ["frame_by", `${report.device}.${frame}`],
+        );
+      }
       DISABLED_NAMES.forEach((name, bit) => {
         if (report.disabled & (1 << bit)) counts.push(["disabled", name]);
       });

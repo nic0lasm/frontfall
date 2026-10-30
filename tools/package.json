@@ -8,7 +8,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "maps": "tsx src/mapgen/cli.ts",
-    "announce": "tsx src/announce-cli.ts"
+    "announce": "tsx src/announce-cli.ts",
+    "usage:report": "tsx src/usage-report-cli.ts"
   },
   "dependencies": {
     "@frontfall/engine": "workspace:*",

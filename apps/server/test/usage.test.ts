@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   botsRange,
   firstOrderRange,
+  frameRange,
+  shareRange,
   exportMonths,
   humansRange,
   loadUsage,
@@ -79,6 +81,74 @@ describe("ranges", () => {
       "40+",
       "40+",
     ]);
+  });
+});
+
+describe("ranges of play", () => {
+  it("puts land shares in fifths and frame times around 60, 30 and 20 images a second", () => {
+    expect([0, 19, 20, 79, 80, 100].map(shareRange)).toEqual([
+      "0-19",
+      "0-19",
+      "20-39",
+      "60-79",
+      "80+",
+      "80+",
+    ]);
+    expect([5, 17, 18, 34, 35, 50, 51].map(frameRange)).toEqual([
+      "smooth",
+      "smooth",
+      "ok",
+      "ok",
+      "slow",
+      "slow",
+      "bad",
+    ]);
+  });
+});
+
+describe("what a game says about play", () => {
+  it("crosses the outcome with the settings, the features used, the land and the frame time", () => {
+    const counted = stats();
+    counted.record(
+      {
+        ...GAME,
+        outcome: "defeat",
+        used: 0b10000001,
+        peak: 45,
+        share: 0,
+        frameMs: 40,
+        view: "globe",
+      },
+      NOW,
+    );
+    const total = counted.export(NOW).total;
+    expect(total["by_difficulty"]).toEqual({ "normal.defeat": 1 });
+    expect(total["by_map"]).toEqual({ "world.defeat": 1 });
+    expect(total["by_length"]).toEqual({ "10-20.defeat": 1 });
+    expect(total["by_device"]).toEqual({ "phone.defeat": 1 });
+    expect(total["by_nations"]).toEqual({ "on.defeat": 1 });
+    expect(total["used"]).toEqual({ city: 1, ally: 1 });
+    expect(total["used_by"]).toEqual({ "city.defeat": 1, "ally.defeat": 1 });
+    expect(total["peak"]).toEqual({ "40-59": 1 });
+    expect(total["share"]).toEqual({ "defeat.0-19": 1 });
+    expect(total["frame"]).toEqual({ "globe.slow": 1 });
+    expect(total["frame_by"]).toEqual({ "phone.slow": 1 });
+  });
+
+  it("counts a game from an older page, which says nothing of play, only by its settings", () => {
+    const counted = stats();
+    counted.record(GAME, NOW);
+    const total = counted.export(NOW).total;
+    expect(total["by_difficulty"]).toEqual({ "normal.victory": 1 });
+    for (const name of ["used", "used_by", "peak", "share", "frame"]) {
+      expect(total).not.toHaveProperty(name);
+    }
+  });
+
+  it("counts a game that used nothing apart", () => {
+    const counted = stats();
+    counted.record({ ...GAME, used: 0 }, NOW);
+    expect(counted.export(NOW).total["used"]).toEqual({ none: 1 });
   });
 });
 

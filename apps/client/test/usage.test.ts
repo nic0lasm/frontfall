@@ -62,6 +62,41 @@ describe("Usage", () => {
     expect(reports()[1]).not.toHaveProperty("firstOrder");
   });
 
+  it("reports what was used, the land held and the median frame time, and nothing of the rest", () => {
+    const { env, reports } = environment();
+    const tracker = new Usage(env).track(FACTS, 0);
+    const glimpse = (tiles: number, extra = {}) => ({
+      you: 1,
+      phase: "play",
+      players: [
+        { id: 1, tiles },
+        { id: 2, tiles: 100 - tiles },
+      ],
+      structures: [{ player: 1, type: "palace", ready: true }],
+      boats: [],
+      warships: [],
+      diplomacy: { allies: [] },
+      ...extra,
+    });
+    tracker.observe(glimpse(40, { phase: "spawn" }), 20, 0);
+    tracker.observe(glimpse(60), 20, 6_000);
+    tracker.observe(glimpse(30, { boats: [{ player: 1 }] }), 40, 7_000);
+    tracker.observe(glimpse(25), 30, 12_000);
+    tracker.used("gift");
+    tracker.end("defeat", 90_000);
+    tracker.observe(glimpse(90), 20, 99_000);
+    // city (bit 0), boat (6), gift (8)
+    expect(reports()[0]).toMatchObject({ used: 1 + 64 + 256, peak: 60, share: 25, frameMs: 30 });
+    expect(parseUsageReport(JSON.stringify(reports()[0])).ok).toBe(true);
+  });
+
+  it("says nothing of the land or the frames when the game was never seen in play", () => {
+    const { env, reports } = environment();
+    new Usage(env).track(FACTS, 0).end("left", 30_000);
+    expect(reports()[0]).toMatchObject({ used: 0 });
+    for (const name of ["peak", "share", "frameMs"]) expect(reports()[0]).not.toHaveProperty(name);
+  });
+
   it("reports a game once, under the page's prefix, in a shape the server accepts", () => {
     const { env, sent, reports } = environment({ coarsePointer: true, screenSide: 390 });
     const tracker = new Usage(env).track(FACTS, 0);

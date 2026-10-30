@@ -28,6 +28,7 @@
     "perf:client": "pnpm --filter @frontfall/bench client",
     "maps": "pnpm --filter @frontfall/tools maps",
     "announce": "pnpm --filter @frontfall/tools announce",
+    "usage:report": "pnpm --filter @frontfall/tools usage:report",
     "sim": "pnpm --filter @frontfall/bench sim",
     "balance": "pnpm --filter @frontfall/bench balance",
     "determinism": "pnpm --filter @frontfall/bench determinism",

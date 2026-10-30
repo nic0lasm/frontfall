@@ -9,6 +9,8 @@ import {
   type Outcome,
   type UsageMode,
   type UsageReport,
+  type UsedName,
+  USED_NAMES,
 } from "@frontfall/protocol";
 import { getLanguage } from "./i18n/index.ts";
 import { RELEASE } from "./release.ts";
@@ -121,13 +123,45 @@ export type GameFacts = Pick<
   | "view"
 >;
 
+/** What the tracker reads of the game as it stands; a GameUpdate has all of it. */
+export interface GameGlimpse {
+  you: number;
+  phase: string;
+  players: readonly { id: number; tiles: number }[];
+  structures: readonly { player: number; type: string; ready: boolean }[];
+  boats: readonly { player: number }[];
+  warships: readonly { player: number }[];
+  diplomacy: { allies: readonly unknown[] };
+}
+
+/** Seconds between two samples of the map's frame time. */
+const FRAME_SAMPLE_MS = 5000;
+/** Samples kept for the median. */
+const MAX_FRAME_SAMPLES = 240;
+
+const STRUCTURE_USED: Record<string, UsedName> = {
+  city: "city",
+  palace: "city",
+  mosque: "city",
+  fort: "fort",
+  port: "port",
+  silo: "silo",
+  airDefense: "air_defense",
+};
+
 /** One game played on this page, reported once when it ends for the player. */
+
 export class GameTracker {
   /** Drawn for this game only, so the server counts it once. */
   readonly key: string;
   private outcome: Outcome | undefined;
   private voted = false;
   private firstOrderAt: number | undefined;
+  private usedBits = 0;
+  private peak = 0;
+  private share = 0;
+  private readonly frames: number[] = [];
+  private lastFrameAt = 0;
 
   constructor(
     private readonly usage: Usage,
@@ -151,10 +185,53 @@ export class GameTracker {
     this.firstOrderAt ??= now;
   }
 
+  /** Notes that the player used a feature at least once. */
+  used(name: UsedName): void {
+    this.usedBits |= 1 << USED_NAMES.indexOf(name);
+  }
+
+  /**
+   * Reads the game once play has begun: what the player owns, the land held
+   * and, at most every few seconds, how long the map takes to draw a frame
+   * (`frameMs` is 0 when not known). Nothing is kept but a few counts.
+   */
+  observe(update: GameGlimpse, frameMs: number, now: number): void {
+    if (this.outcome || update.phase !== "play") return;
+    for (const structure of update.structures) {
+      const name = STRUCTURE_USED[structure.type];
+      if (structure.player === update.you && structure.ready && name) this.used(name);
+    }
+    if (update.boats.some((boat) => boat.player === update.you)) this.used("boat");
+    if (update.warships.some((ship) => ship.player === update.you)) this.used("warship");
+    if (update.diplomacy.allies.length > 0) this.used("ally");
+    let mine = 0;
+    let all = 0;
+    for (const player of update.players) {
+      all += player.tiles;
+      if (player.id === update.you) mine = player.tiles;
+    }
+    if (all > 0) {
+      this.share = Math.round((100 * mine) / all);
+      this.peak = Math.max(this.peak, this.share);
+    }
+    if (frameMs > 0 && now - this.lastFrameAt >= FRAME_SAMPLE_MS) {
+      this.lastFrameAt = now;
+      if (this.frames.length < MAX_FRAME_SAMPLES) this.frames.push(frameMs);
+    }
+  }
+
+  /** Median of the frame times sampled, or none when there are none. */
+  private medianFrame(): number | undefined {
+    if (this.frames.length === 0) return undefined;
+    const sorted = [...this.frames].sort((a, b) => a - b);
+    return Math.round((sorted[Math.floor(sorted.length / 2)] ?? 0) * 10) / 10;
+  }
+
   /** Reports the game; later calls do nothing, so the first ending is the one counted. */
   end(outcome: Outcome, now: number): void {
     if (this.outcome) return;
     this.outcome = outcome;
+    const frameMs = this.medianFrame();
     const minutes = Math.min(24 * 60, Math.max(0, (now - this.startedAt) / 60_000));
     this.usage.ended({ map: this.facts.map, mode: this.facts.mode, outcome, minutes, at: now });
     this.usage.send({
@@ -167,6 +244,10 @@ export class GameTracker {
       ...(this.firstOrderAt === undefined
         ? {}
         : { firstOrder: Math.max(0, Math.round((this.firstOrderAt - this.startedAt) / 1000)) }),
+      ...(this.peak > 0
+        ? { used: this.usedBits, peak: this.peak, share: this.share }
+        : { used: this.usedBits }),
+      ...(frameMs === undefined ? {} : { frameMs }),
       ...this.usage.device(),
       lang: getLanguage(),
     });

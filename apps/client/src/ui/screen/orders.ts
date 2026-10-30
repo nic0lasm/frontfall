@@ -45,6 +45,8 @@ export class Orders {
     const update = this.playing();
     if (!update) return false;
     this.ordered(update);
+    if (type === "ally") this.state.tracker?.used("ally");
+    if (type === "embargo" && on) this.state.tracker?.used("embargo");
     this.session.sendOrder(
       type === "embargo" ? { type, target, on: on ? 1 : 0 } : { type, target },
     );
@@ -63,6 +65,7 @@ export class Orders {
     const amount = Math.floor((held * this.state.ratio()) / 100);
     if (amount < 1) return;
     this.ordered(update);
+    this.state.tracker?.used("gift");
     this.session.sendOrder({
       type: "gift",
       target,
