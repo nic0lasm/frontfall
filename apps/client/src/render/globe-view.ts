@@ -56,6 +56,7 @@ export class GlobeView implements Renderer {
   constructor(readonly options: RendererOptions) {
     if (!options.wrapsX) throw new RangeError("the globe needs a map of the whole planet");
     this.renderer = new THREE.WebGLRenderer({ antialias: false });
+    this.watch();
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(SPACE);
     this.canvas = this.renderer.domElement;
@@ -249,6 +250,34 @@ export class GlobeView implements Renderer {
       fill.setScale(scale);
     }
     this.renderer.render(this.scene, this.camera);
+    if (this.frames < 3) {
+      this.frames++;
+      this.inspect();
+    }
+  }
+
+  private frames = 0;
+  private broken: string | undefined;
+
+  /** What went wrong with the context or the shaders, found after the first frames. */
+  fault(): string | undefined {
+    return this.broken;
+  }
+
+  private watch(): void {
+    this.renderer.debug.onShaderError = (gl, _program, vertex, fragment) => {
+      this.broken ??= `shader: ${gl.getShaderInfoLog(vertex) ?? ""} ${gl.getShaderInfoLog(fragment) ?? ""}`;
+    };
+  }
+
+  private inspect(): void {
+    if (this.broken) return;
+    const gl = this.renderer.getContext();
+    if (gl.isContextLost()) this.broken = "context lost";
+    else {
+      const code = gl.getError();
+      if (code !== gl.NO_ERROR) this.broken = `gl error ${String(code)}`;
+    }
   }
 
   private clock(): number {

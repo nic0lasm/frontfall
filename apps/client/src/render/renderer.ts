@@ -148,6 +148,8 @@ export interface Renderer {
   /** Device pixels per CSS pixel the map is drawn at (render-scale.ts). */
   setPixelRatio(ratio: number): void;
   render(view: CameraView): void;
+  /** Why the frames come out blank (a shader that did not build, a lost context), once known. */
+  fault?(): string | undefined;
   dispose(): void;
 }
 

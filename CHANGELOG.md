@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- **A blank map now says why.** When a browser (Brave with its fingerprinting shield, for one) creates WebGL 2 but draws nothing, the game now stops with a message that says what to change instead of leaving an empty map under the controls.
+
 ## [0.9.4] - 2026-10-30
 
 ### Added
