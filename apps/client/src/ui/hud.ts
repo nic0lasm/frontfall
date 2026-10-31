@@ -1,4 +1,4 @@
-import { DEFAULT_BALANCE, NO_OPERATOR } from "@frontfall/engine";
+import { DEFAULT_BALANCE, NO_OPERATOR, PALACE_CITIES } from "@frontfall/engine";
 import { attackPreview, goldPerSecond, soldiersOf } from "../game/attack-preview.ts";
 import type { GameRules } from "../game/messages.ts";
 import type { ClickMode, GameUpdate, PlayerView } from "../game/solo-game.ts";
@@ -827,12 +827,16 @@ export class Hud {
     const playing = update.phase === "play" && human.alive;
     const can: Partial<Record<ClickMode, boolean>> = {
       city: playing && human.gold >= cityCost && cities < cityLimit,
-      palace: playing && human.gold >= palaceCost && cities + 2 <= cityLimit,
+      palace:
+        playing &&
+        !update.build.palaceBuilt &&
+        human.gold >= palaceCost &&
+        cities + PALACE_CITIES <= cityLimit,
       fort: playing && human.gold >= fortCost,
       port: playing && human.gold >= portCost,
       silo: playing && human.gold >= siloCost,
       airDefense: playing && human.gold >= airDefenseCost,
-      mosque: playing && human.gold >= mosqueCost,
+      mosque: playing && !update.build.mosqueBuilt && human.gold >= mosqueCost,
       missile: playing && loaded && human.gold >= missileCost,
       heavyMissile: playing && loaded && human.gold >= heavyMissileCost,
       warship:
@@ -845,13 +849,15 @@ export class Hud {
       human.gold < cost ? workText("whyGold", { gap: formatCount(cost - human.gold) }) : undefined;
     const why: Partial<Record<ClickMode, string | undefined>> = {
       city: missing(cityCost) ?? (cities >= cityLimit ? workText("whyCityLimit") : undefined),
-      palace:
-        missing(palaceCost) ?? (cities + 2 > cityLimit ? workText("whyCityLimit") : undefined),
+      palace: update.build.palaceBuilt
+        ? workText("whyWonder")
+        : (missing(palaceCost) ??
+          (cities + PALACE_CITIES > cityLimit ? workText("whyCityLimit") : undefined)),
       fort: missing(fortCost),
       port: missing(portCost),
       silo: missing(siloCost),
       airDefense: missing(airDefenseCost),
-      mosque: missing(mosqueCost),
+      mosque: update.build.mosqueBuilt ? workText("whyWonder") : missing(mosqueCost),
       missile: missing(missileCost) ?? (loaded ? undefined : workText("whyLoad")),
       heavyMissile: missing(heavyMissileCost) ?? (loaded ? undefined : workText("whyLoad")),
       warship:

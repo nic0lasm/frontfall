@@ -19,6 +19,7 @@ const TEXTS: Record<Language, Record<string, string>> = {
       "Gold you earn each second: the base income, more for your workers; trade comes on top.",
     whyGold: "Not enough gold: {gap} short.",
     whyCityLimit: "No room for another city on your land yet.",
+    whyWonder: "You have built this wonder already: one each.",
     whyLoad: "No silo is loaded yet.",
     whyPort: "A finished port is needed first.",
     statTroops:
@@ -46,6 +47,7 @@ const TEXTS: Record<Language, Record<string, string>> = {
       "L'or que vous gagnez chaque seconde : le revenu de base, plus pour vos ouvriers ; commerce en plus.",
     whyGold: "Pas assez d'or : il en manque {gap}.",
     whyCityLimit: "Plus de place pour une ville sur vos terres pour l'instant.",
+    whyWonder: "Vous avez déjà bâti cette merveille : une seule chacun.",
     whyLoad: "Aucun silo n'est encore chargé.",
     whyPort: "Il faut d'abord un port terminé.",
     statTroops:
