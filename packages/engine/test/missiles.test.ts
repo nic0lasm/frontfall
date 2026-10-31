@@ -452,20 +452,20 @@ describe("mosque (R-BUILD-09)", () => {
     return game.missileEvents.filter((e) => e.type === "intercepted").length / flown;
   }
 
-  it("gets two tries at each missile, so it stops more than an air defense", () => {
+  it("gets three tries at each missile, so it stops more than an air defense", () => {
     const single = stopped(StructureKind.AirDefense);
     const double = stopped(StructureKind.Mosque);
     expect(double).toBeGreaterThan(single);
-    // 50 % twice is 75 %, against 50 %.
-    expect(double).toBeGreaterThan(0.65);
+    // 50 % three times is 87.5 %, against 50 %.
+    expect(double).toBeGreaterThan(0.78);
     expect(single).toBeLessThan(0.6);
   });
 
-  it("costs the next two air defenses, counts as two after, and goes with their disable bit", () => {
+  it("costs twice the next air defense, counts as two after, and goes with their disable bit", () => {
     const { game } = newGame();
     // Each air defense costs one B-AIR-DEFENSE-COST more than the last.
     expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(1000);
-    expect(structureCost(game, 1, StructureKind.Mosque)).toBe(1000 + 2000);
+    expect(structureCost(game, 1, StructureKind.Mosque)).toBe(2 * 1000);
     game.structures.push({
       id: 99,
       player: 1,

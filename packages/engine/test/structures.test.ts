@@ -142,56 +142,44 @@ describe("structures", () => {
     expect(workingCities(game, ada)).toBe(2);
   });
 
-  it("prices a palace as the next two cities, and counts it as two after (R-BUILD-08)", () => {
-    const { game, ada, build } = newGame();
+  it("prices a palace as the next three cities, and counts the three after (R-BUILD-08)", () => {
+    const { game, ada, build } = newGame({ cityLand: 80 });
     build(1, StructureKind.City, 2, 2);
-    // The second and third cities: 1500 + 2250.
-    expect(structureCost(game, 1, StructureKind.Palace)).toBe(3750);
+    // The second, third and fourth cities: 1500 + 2250 + 3375.
+    expect(structureCost(game, 1, StructureKind.Palace)).toBe(7125);
     build(1, StructureKind.Palace, 8, 2);
-    expect(ada.gold).toBe(100_000 - 1000 - 3750);
-    expect(cityShare(game, 1)).toBe(3);
-    // The next city is the fourth.
-    expect(structureCost(game, 1, StructureKind.City)).toBe(3375);
-    expect(structureCost(game, 1, StructureKind.Palace)).toBe(3375 + 5062);
-    expect(structureCost(game, 2, StructureKind.Palace)).toBe(2500);
+    expect(ada.gold).toBe(100_000 - 1000 - 7125);
+    // Worth five cities, but it only set the price of three.
+    expect(cityShare(game, 1)).toBe(6);
+    expect(structureCost(game, 1, StructureKind.City)).toBe(5062);
+    expect(structureCost(game, 2, StructureKind.Palace)).toBe(1000 + 1500 + 2250);
   });
 
-  it("raises the population cap as two cities once ready (R-BUILD-08)", () => {
-    const { game, ada, build, run } = newGame();
+  it("raises the population cap as five cities once ready (R-BUILD-08)", () => {
+    const { game, ada, build, run } = newGame({ cityLand: 80 });
     build(1, StructureKind.Palace, 5, 5);
     expect(workingCities(game, ada)).toBe(0);
     run(4);
-    expect(workingCities(game, ada)).toBe(2);
+    expect(workingCities(game, ada)).toBe(5);
   });
 
-  it("needs land for two cities, and counts within the land's cities when land is lost (R-BUILD-08)", () => {
-    const { game, grid, ada, build, run } = newGame();
-    // 400 tiles: three cities' worth.
-    build(1, StructureKind.City, 2, 2);
+  it("needs land for five cities, and counts within the land's cities when land is lost (R-BUILD-08)", () => {
+    const { game, grid, ada, build, run } = newGame({ cityLand: 100 });
+    // 400 tiles: five cities' worth.
     build(1, StructureKind.Palace, 8, 2);
-    const order = (structure: StructureKind): Order => ({
-      type: "build",
-      structure,
-      tile: grid.index(2, 10),
-    });
-    expect(orderError(game, ada, order(StructureKind.City))).toBe(
-      "not enough land for another city",
-    );
-    expect(orderError(game, ada, order(StructureKind.Palace))).toBe(
-      "not enough land for another city",
-    );
+    const city: Order = { type: "build", structure: StructureKind.City, tile: grid.index(2, 10) };
+    expect(orderError(game, ada, city)).toBe("not enough land for another city");
     run(5);
-    expect(workingCities(game, ada)).toBe(3);
-    // Down to 300 tiles: two cities' worth.
+    expect(workingCities(game, ada)).toBe(5);
+    // Down to 300 tiles: four cities' worth.
     for (let y = 10; y < 20; y++)
       for (let x = 10; x < 20; x++) game.territory.setOwner(grid.index(x, y), 2);
-    expect(workingCities(game, ada)).toBe(2);
+    expect(workingCities(game, ada)).toBe(4);
   });
 
-  it("refuses a palace with only one more city's land (R-BUILD-08)", () => {
-    const { game, grid, ada, build } = newGame();
+  it("refuses a palace with land for fewer than five cities (R-BUILD-08)", () => {
+    const { game, grid, ada, build } = newGame({ cityLand: 100 });
     build(1, StructureKind.City, 2, 2);
-    build(1, StructureKind.City, 8, 2);
     const palace: Order = {
       type: "build",
       structure: StructureKind.Palace,
@@ -200,14 +188,40 @@ describe("structures", () => {
     expect(orderError(game, ada, palace)).toBe("not enough land for another city");
   });
 
+  it("lets each player build one palace, and one mosque, at most (R-BUILD-10)", () => {
+    const { game, grid, ada, bea, build } = newGame({ cityLand: 0 });
+    ada.gold = 100_000_000;
+    build(1, StructureKind.Palace, 2, 2);
+    const again = (kind: StructureKind): Order => ({
+      type: "build",
+      structure: kind,
+      tile: grid.index(2, 10),
+    });
+    expect(orderError(game, ada, again(StructureKind.Palace))).toBe(
+      "a wonder can be built only once by each player",
+    );
+    // A city is no wonder, and another player has their own.
+    expect(orderError(game, ada, again(StructureKind.City))).toBeUndefined();
+    const beas: Order = { type: "build", structure: StructureKind.Palace, tile: grid.index(30, 5) };
+    expect(orderError(game, bea, beas)).toBeUndefined();
+    build(1, StructureKind.Mosque, 8, 2);
+    expect(orderError(game, ada, again(StructureKind.Mosque))).toBe(
+      "a wonder can be built only once by each player",
+    );
+    // Refused, so nothing was paid.
+    const gold = ada.gold;
+    build(1, StructureKind.Palace, 2, 14);
+    expect(ada.gold).toBe(gold);
+  });
+
   it("changes hands with its tile, and goes with the cities in a private game (R-BUILD-08)", () => {
-    const { game, grid, ada, bea, build, run } = newGame();
+    const { game, grid, ada, bea, build, run } = newGame({ cityLand: 80 });
     build(1, StructureKind.Palace, 18, 5);
     run(5);
     game.territory.setOwner(grid.index(18, 5), 2);
     run(1);
     expect(workingCities(game, ada)).toBe(0);
-    expect(workingCities(game, bea)).toBe(2);
+    expect(workingCities(game, bea)).toBe(5);
     const off = newGame();
     const noCities = createGame({
       terrain: off.game.terrain,
@@ -227,7 +241,7 @@ describe("structures", () => {
       terrain: off.game.terrain,
       seed: 1,
       players: [{ id: 1, name: "Ada" }],
-      balance,
+      balance: { ...balance, cityLand: 0 },
       disabled: Disable.Warships,
     });
     for (let tile = 0; tile < off.grid.size; tile++) noWarships.territory.setOwner(tile, 1);

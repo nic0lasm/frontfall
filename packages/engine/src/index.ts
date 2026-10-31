@@ -149,6 +149,8 @@ export { DrawUsage, Random, derivedRandom, type RandomState } from "./random.ts"
 export { installSpawn, spawnSettings } from "./spawn.ts";
 export {
   BuildError,
+  MOSQUE_TRIES,
+  PALACE_CITIES,
   StructureKind,
   cityLimit,
   airDefenseShare,
@@ -157,6 +159,7 @@ export {
   fortRadius,
   fortified,
   installStructures,
+  isWonder,
   isReady,
   placementError,
   structureAt,

@@ -161,7 +161,10 @@ A tribute buys a truce, not an alliance, and its price grows with the payer's la
 | `B-COST-MAX`             | 1000000 | gold       | `R-BUILD-*`  | Most a city, a port or a warship costs                  |
 | `B-COST-FORT-MAX`        |  250000 | gold       | `R-BUILD-03` | Most a fort costs                                       |
 | `B-COST-AIR-DEFENSE-MAX` | 3000000 | gold       | `R-BUILD-05` | Most an air defense costs                               |
-| `B-PALACE-CITIES`        |       2 | cities     | `R-BUILD-08` | Fixed: what a palace counts as, for cost, land and pop. |
+| `B-PALACE-CITIES`        |       5 | cities     | `R-BUILD-08` | Fixed: what a palace is worth, for land and pop.        |
+| `B-PALACE-COST-CITIES`   |       3 | cities     | `R-BUILD-08` | Fixed: what a palace costs, and counts for later prices |
+| `B-MOSQUE-COST`          |       2 | air def.   | `R-BUILD-09` | Fixed: a mosque costs this many times the next one      |
+| `B-MOSQUE-TRIES`         |       3 | tries      | `R-BUILD-09` | Fixed: independent tries at each missile                |
 | `B-BUILD-SPACING`        |      10 | tiles      | `R-BUILD-07` | Between any two structures                              |
 | `B-CITY-LAND`            |       0 | tiles      | `R-BUILD-07` | Land each city beyond the first needs; 0 for no limit   |
 | `B-FORT-RADIUS`          |      25 | tiles      | `R-BUILD-03` |                                                         |
