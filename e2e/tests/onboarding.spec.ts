@@ -277,7 +277,13 @@ for (const viewport of [
       // A window that is not in front can be held back by the browser, and the game with it.
       await page.bringToFront();
       await page.locator("#tutorial").click();
-      await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
+      // The dialog must be gone, and the game running, before the cards can show: press again if a press was lost.
+      const intro = page.locator("#tutorial-intro");
+      await expect(intro).toBeVisible({ timeout: 30_000 });
+      await expect(async () => {
+        if ((await intro.count()) > 0) await intro.getByRole("button", { name: "Start" }).click();
+        await expect(intro).toHaveCount(0, { timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
       // The game answers once its terrain and its first update are in: slow in a software browser.
       const picker = page.locator(".doctrine-picker");
       await expect(picker).toBeVisible({ timeout: 30_000 });

@@ -297,6 +297,34 @@
   }
 }
 
+/* A short phone: the dialogs are tighter, so that the whole of one fits with room to spare in any browser. */
+@media (height < 700px) {
+  .tutorial-dialog p,
+  .tutorial-points,
+  .tutorial-rules {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .tutorial-dialog p {
+    margin-bottom: 8px;
+  }
+
+  .tutorial-points li,
+  .tutorial-rules li {
+    padding-block: 5px;
+  }
+
+  .tutorial-points li + li,
+  .tutorial-rules li + li {
+    margin-top: 4px;
+  }
+
+  .tutorial-dialog .tutorial-note {
+    font-size: 12px;
+  }
+}
+
 /* The open tray rises over the cards and the place under the banner: the guide goes up under the figures. */
 @media (width < 720px), (height < 560px) {
   .game:has(.doctrine-picker:not([hidden])):has(.build.open) .guide {
