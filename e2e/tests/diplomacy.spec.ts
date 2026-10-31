@@ -130,7 +130,7 @@ test("asks a bot for an alliance from the leaderboard, then betrays it (R-DIPLO)
   expect(pageErrors).toEqual([]);
 });
 
-test("sends a bot a gift of gold, in a game without silos (R-DIPLO-06, R-MODE-03)", async ({
+test("offers no gift to a bot that is not an ally, in a game without silos (R-DIPLO-06, R-MODE-03)", async ({
   page,
 }) => {
   const pageErrors: Error[] = [];
@@ -143,11 +143,10 @@ test("sends a bot a gift of gold, in a game without silos (R-DIPLO-06, R-MODE-03
   await expect(page.locator("#build-silo")).toHaveAttribute("aria-pressed", "false");
   await page.locator(".leader-button").click();
   const menu = page.locator("#player-menu");
-  const gold = menu.locator(".menu-action.gift-gold");
-  await expect(gold).toContainText("of your gold");
-  await expect(gold).toBeEnabled({ timeout: 10_000 });
-  await gold.click();
-  await expect(page.locator(".events-feed")).toContainText("sent a gift to");
+  // Gifts go to allies and teammates only: the menu of a stranger has none.
+  await expect(menu.locator(".menu-action.ask")).toBeVisible();
+  await expect(menu.locator(".menu-action.gift-gold")).toHaveCount(0);
+  await expect(menu.locator(".menu-action.gift-troops")).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });
 
@@ -158,7 +157,7 @@ test("leaves warships and embargoes out with ports (R-MODE-03)", async ({ page }
   await expect(page.locator("#build-warship")).toBeHidden();
   await page.locator(".leader-button").click();
   const menu = page.locator("#player-menu");
-  await expect(menu.locator(".menu-action.gift-gold")).toBeVisible();
+  await expect(menu.locator(".menu-action.ask")).toBeVisible();
   await expect(menu.locator(".menu-action.embargo")).toHaveCount(0);
 });
 
