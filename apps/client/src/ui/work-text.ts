@@ -17,6 +17,16 @@ const TEXTS: Record<Language, Record<string, string>> = {
     goldRate: "+{rate}/s",
     goldRateHint:
       "Gold you earn each second: the base income, more for your workers; trade comes on top.",
+    whyGold: "Not enough gold: {gap} short.",
+    whyCityLimit: "No room for another city on your land yet.",
+    whyLoad: "No silo is loaded yet.",
+    whyPort: "A finished port is needed first.",
+    statTroops:
+      "Troops at home: {troops} of {cap}, a cap that land and cities raise. {soldiers} can fight, {workers} work. They grow by {growth} a second.",
+    statGold:
+      "Gold: +{rate} a second, {base} of base income and {workers} from workers. Trade routes and landmarks come on top.",
+    statLand:
+      "Land: {share} of the map, {tiles} tiles. More land raises your troop cap; the game is won at {win}.",
     previewTiles: "≈ {count} tiles",
     previewTile: "≈ {count} tile",
     previewSend: "{troops} soldiers, {cost} a tile",
@@ -34,6 +44,16 @@ const TEXTS: Record<Language, Record<string, string>> = {
     goldRate: "+{rate}/s",
     goldRateHint:
       "L'or que vous gagnez chaque seconde : le revenu de base, plus pour vos ouvriers ; commerce en plus.",
+    whyGold: "Pas assez d'or : il en manque {gap}.",
+    whyCityLimit: "Plus de place pour une ville sur vos terres pour l'instant.",
+    whyLoad: "Aucun silo n'est encore chargé.",
+    whyPort: "Il faut d'abord un port terminé.",
+    statTroops:
+      "Troupes à la maison : {troops} sur {cap}, un plafond que les terres et les villes relèvent. {soldiers} peuvent se battre, {workers} travaillent. Elles augmentent de {growth} par seconde.",
+    statGold:
+      "Or : +{rate} par seconde, dont {base} de revenu de base et {workers} grâce aux ouvriers. Routes commerciales et sites remarquables en plus.",
+    statLand:
+      "Terres : {share} de la carte, {tiles} cases. Plus de terres relèvent votre plafond de troupes ; la partie se gagne à {win}.",
     previewTiles: "≈ {count} cases",
     previewTile: "≈ {count} case",
     previewSend: "{troops} soldats, {cost} par case",

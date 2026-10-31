@@ -56,7 +56,6 @@
   "hud.spawnPick": "Cliquez sur une terre pour choisir votre point de départ. Encore {seconds} s.",
   "hud.spawnMove": "Cliquez ailleurs pour changer de point de départ. Les attaques commencent dans {seconds} s.",
   "hud.playHint": "Cliquez sur une terre voisine pour vous étendre, ou sur un voisin pour l’attaquer.",
-  "hud.attacking": "À l’attaque : {troops} troupes en marche.",
   "hud.eliminated": "Vous avez été éliminé. Vous pouvez continuer à regarder.",
   "hud.spawnCapital": "Mode capitale : votre point de départ devient votre capitale. Perdez-la et vous perdez tout.",
   "hud.capitalThreat": "Votre capitale est attaquée par {name} ! Repoussez l’attaque ou vous perdrez tout votre empire.",

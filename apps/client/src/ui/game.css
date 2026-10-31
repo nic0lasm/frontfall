@@ -2091,6 +2091,11 @@ button.feed-entry:focus-visible {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
+
+  /* With three buttons the main one takes the first row; the other two share the second. */
+  .end-screen:has(.end-stats-chart) .end-actions > :first-child:nth-last-child(odd) {
+    grid-column: 1 / -1;
+  }
 }
 
 /* A short screen: the panel scrolls as a whole, the buttons stick to its foot. */
@@ -2836,4 +2841,26 @@ button.feed-entry:focus-visible {
     overflow: hidden;
     clip-path: inset(50%);
   }
+}
+
+/* A figure of the bar that explains itself: it reads as pressable only once pointed at. */
+.stat-help {
+  cursor: help;
+  border-radius: 8px;
+}
+
+.stat-help:focus-visible {
+  outline: 2px solid var(--ff-ember-bright);
+  outline-offset: 2px;
+}
+
+/* Why a building cannot be had now: a line in its bubble, only while it cannot. */
+.build-why {
+  display: none;
+  color: var(--ff-ember-bright);
+  font-weight: 600;
+}
+
+.build-button.unaffordable .build-why:not(:empty) {
+  display: block;
 }

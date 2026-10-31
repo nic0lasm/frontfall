@@ -56,7 +56,6 @@
   "hud.spawnPick": "Click on land to choose where you start. {seconds} s left.",
   "hud.spawnMove": "Click elsewhere to move your start. Attacks open in {seconds} s.",
   "hud.playHint": "Click land next to yours to expand, or a neighbour to attack.",
-  "hud.attacking": "Attacking: {troops} troops on the move.",
   "hud.eliminated": "You have been eliminated. You can keep watching.",
   "hud.spawnCapital": "Capital mode: your start becomes your capital. Lose it and you lose everything.",
   "hud.capitalThreat": "Your capital is under attack by {name}! Push them back or lose your whole empire.",

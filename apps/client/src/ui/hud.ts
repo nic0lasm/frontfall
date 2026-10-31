@@ -66,6 +66,9 @@ const MODE_BANNERS = {
   demolish: "hud.modeDemolish",
 } as const;
 
+/** The figures of the bar that explain themselves. */
+type StatKind = "troops" | "gold" | "land";
+
 /**
  * Numbers the player plays by: their troops, gold and land, the attack
  * ratio, what the game expects of them now, and the leading players.
@@ -79,6 +82,7 @@ export class Hud {
   /** R-ECO-08: the gold of a player the player just eliminated, rising off the counter. */
   private readonly goldGain = h("span", { class: "gold-gain", "aria-hidden": "true" });
   private readonly land = h("strong", { class: "stat-value" });
+  private readonly statEls = new Map<StatKind, HTMLElement>();
   private readonly population = new PopulationBar((text) => {
     this.explain(text);
   });
@@ -141,6 +145,9 @@ export class Hud {
   private readonly buildButtons = new Map<ClickMode, HTMLButtonElement>();
   /** The price in each button's bubble, kept up to date with the cost under its icon. */
   private readonly tipPrices = new Map<ClickMode, HTMLElement>();
+  /** Why a build button cannot be used now, in its bubble and read out with it. */
+  private readonly tipWhy = new Map<ClickMode, HTMLElement>();
+  private readonly whyNot = new Map<ClickMode, string>();
   private readonly cityCost = h("span", { class: "build-cost" });
   private readonly palaceCost = h("span", { class: "build-cost" });
   private readonly fortCost = h("span", { class: "build-cost" });
@@ -164,6 +171,12 @@ export class Hud {
     hidden: true,
   });
   private tipTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly dismissTip = (event: Event): void => {
+    if (event.target instanceof Element && event.target.closest(".stats, .build-button")) return;
+    this.tip.hidden = true;
+    clearTimeout(this.tipTimer);
+    document.removeEventListener("pointerdown", this.dismissTip, { capture: true });
+  };
   private rules: GameRules = {
     ownableTiles: 1,
     ticksPerSecond: 10,
@@ -208,8 +221,32 @@ export class Hud {
     });
     this.showWork(0);
 
-    const stat = (key: string, ...value: Node[]): HTMLElement =>
-      h("div", { class: "stat" }, h("span", { class: "stat-label", "data-i18n": key }), ...value);
+    // A figure explains itself on hover (title) and on a press, which a finger needs.
+    const stat = (key: string, kind: StatKind, ...value: Node[]): HTMLElement => {
+      const element = h(
+        "div",
+        {
+          class: "stat stat-help",
+          role: "button",
+          tabindex: 0,
+          "aria-describedby": "build-tip",
+        },
+        h("span", { class: "stat-label", "data-i18n": key }),
+        ...value,
+      );
+      const show = (): void => {
+        const text = this.statHelp(kind);
+        if (text) this.explain(text);
+      };
+      element.addEventListener("click", show);
+      element.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        show();
+      });
+      this.statEls.set(kind, element);
+      return element;
+    };
 
     const pause = h("button", {
       type: "button",
@@ -263,6 +300,8 @@ export class Hud {
         const count = mode === "city" ? [this.cityCount] : [];
         const tipPrice = mode === "demolish" ? undefined : h("span", { class: "build-price" });
         if (tipPrice) this.tipPrices.set(mode, tipPrice);
+        const tipWhy = h("span", { class: "build-why" });
+        this.tipWhy.set(mode, tipWhy);
         const button = h(
           "button",
           {
@@ -291,6 +330,7 @@ export class Hud {
             ...count,
             // What it does and what it costs: in the bubble on hover and focus, read out by the label.
             ...(tipPrice ? [tipPrice] : []),
+            tipWhy,
             h("span", {
               class: "build-desc",
               id: `build-desc-${mode}`,
@@ -330,6 +370,8 @@ export class Hud {
             explained = false;
             return;
           }
+          const why = this.whyNot.get(mode);
+          if (why) this.explain(why);
           actions.onMode(mode);
           // On a narrow screen the tray gives the map back once a choice is made.
           this.setBuildOpen(false);
@@ -404,9 +446,9 @@ export class Hud {
         h(
           "section",
           { class: "panel stats", "data-i18n-attr": "aria-label:hud.yourEmpire" },
-          stat("hud.troops", this.troops, this.troopsCap),
-          stat("hud.gold", this.gold, this.goldRate, this.goldGain),
-          stat("hud.land", this.land),
+          stat("hud.troops", "troops", this.troops, this.troopsCap),
+          stat("hud.gold", "gold", this.gold, this.goldRate, this.goldGain),
+          stat("hud.land", "land", this.land),
           this.population.element,
         ),
         // R-ECO-07: what attacks take, and what stays at home to work, side by side.
@@ -466,9 +508,12 @@ export class Hud {
   explain(text: string): void {
     this.tip.textContent = text;
     this.tip.hidden = false;
+    // A touch elsewhere puts it away, so it never lingers over the map or the other cards.
+    document.addEventListener("pointerdown", this.dismissTip, { capture: true });
     clearTimeout(this.tipTimer);
     this.tipTimer = setTimeout(() => {
       this.tip.hidden = true;
+      document.removeEventListener("pointerdown", this.dismissTip, { capture: true });
     }, TIP_MS);
   }
 
@@ -577,6 +622,7 @@ export class Hud {
       this.land.textContent = this.share(human.tiles);
       this.population.update(human.troops, human.cap, update.economy.growth);
       this.renderBuild(update, human);
+      this.renderStatHelp();
     }
     this.banner.textContent = this.bannerText(update, human);
     // R-CAP-05: the banner turns to an alarm while the capital is threatened.
@@ -585,6 +631,49 @@ export class Hud {
     this.renderGoal(update, human);
     this.renderAttacks(update);
     this.renderPreview(update);
+  }
+
+  /** What each figure of the bar means now, read out and shown on hover. */
+  private renderStatHelp(): void {
+    for (const [kind, element] of this.statEls) {
+      const text = this.statHelp(kind);
+      if (text) element.title = text;
+    }
+  }
+
+  /** What a figure of the bar is made of, with the player's own numbers. */
+  private statHelp(kind: StatKind): string | undefined {
+    const update = this.last;
+    const human = update ? this.you(update) : undefined;
+    if (!update || !human) return undefined;
+    const soldiers = soldiersOf({ troops: human.troops, workShare: this.work });
+    switch (kind) {
+      case "troops":
+        return workText("statTroops", {
+          troops: formatCount(human.troops),
+          cap: formatCount(human.cap),
+          soldiers: formatCount(soldiers),
+          workers: formatCount(human.troops - soldiers),
+          growth: formatCount(update.economy.growth),
+        });
+      case "gold": {
+        const gold = (workShare: number): number =>
+          goldPerSecond({ troops: human.troops, workShare, cap: human.cap });
+        const base = Math.floor(gold(0));
+        const total = Math.floor(gold(this.work));
+        return workText("statGold", {
+          rate: formatCount(total),
+          base: formatCount(base),
+          workers: formatCount(total - base),
+        });
+      }
+      case "land":
+        return workText("statLand", {
+          share: this.share(human.tiles),
+          tiles: formatCount(human.tiles),
+          win: formatPercent(this.rules.winSharePercent / 100),
+        });
+    }
   }
 
   /** R-ECO-08: the gold taken from the players the player eliminated in this update. */
@@ -643,7 +732,10 @@ export class Hud {
 
   /** Gold a second from the troops, with the share the slider shows. */
   private renderGold(human: PlayerView): void {
-    const rate = goldPerSecond({ troops: human.troops, workShare: this.work, cap: human.cap });
+    // Nobody earns anything once wiped out.
+    const rate = human.alive
+      ? goldPerSecond({ troops: human.troops, workShare: this.work, cap: human.cap })
+      : 0;
     this.goldRate.textContent = workText("goldRate", { rate: formatCount(Math.floor(rate)) });
   }
 
@@ -745,9 +837,33 @@ export class Hud {
         update.structures.some((s) => s.type === "port" && s.player === human.id && s.ready),
       demolish: playing,
     };
+    const missing = (cost: number): string | undefined =>
+      human.gold < cost ? workText("whyGold", { gap: formatCount(cost - human.gold) }) : undefined;
+    const why: Partial<Record<ClickMode, string | undefined>> = {
+      city: missing(cityCost) ?? (cities >= cityLimit ? workText("whyCityLimit") : undefined),
+      palace:
+        missing(palaceCost) ?? (cities + 2 > cityLimit ? workText("whyCityLimit") : undefined),
+      fort: missing(fortCost),
+      port: missing(portCost),
+      silo: missing(siloCost),
+      airDefense: missing(airDefenseCost),
+      mosque: missing(mosqueCost),
+      missile: missing(missileCost) ?? (loaded ? undefined : workText("whyLoad")),
+      heavyMissile: missing(heavyMissileCost) ?? (loaded ? undefined : workText("whyLoad")),
+      warship:
+        missing(update.build.warshipCost) ??
+        (update.structures.some((s) => s.type === "port" && s.player === human.id && s.ready)
+          ? undefined
+          : workText("whyPort")),
+    };
     // Still pressable: a click on the map then says what is missing.
     for (const [mode, button] of this.buildButtons) {
       const allowed = can[mode] === true;
+      const reason = allowed ? undefined : why[mode];
+      if (reason) this.whyNot.set(mode, reason);
+      else this.whyNot.delete(mode);
+      const tipReason = this.tipWhy.get(mode);
+      if (tipReason) tipReason.textContent = reason ?? "";
       button.classList.toggle("unaffordable", !allowed);
       button.setAttribute("aria-disabled", String(!allowed));
       // The name and the cost sit in a bubble only the pointer reaches: say them to the rest.
@@ -755,7 +871,7 @@ export class Hud {
       const name = t(`hud.${mode}` as MessageKey);
       const label =
         price === undefined ? name : t("hud.buildLabel", { name, cost: formatCount(price) });
-      button.setAttribute("aria-label", label);
+      button.setAttribute("aria-label", reason ? `${label}. ${reason}` : label);
       const tipPrice = this.tipPrices.get(mode);
       if (tipPrice && price !== undefined) tipPrice.textContent = formatCount(price);
     }
@@ -875,8 +991,8 @@ export class Hud {
         this.hintDone = true;
         setHintSeen(safeStorage());
       }
-      const troops = update.attacks.reduce((sum, attack) => sum + attack.troops, 0);
-      return t("hud.attacking", { count: update.attacks.length, troops: formatCount(troops) });
+      // The attack panel names each attack and its troops: the banner stays quiet.
+      return "";
     }
     return this.hintDone ? "" : this.say("hud.playHint");
   }
