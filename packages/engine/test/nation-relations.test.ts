@@ -136,6 +136,7 @@ describe("nation relations (R-BOT-20 to R-BOT-24)", () => {
     expect(messages).toContainEqual({ from: 1, to: 2, phrase: Phrase.Up });
     applied.length = 0;
     nation.troops = populationCap(game, nation);
+    ada.troops = nation.troops;
     run(1, [{ player: 2, order: { type: "betray", target: 1 } }]);
     expect(nationMood(game, 1, 2)).toBe("hostile");
     run(seconds(6));
