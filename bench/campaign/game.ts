@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import {
   createGame,
   DEFAULT_BALANCE,
+  populationCap,
   installCityStates,
   installNations,
   CITY_STATES_PER_NATION,
@@ -25,6 +26,23 @@ export interface CampaignSetup {
   readonly rules?: Partial<GameRules>;
 }
 
+/** The game at one moment: where the player stands, who leads, and why the player held back since the last one. */
+export interface CampaignSnapshot {
+  readonly minute: number;
+  readonly sharePercent: number;
+  readonly gold: number;
+  /** Troops in % of the player's cap. */
+  readonly troopsPercent: number;
+  /** The biggest other player: id, nation or city-state, share of the map. */
+  readonly leader: number;
+  readonly leaderKind: "nation" | "city-state";
+  readonly leaderSharePercent: number;
+  readonly deadMinutes: number;
+  readonly underAttackMinutes: number;
+  /** The player's attack decisions since the last snapshot, by reason. */
+  readonly reasons: Readonly<Record<string, number>>;
+}
+
 /** What one simulated game says about the game, the player and the rules. */
 export interface CampaignReport {
   readonly setup: CampaignSetup;
@@ -34,6 +52,10 @@ export interface CampaignReport {
   readonly aliveAtEnd: boolean;
   readonly eliminatedAt?: number;
   readonly finalSharePercent: number;
+  /** Not won but alive at the end, first on the map with more than 40 % of it: shown beside the win rate. */
+  readonly led: boolean;
+  /** Snapshots at 5, 10, 20 and 30 min, and at the end if sooner. */
+  readonly timeline: readonly CampaignSnapshot[];
   readonly peakSharePercent: number;
   /** Fun: minutes without any land gained or lost by the player, and its share of the game. */
   readonly deadMinutes: number;
@@ -146,6 +168,44 @@ export function playCampaignGame(
   let shareSig = "";
   let sigSince = 0;
   let playMinutesDone = 0;
+  const timeline: CampaignSnapshot[] = [];
+  let windowDead = 0;
+  let windowAttacked = 0;
+  let lastReasons = new Map<string, number>();
+  const snapshot = (minute: number): void => {
+    const p = game.player(1);
+    let leader = 0;
+    let most = -1;
+    for (const q of game.players()) {
+      if (q.id === 1 || !q.alive) continue;
+      const count = game.territory.tileCount(q.id);
+      if (count > most) {
+        most = count;
+        leader = q.id;
+      }
+    }
+    const reasons: Record<string, number> = {};
+    const now = me.reasons ?? new Map<string, number>();
+    for (const [why, n] of now) {
+      const since = n - (lastReasons.get(why) ?? 0);
+      if (since > 0) reasons[why] = since;
+    }
+    lastReasons = new Map(now);
+    timeline.push({
+      minute,
+      sharePercent: round1((game.territory.tileCount(1) * 100) / ownable),
+      gold: p?.gold ?? 0,
+      troopsPercent: p ? Math.round((p.troops * 100) / Math.max(1, populationCap(game, p))) : 0,
+      leader,
+      leaderKind: game.bots.has(leader) ? "city-state" : "nation",
+      leaderSharePercent: round1((Math.max(0, most) * 100) / ownable),
+      deadMinutes: windowDead,
+      underAttackMinutes: windowAttacked,
+      reasons,
+    });
+    windowDead = 0;
+    windowAttacked = 0;
+  };
 
   while (game.tick < lastTick) {
     const orders = game.tick === 0 || game.phase === "play" ? me.orders() : [];
@@ -181,9 +241,13 @@ export function playCampaignGame(
     if (elapsed > 0 && elapsed % perMinute === 0) {
       playMinutesDone = elapsed / perMinute;
       if (p.alive) {
-        if (!changedThisMinute) deadMinutes++;
+        if (!changedThisMinute) {
+          deadMinutes++;
+          windowDead++;
+        }
         if (attackedThisMinute) {
           underAttackMinutes++;
+          windowAttacked++;
           firstFight ??= playMinutesDone;
         }
       }
@@ -210,14 +274,22 @@ export function playCampaignGame(
         shareSig = sig;
         sigSince = playMinutesDone;
       }
+      if (SNAPSHOT_MINUTES.includes(playMinutesDone)) snapshot(playMinutesDone);
     }
     if (game.decidedAt !== undefined && decidedAt === undefined) {
       decidedAt = (game.decidedAt - balance.spawnPhaseTicks) / perMinute;
       break;
     }
   }
+  if (timeline.at(-1)?.minute !== playMinutesDone) snapshot(playMinutesDone);
   const sorted = [...stepMs].sort((a, b) => a - b);
   const alive = game.player(1)?.alive ?? false;
+  const mine = game.territory.tileCount(1);
+  const led =
+    game.winner !== 1 &&
+    alive &&
+    mine * 100 > ownable * 40 &&
+    game.players().every((q) => q.id === 1 || game.territory.tileCount(q.id) < mine);
   const stalemate = decidedAt === undefined && playMinutesDone - sigSince >= 10;
   return {
     setup,
@@ -226,7 +298,9 @@ export function playCampaignGame(
     ...(game.winner === undefined ? {} : { winner: game.winner }),
     aliveAtEnd: alive,
     ...(eliminatedAt === undefined ? {} : { eliminatedAt }),
-    finalSharePercent: (game.territory.tileCount(1) * 100) / ownable,
+    finalSharePercent: (mine * 100) / ownable,
+    led,
+    timeline,
     peakSharePercent: peak,
     deadMinutes,
     playedMinutes: Math.max(1, playMinutesDone),
@@ -244,6 +318,9 @@ export function playCampaignGame(
   };
 }
 
+const SNAPSHOT_MINUTES = [5, 10, 20, 30];
+const round1 = (x: number): number => Math.round(x * 10) / 10;
+
 /** Nico plays quicker and a little braver than the bench's reference; a veteran waits for the odds. */
 const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
   nico: {
@@ -253,6 +330,7 @@ const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
     warPercent: 55,
     oddsPercent: 140,
     allySeconds: 600,
+    measured: true,
   },
   veteran: {
     everySeconds: 1,
@@ -261,6 +339,7 @@ const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
     warPercent: 60,
     oddsPercent: 160,
     allySeconds: 300,
+    measured: true,
   },
 };
 
@@ -275,6 +354,7 @@ function humanProfile(
     orders: () => human.orders(),
     refused: 0,
     sent: 0,
+    reasons: human.reasons,
   };
 }
 

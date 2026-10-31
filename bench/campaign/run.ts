@@ -141,6 +141,10 @@ for (const profile of profiles) {
       "win %": Math.round(win),
       target: `${String(lo)}-${String(hi)}`,
       ok: ok ? "yes" : "NO",
+      // Information only: the campaign's criterion is the outright win.
+      "won or led >40 % at end": Math.round(
+        pct(rs.filter((r) => r.won || r.led).length, rs.length),
+      ),
       "alive %": Math.round(survive),
       "share % (med)": Math.round(median(rs.map((r) => r.finalSharePercent))),
       "dead min %": Math.round(dead),
