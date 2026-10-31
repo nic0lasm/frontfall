@@ -34,4 +34,4 @@ export const FUN = {
 };
 
 /** Perf: engine tick cost, ms. */
-export const PERF = { tickP99MaxMs: 12, tickMaxMs: 120 };
+export const PERF = { tickP99MaxMs: 12, tickMaxMs: 120, startMaxMs: 250 };
