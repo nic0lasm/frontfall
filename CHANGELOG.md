@@ -4,6 +4,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-10-31
+
 ### Added
 
 - **The gold of a trade ship, at the dock.** When a trade ship reaches a port, the gold it brings you now rises as a "+N" over that port, for your own ships and for those that call at your ports. Two ships docking together add up in one figure, and with reduced motion the figure stays still and fades.
@@ -19,6 +21,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **Point at a ship to read it.** Resting the mouse on a transport, trade or war ship shows a card with its owner, what it carries (troops aboard, goods, or its health left) and where it is bound. On a touch screen, press and hold the ship.
 - **Point at bombed land to read it.** Resting the mouse on land under fallout shows a card with the missile (light or heavy), that taking a tile there costs twice the usual price, the seconds before it clears, and who fired it when the missile came down in this game. On a touch screen, press and hold unclaimed irradiated land.
 - **City-states.** Games with nations now come with small city-states scattered across the map, six for each nation (420 on the world map). They are weak, never ally with anyone and nobody can ally with them, and whoever takes their last tile takes their gold: they are where everyone, you included, finds land and gold early on. You only hear of the ones you take.
+- **Warships tell from trade ships.** At every zoom a war ship now reads as a warship, apart from a trade ship, and its shots show.
+- **A growth bar you can read.** The troop growth bar gives the gain per second in full and names the zone where your army grows best.
 - **Land by boat along a shared border.** When you touch a player by land, a click always attacked by land. You can now choose the boat: hold Shift and click their coast, or press and hold their land and pick "Land here by boat" in the player menu. The troops sail from your closest coast and land where you pointed.
 
 ### Changed
@@ -29,6 +33,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **Diplomacy takes a step.** Attack or land on a player and their ports shut to you for five minutes, unless you become allies first. They can keep the embargo longer or lift it. Gifts of troops and gold now go to allies and teammates only. An alliance can be renewed in its last 30 seconds instead of 60. Each row of the leaderboard says what a player is to you: at war, embargoed, hostile, wary, friendly or neutral.
 - **Your figures explain themselves.** Rest the mouse on, or press, Troops, Gold or Land: a card says what the number is made of (troop cap, soldiers and workers, base income and workers' share, tiles and the winning share). It works with the keyboard too.
 - **A greyed building says why.** Point at a building you cannot place yet, or press it: its card tells what is missing (gold to find, a loaded silo, a finished port, room for a city).
+- **A quieter event feed.** Embargoes between other players no longer fill it: only the ones that concern you stay.
+- **A wider leaderboard,** so the names of countries are no longer cut.
 - **End screen buttons.** With three buttons, "Play again" takes a row of its own and the other two share the next, instead of one left alone.
 - **A quieter screen.** The banner no longer repeats the attack panel, and a card of figures or of a building goes away at your next touch.
 - **Keep playing after the game is decided.** Choosing "Keep watching" on the end screen no longer takes your orders away: if you still hold land, you can attack, build, trade and talk to the others while the game goes on. Only a player who has been wiped out just watches.
@@ -45,6 +51,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Fixed
 
+- **The first-steps card goes when you are out.** It no longer stays on screen after your elimination.
+- **A player card that stays.** Letting go of a drag past the map, or leaving the window, no longer leaves the card of a player or the lit land behind.
 - **A blank map now says why.** When a browser (Brave with its fingerprinting shield, for one) creates WebGL 2 but draws nothing, the game now stops with a message that says what to change instead of leaving an empty map under the controls.
 
 ## [0.9.4] - 2026-10-30
@@ -597,7 +605,8 @@ The first playable beta: a solo game in the browser against bots on a map of the
 - The server trusts the `X-Client-IP` header only from a proxy on a private address, and accepts WebSocket connections without an `Origin` header, as sent by bots and tools.
 - A client that cannot read a turn asks for a reload instead of playing on out of step, and one that notices a gap in its turns rejoins to fetch the missing ones.
 
-[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/nic0lasm/frontfall/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/nic0lasm/frontfall/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/nic0lasm/frontfall/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/nic0lasm/frontfall/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/nic0lasm/frontfall/compare/v0.9.1...v0.9.2
