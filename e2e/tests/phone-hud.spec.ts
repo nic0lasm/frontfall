@@ -3,10 +3,14 @@ import { expect, test } from "@playwright/test";
 // The narrowest phones still sold, in French, whose costs are the longest ("1,5 M").
 test.use({ viewport: { width: 320, height: 568 }, hasTouch: true, locale: "fr-FR" });
 
+test.setTimeout(90_000);
+
 test("fits every build button and its cost on a narrow phone", async ({ page }) => {
   await page.goto("./?map=skirmish&bots=1&nations=0");
   await page.locator("#play").click();
   await expect(page.locator("#map")).toBeVisible();
+  // The doctrine cards cover the bottom of a narrow phone until the spawn phase ends (R-DOCTRINE-01).
+  await expect(page.locator(".doctrine-picker")).toBeHidden({ timeout: 60_000 });
   // The buildings sit behind a button on a phone.
   await expect(page.locator(".build")).toBeHidden();
   await page.locator("#build-toggle").click();

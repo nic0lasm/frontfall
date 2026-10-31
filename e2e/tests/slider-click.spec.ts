@@ -32,7 +32,12 @@ async function start(page: Page): Promise<void> {
   await expect(page.locator("#map")).toBeVisible();
   await spawn(page);
   await expect(page.locator("#work-share")).toBeEnabled();
+  // The doctrine cards cover the sliders until the spawn phase ends (R-DOCTRINE-01).
+  await expect(page.locator(".doctrine-picker")).toBeHidden({ timeout: 60_000 });
 }
+
+// Each game waits out the spawn phase, which the doctrine cards cover the sliders for.
+test.setTimeout(90_000);
 
 test.describe("a press anywhere on a slider sets it", () => {
   test("a single mouse click on the middle of the track", async ({ page }) => {

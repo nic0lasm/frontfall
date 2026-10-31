@@ -33,7 +33,7 @@ const snapshotTick = (page: Page): Promise<number> =>
   })`);
 
 interface Case {
-  /** The special rules (R-MODE-08), collapsing fronts and capitals, all on or all off. */
+  /** The special rules (R-MODE-08), collapsing fronts, capitals and doctrines, all on or all off. */
   readonly rules: boolean;
   readonly speed: 1 | 4;
 }
@@ -84,6 +84,7 @@ for (const { rules, speed } of CASES) {
     await host.locator("#lobby-speed").selectOption(String(speed));
     await host.locator("#lobby-collapsingFronts").setChecked(rules);
     await host.locator("#lobby-capitals").setChecked(rules);
+    await host.locator("#lobby-doctrines").setChecked(rules);
     const link = await invite.inputValue();
     for (const [index, guest] of [reloading, other].entries()) {
       const invited = new URL(link);
@@ -99,7 +100,8 @@ for (const { rules, speed } of CASES) {
       if (speed === 1) await expect(summary).not.toContainText("speed");
       else await expect(summary).toContainText(`speed ×${String(speed)}`);
       const line = guest.locator("#lobby-rules-line");
-      if (rules) await expect(line).toHaveText("Special rules: Collapsing fronts, Capital mode");
+      if (rules)
+        await expect(line).toHaveText("Special rules: Collapsing fronts, Capital mode, Doctrines");
       else await expect(line).toBeHidden();
     }
     await host.locator("#lobby-start").click();
@@ -140,7 +142,7 @@ for (const { rules, speed } of CASES) {
     await expect(end).toBeVisible({ timeout: 240_000 });
     expect(await desyncs(baseURL)).toBe("0");
     await expect(end.locator(".end-rules")).toHaveText(
-      "Special rules: Collapsing fronts, Capital mode",
+      "Special rules: Collapsing fronts, Capital mode, Doctrines",
     );
     const saved = host.waitForEvent("download");
     await end.getByRole("button", { name: "Save the replay" }).click();
