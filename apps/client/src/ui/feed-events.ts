@@ -297,6 +297,9 @@ export class FeedWatcher {
     // A quick message is for its sender and its receiver only (R-DIPLO-07).
     if (event.type === "quick" && event.a !== you && event.b !== you) return undefined;
     if (event.type === "trade") return undefined;
+    // Between two others, an embargo is no news for the player: a crowded world would bury theirs.
+    const trade = event.type === "embargo" || event.type === "lifted";
+    if (this.personal && trade && event.a !== you && event.b !== you) return undefined;
     const mine = this.personal && (event.a === you || event.b === you);
     const other = event.a === you ? event.b : event.a;
     const tone = mine ? this.tone(event, you) : "info";
