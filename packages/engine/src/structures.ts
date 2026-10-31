@@ -38,6 +38,7 @@ export const BuildError = {
   Foreign: "the tile is not yours",
   Crowded: "too close to another structure",
   Land: "not enough land for another city",
+  Unique: "a wonder can be built only once by each player",
   Coast: "a port needs a coast",
   Disabled: "left out of this game",
   Gold: "not enough gold",
@@ -76,7 +77,21 @@ export function disableBit(kind: StructureKind): number {
   return 1 << kind;
 }
 
-/** Air defenses a player owns, those still being built included, a mosque counting as two (R-BUILD-09). */
+/** Cities a palace is worth: for the population cap and the land limit (R-BUILD-08). */
+export const PALACE_CITIES = 5;
+/** Cities a palace costs, at the price of the next ones (R-BUILD-08). */
+export const PALACE_COST_CITIES = 3;
+/** Independent tries at each missile a mosque gets (R-BUILD-09). */
+export const MOSQUE_TRIES = 3;
+/** Air defenses a mosque costs, at the price of the next one (R-BUILD-09). */
+export const MOSQUE_COST_FACTOR = 2;
+
+/** Whether a kind is a wonder: each player builds one of it at most (R-BUILD-10). */
+export function isWonder(kind: StructureKind): boolean {
+  return kind === StructureKind.Palace || kind === StructureKind.Mosque;
+}
+
+/** Air defenses a player owns, those still being built included, a mosque counting as two, what it cost (R-BUILD-09). */
 export function airDefenseShare(game: Game, player: number): number {
   return (
     structureCount(game, player, StructureKind.AirDefense) +
@@ -84,11 +99,19 @@ export function airDefenseShare(game: Game, player: number): number {
   );
 }
 
-/** Cities a player owns, those still being built included, a palace counting as two (R-BUILD-08). */
+/** Cities a player owns, those still being built included, a palace counting as PALACE_CITIES (R-BUILD-08). */
 export function cityShare(game: Game, player: number): number {
   return (
     structureCount(game, player, StructureKind.City) +
-    2 * structureCount(game, player, StructureKind.Palace)
+    PALACE_CITIES * structureCount(game, player, StructureKind.Palace)
+  );
+}
+
+/** Cities that set the price of the next one: a palace counting as what it cost, PALACE_COST_CITIES (R-BUILD-08). */
+function cityCostShare(game: Game, player: number): number {
+  return (
+    structureCount(game, player, StructureKind.City) +
+    PALACE_COST_CITIES * structureCount(game, player, StructureKind.Palace)
   );
 }
 
@@ -97,8 +120,8 @@ export function cityShare(game: Game, player: number): number {
  * port its base cost times B-COST-GROWTH for each one of that kind they
  * already own, up to B-COST-MAX; a fort or an air defense one base cost more
  * for each, up to its own maximum; a silo always the same. Cities and
- * palaces grow together, a palace counting as two cities and costing
- * what the next two would (R-BUILD-08); air defenses and mosques likewise (R-BUILD-09).
+ * palaces grow together, a palace costing what the next three cities would
+ * (R-BUILD-08); a mosque costs twice the next air defense (R-BUILD-09).
  */
 export function structureCost(game: Game, player: number, kind: StructureKind): number {
   const cost = fullCost(game, player, kind);
@@ -109,16 +132,19 @@ export function structureCost(game: Game, player: number, kind: StructureKind): 
 function fullCost(game: Game, player: number, kind: StructureKind): number {
   const { balance } = game;
   if (kind === StructureKind.City || kind === StructureKind.Palace) {
-    const owned = cityShare(game, player);
+    const owned = cityCostShare(game, player);
     const next = doublingCost(game, balance.cityCost, owned);
     if (kind === StructureKind.City) return next;
-    return next + doublingCost(game, balance.cityCost, owned + 1);
+    let total = next;
+    for (let i = 1; i < PALACE_COST_CITIES; i++) {
+      total += doublingCost(game, balance.cityCost, owned + i);
+    }
+    return total;
   }
   if (kind === StructureKind.AirDefense || kind === StructureKind.Mosque) {
     const owned = airDefenseShare(game, player);
     const next = linearCost(balance.airDefenseCost, balance.airDefenseCostMax, owned);
-    if (kind === StructureKind.AirDefense) return next;
-    return next + linearCost(balance.airDefenseCost, balance.airDefenseCostMax, owned + 1);
+    return kind === StructureKind.AirDefense ? next : MOSQUE_COST_FACTOR * next;
   }
   // A silo always costs the same.
   if (kind === StructureKind.Silo) return balance.siloCost;
@@ -170,7 +196,7 @@ export function workingCities(game: Game, player: Player): number {
   for (const structure of game.structures) {
     if (structure.player !== player.id || !isReady(game, structure)) continue;
     if (structure.kind === StructureKind.City) ready++;
-    else if (structure.kind === StructureKind.Palace) ready += 2;
+    else if (structure.kind === StructureKind.Palace) ready += PALACE_CITIES;
   }
   return Math.min(ready, cityLimit(game, player.id));
 }
@@ -193,7 +219,10 @@ export function placementError(
   for (const structure of game.structures) {
     if (topology.distance(structure.tile, tile) < spacing) return BuildError.Crowded;
   }
-  const cities = kind === StructureKind.City ? 1 : kind === StructureKind.Palace ? 2 : 0;
+  // R-BUILD-10: one of each wonder for each player, those still being built included.
+  if (isWonder(kind) && structureCount(game, player.id, kind) > 0) return BuildError.Unique;
+  const cities =
+    kind === StructureKind.City ? 1 : kind === StructureKind.Palace ? PALACE_CITIES : 0;
   if (cities > 0 && cityShare(game, player.id) + cities > cityLimit(game, player.id)) {
     return BuildError.Land;
   }

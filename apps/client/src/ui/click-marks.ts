@@ -26,6 +26,7 @@ export const REFUSALS: Partial<Record<ClickOutcome, MessageKey>> = {
   foreign: "click.foreign",
   crowded: "click.crowded",
   land: "click.land",
+  unique: "click.unique",
   gold: "click.gold",
   nothing: "click.nothing",
   ally: "click.ally",

@@ -155,12 +155,14 @@ test("builds a city once the gold allows it (R-BUILD-01)", async ({ page }) => {
   expect(pageErrors).toEqual([]);
 });
 
-test("builds a Micho Palace, worth two cities (R-BUILD-08)", async ({ page }) => {
+test("builds a Micho Palace, worth five cities, once (R-BUILD-08, R-BUILD-10)", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
-  // Gold fast, and so little land per city that the starting land holds two.
-  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=5&gold=1000&cityland=10");
+  // Gold fast, and so little land per city that the starting land holds five.
+  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=5&gold=1000&cityland=1");
   await page.locator("#play").click();
   await expect(page.locator("#map")).toBeVisible();
   const box = await page.locator("#map").boundingBox();
@@ -178,9 +180,11 @@ test("builds a Micho Palace, worth two cities (R-BUILD-08)", async ({ page }) =>
   await expect(palace).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".banner")).toContainText("build a Micho Palace");
   await page.mouse.click(start.x, start.y);
-  // It counts as two of the cities the land supports.
-  await expect(page.locator("#build-city .build-count")).toContainText("2 of", { timeout: 5_000 });
+  // It counts as five of the cities the land supports.
+  await expect(page.locator("#build-city .build-count")).toContainText("5 of", { timeout: 5_000 });
   await expect(palace).toHaveAttribute("aria-pressed", "false");
+  // One each: the button greys out.
+  await expect(palace).toHaveClass(/unaffordable/);
   await expect
     .poll(() => changedSince(page, start, before), { timeout: 30_000 })
     .toBeGreaterThan(150);

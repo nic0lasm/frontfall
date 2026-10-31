@@ -89,6 +89,7 @@ const BUILD_REFUSALS: Readonly<Record<BuildError, ClickRefusal>> = {
   [BuildError.Foreign]: "foreign",
   [BuildError.Crowded]: "crowded",
   [BuildError.Land]: "land",
+  [BuildError.Unique]: "unique",
   [BuildError.Coast]: "coast",
   [BuildError.Gold]: "gold",
   [BuildError.Disabled]: "disabled",

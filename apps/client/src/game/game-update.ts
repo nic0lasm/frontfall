@@ -11,6 +11,7 @@ import {
   cityLimit,
   capitalThreat,
   cityShare,
+  structureCount,
   isReady,
   launchSilo,
   missileCost,
@@ -237,6 +238,8 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       siloCost: structureCost(game, you, StructureKind.Silo),
       airDefenseCost: structureCost(game, you, StructureKind.AirDefense),
       mosqueCost: structureCost(game, you, StructureKind.Mosque),
+      palaceBuilt: structureCount(game, you, StructureKind.Palace) > 0,
+      mosqueBuilt: structureCount(game, you, StructureKind.Mosque) > 0,
       missileCost: missileCost(game, MissileSize.Light),
       heavyMissileCost: missileCost(game, MissileSize.Heavy),
       // Any tile will do: whether one is loaded does not depend on the target.

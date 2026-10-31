@@ -5,7 +5,7 @@ import { DrawUsage, derivedRandom } from "./random.ts";
 import { shieldedBy } from "./landmarks.ts";
 import { spawnSettings } from "./spawn.ts";
 import type { Topology } from "./topology.ts";
-import { StructureKind, isReady, type Structure } from "./structures.ts";
+import { MOSQUE_TRIES, StructureKind, isReady, type Structure } from "./structures.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
 
 /** How strong a missile is: its code in missile orders, never renumbered. */
@@ -341,8 +341,8 @@ export function installMissiles(game: Game): void {
         defense.id,
         DrawUsage.Interception,
       );
-      // R-BUILD-09: a mosque gets a second, independent try.
-      const tries = defense.kind === StructureKind.Mosque ? 2 : 1;
+      // R-BUILD-09: a mosque gets MOSQUE_TRIES independent tries.
+      const tries = defense.kind === StructureKind.Mosque ? MOSQUE_TRIES : 1;
       let stopped = false;
       for (let attempt = 0; attempt < tries && !stopped; attempt++) {
         const roll =

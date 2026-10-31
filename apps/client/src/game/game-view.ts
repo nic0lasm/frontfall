@@ -231,6 +231,8 @@ export type ClickRefusal =
   | "crowded"
   /** The player's land supports no more cities (R-BUILD-07). */
   | "land"
+  /** A wonder the player has built already: one each (R-BUILD-10). */
+  | "unique"
   | "gold"
   /** No structure of the player's near the click to demolish. */
   | "nothing"
@@ -280,13 +282,17 @@ export interface BuildView {
   warshipCost: number;
   siloCost: number;
   airDefenseCost: number;
-  /** What the next two air defenses would cost together (R-BUILD-09). */
+  /** What a mosque costs: twice the next air defense (R-BUILD-09). */
   mosqueCost: number;
+  /** The player has a palace, ready or not: no second one (R-BUILD-10). */
+  palaceBuilt: boolean;
+  /** The player has a mosque, ready or not: no second one (R-BUILD-10). */
+  mosqueBuilt: boolean;
   missileCost: number;
   heavyMissileCost: number;
   /** Whether a silo of the player's has a missile ready. */
   loaded: boolean;
-  /** Cities owned or being built, a palace counting as two. */
+  /** Cities owned or being built, a palace counting as five. */
   cities: number;
   /** Most cities the player's land supports now. */
   cityLimit: number;
