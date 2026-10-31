@@ -231,7 +231,9 @@ test.describe("on a touch screen", () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    await startGame(page);
+    // At ×5 a bot may take the whole map while the camera looks for the other one; at ×1 the
+    // bots' land is still too small to find.
+    await startGame(page, 2, "", 2);
     // On a phone the guide covers a good part of the map: put away, as a player would.
     const hide = page.locator("#guide-hide");
     if (await hide.isVisible()) await hide.click();
