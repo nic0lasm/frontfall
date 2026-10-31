@@ -227,12 +227,16 @@ for (const viewport of [
     test("the tutorial's card and the doctrine cards leave the banner and the sliders in sight", async ({
       page,
     }) => {
-      await page.goto("./");
+      // At ×1 the placement phase lasts a full minute: a slow browser cannot outrun it.
+      await page.goto("./?speed=1");
       await page.locator("#tutorial").click();
       await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
+      // The game answers once its terrain and its first update are in: slow in a software browser.
       const picker = page.locator(".doctrine-picker");
-      await expect(picker).toBeVisible();
+      await expect(picker).toBeVisible({ timeout: 30_000 });
       await expect(page.locator("#guide")).toBeVisible();
+      await expect(page.locator(".banner")).toBeVisible();
+      await expect(page.locator("#attack-ratio")).toBeVisible();
       const box = async (selector: string) => {
         const found = await page.locator(selector).first().boundingBox();
         if (!found) throw new Error(`${selector} has no size`);
