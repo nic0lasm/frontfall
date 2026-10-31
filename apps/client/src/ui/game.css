@@ -2765,14 +2765,49 @@ button.feed-entry:focus-visible {
   color: #f08a6a;
 }
 
+/* A phone keeps the map: the cards fold to a line each, and only the chosen one
+   spells out its effects (the others stay in the reading order for a screen reader),
+   so that the start can still be placed above them. */
 @media (width < 640px) {
   .doctrine-picker {
     inset: auto 8px 8px;
-    max-height: 70vh;
+    gap: 4px;
+    max-height: 50vh;
+    padding: 8px 10px;
     overflow-y: auto;
+  }
+
+  .doctrine-title {
+    font-size: 0.95rem;
+  }
+
+  .doctrine-timer {
+    font-size: 0.8rem;
   }
 
   .doctrine-cards {
     grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .doctrine-card {
+    position: relative;
+    flex-flow: row wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    padding: 6px 10px;
+  }
+
+  .doctrine-effects {
+    flex-basis: 100%;
+  }
+
+  .doctrine-card:not([aria-pressed="true"]) .doctrine-effects {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 }
