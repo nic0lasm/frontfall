@@ -1,6 +1,14 @@
 import type { GameUpdate, PlayerView } from "../game/solo-game.ts";
 import { t, type MessageKey } from "../i18n/index.ts";
 import { h, setText, swatch } from "./dom.ts";
+import { icon, type IconName } from "./icons.ts";
+
+/** The doctrines (R-DOCTRINE) by code from 1: the icon and the name of each. */
+const DOCTRINES: readonly { icon: IconName; name: MessageKey }[] = [
+  { icon: "attack", name: "doctrine.conqueror" },
+  { icon: "trade", name: "doctrine.merchant" },
+  { icon: "fort", name: "doctrine.bastion" },
+];
 
 /** The rows of the leaderboard in the HUD. */
 export class LeaderList {
@@ -69,6 +77,18 @@ export class LeaderList {
         t(teammate ? "diplo.teammateBadge" : truce ? "diplo.truceBadge" : "diplo.allyBadge"),
       );
       row.traitor.hidden = !traitors.has(player.id);
+      const doctrine = DOCTRINES[(player.doctrine ?? 0) - 1];
+      const shown = doctrine ? doctrine.name : "";
+      if (row.doctrine.dataset["doctrine"] !== shown) {
+        row.doctrine.dataset["doctrine"] = shown;
+        row.doctrine.hidden = !doctrine;
+        row.doctrine.replaceChildren(...(doctrine ? [icon(doctrine.icon)] : []));
+        if (doctrine) {
+          const label = t(doctrine.name);
+          row.doctrine.setAttribute("title", label);
+          row.doctrine.setAttribute("aria-label", label);
+        }
+      }
       // One word for what the player is to you: war, then an embargo, then how a nation feels.
       const status = row.button
         ? atWar.has(player.id)
@@ -105,6 +125,8 @@ interface LeaderRow {
   land: HTMLElement;
   ally: HTMLElement;
   traitor: HTMLElement;
+  /** The icon of the doctrine they play, once play has started (R-DOCTRINE). */
+  doctrine: HTMLElement;
   /** What the player is to the one at this screen: war, embargo, mood or neutral. */
   status: HTMLElement;
   /** Opens the player's menu; none on the row of the player at this screen. */
@@ -130,9 +152,10 @@ function leaderRow(
     hidden: true,
   });
   const status = h("span", { class: "badge badge-status", hidden: true });
+  const doctrine = h("span", { class: "leader-doctrine", role: "img", hidden: true });
   ally.textContent = t("diplo.allyBadge");
   traitor.textContent = t("diplo.traitorBadge");
-  const content = [swatch(color), name, ally, traitor, status, land];
+  const content = [swatch(color), name, doctrine, ally, traitor, status, land];
   if (you) {
     return {
       item: h("li", { class: "leader you" }, ...content),
@@ -140,6 +163,7 @@ function leaderRow(
       land,
       ally,
       traitor,
+      doctrine,
       status,
     };
   }
@@ -155,5 +179,14 @@ function leaderRow(
   button.addEventListener("click", () => {
     onPick(player.id);
   });
-  return { item: h("li", { class: "leader" }, button), name, land, ally, traitor, status, button };
+  return {
+    item: h("li", { class: "leader" }, button),
+    name,
+    land,
+    ally,
+    traitor,
+    doctrine,
+    status,
+    button,
+  };
 }

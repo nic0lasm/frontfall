@@ -903,6 +903,25 @@
   background: var(--ff-danger);
 }
 
+/* The doctrine a player plays (ui/leader-list.ts): a small icon after the name. */
+.leader-doctrine {
+  display: inline-flex;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--ff-slate-300);
+}
+
+.leader-doctrine[hidden] {
+  display: none;
+}
+
+.leader-doctrine .icon {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 /* What a player is to you (ui/leader-list.ts): quiet when neutral, warm when it matters. */
 .badge-status {
   background: var(--ff-night-600);
