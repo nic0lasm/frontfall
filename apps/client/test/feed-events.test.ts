@@ -303,12 +303,27 @@ describe("FeedWatcher", () => {
       new Map(),
       mine,
     );
-    // A quick message between two others is not for the player to read (R-DIPLO-07).
+    // A quick message between two others is not for the player to read (R-DIPLO-07),
+    // nor an embargo between two others.
     expect(entries.map((e) => [e.tone, e.mine, e.player])).toEqual([
       ["bad", true, 2],
       ["good", true, 3],
-      ["info", false, 2],
     ]);
+  });
+
+  it("tells of an embargo only when it is the player's, or in a replay", () => {
+    const events = [
+      { type: "embargo", a: 2, b: 3 },
+      { type: "embargo", a: 2, b: 1 },
+      { type: "lifted", a: 3, b: 2 },
+    ] as const;
+    const watcher = new FeedWatcher(true);
+    watcher.observe(update(), new Map(), mine);
+    const own = watcher.observe(update({ events: [...events] }), new Map(), mine);
+    expect(own.map((e) => [e.tone, e.mine])).toEqual([["bad", true]]);
+    const replay = new FeedWatcher(false);
+    replay.observe(update(), new Map(), mine);
+    expect(replay.observe(update({ events: [...events] }), new Map(), mine)).toHaveLength(3);
   });
 
   it("keeps who is allied with whom from the events", () => {
