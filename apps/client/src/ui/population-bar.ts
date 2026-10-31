@@ -27,12 +27,15 @@ export class PopulationBar {
   private readonly fill = h("span", { class: "pop-fill" });
   private readonly band = h("span", { class: "pop-band" });
   private readonly rate = h("span", { class: "pop-rate" });
+  private readonly rateShort = h("span", { class: "pop-short" });
+  private readonly rateLong = h("span", { class: "pop-long" });
   private readonly zone = h("span", { class: "pop-zone" });
   private lastRate = "";
   private span = { from: 0, to: 0 };
   private bandCap = -1;
 
   constructor(onExplain: (text: string) => void) {
+    this.rate.append(this.rateShort, this.rateLong);
     this.element = h(
       "button",
       { type: "button", class: "pop-bar", "aria-describedby": "build-tip" },
@@ -41,7 +44,7 @@ export class PopulationBar {
     );
     // A finger has no tooltip: a press shows the figures, which a phone hides, and how growth works.
     this.element.addEventListener("click", () => {
-      onExplain(`${this.element.getAttribute("aria-label") ?? ""} ${t("hud.growthHelp")}`);
+      onExplain(`${this.rateLong.textContent} ${t("hud.growthNow")} ${t("hud.growthHelp")}`);
     });
   }
 
@@ -69,10 +72,9 @@ export class PopulationBar {
     const count = formatCount(growth);
     if (count !== this.lastRate) {
       this.lastRate = count;
-      this.rate.textContent = t("hud.growthRate", { troops: count });
+      this.rateShort.textContent = t("hud.growthRate", { troops: count });
+      this.rateLong.textContent = t("hud.growthRateLong", { troops: count });
     }
-    // The name starts with the figures shown, so a voice command can name the button by them.
-    this.element.setAttribute("aria-label", t("hud.growthNow", { troops: count }));
     this.element.title = t("hud.growthHelp");
   }
 }
