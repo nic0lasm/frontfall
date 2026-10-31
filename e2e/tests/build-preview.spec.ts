@@ -12,7 +12,8 @@ async function landShare(page: Page): Promise<number> {
  * spiral around the middle finds; returns that point, which stays the player's.
  */
 async function startRich(page: Page, tap = false): Promise<{ x: number; y: number }> {
-  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=5&gold=500");
+  // At ×5 the bots of the 0.9.5 economy may take a slow runner's land before the checks end.
+  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=2&gold=500");
   await page.locator("#play").click();
   await expect(page.locator("#map")).toBeVisible();
   const box = await page.locator("#map").boundingBox();
