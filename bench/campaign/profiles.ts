@@ -75,7 +75,8 @@ export interface Style {
   readonly workShare?: number;
 }
 
-export const STYLES: Record<ProfileName, Style> = {
+/** Only the beginner is played by this class; Nico and the veteran go through the balance bench's HumanPlayer (see game.ts). */
+export const STYLES: Record<"beginner", Style> = {
   // Ignores the guide: random slider, misclicks, looks away, no boat, no ally.
   beginner: {
     everySeconds: [5, 14],
@@ -90,38 +91,6 @@ export const STYLES: Record<ProfileName, Style> = {
     buildsFort: false,
     usesBoats: false,
     asksAlliances: false,
-  },
-  // Nico: fast, easy to normal, boats, alliances, builds a lot.
-  nico: {
-    everySeconds: [1, 3],
-    ratios: [30, 40, 50],
-    misclickPercent: 3,
-    idlePercent: 5,
-    bravePercent: 10,
-    waitFillPercent: 30,
-    reservePercent: 20,
-    buildsCities: true,
-    buildsPort: true,
-    buildsFort: true,
-    usesBoats: true,
-    asksAlliances: true,
-    workShare: 50,
-  },
-  // A veteran: reads the population bar, waits, picks fights it wins.
-  veteran: {
-    everySeconds: [1, 2],
-    ratios: [35, 45, 55],
-    misclickPercent: 0,
-    idlePercent: 0,
-    bravePercent: 0,
-    waitFillPercent: 55,
-    reservePercent: 30,
-    buildsCities: true,
-    buildsPort: true,
-    buildsFort: true,
-    usesBoats: true,
-    asksAlliances: true,
-    workShare: 60,
   },
 };
 

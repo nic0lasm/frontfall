@@ -144,9 +144,6 @@ for (const profile of profiles) {
       rs.reduce((a, r) => a + r.refused, 0),
       rs.reduce((a, r) => a + r.sent, 0),
     );
-    if (profile === "veteran" && refused > FUN.refusedMaxPercentVeteran) {
-      verdicts.push(`${profile}/${difficulty}: ${refused.toFixed(0)} % of orders refused`);
-    }
     const p99 = median(rs.map((r) => r.tickP99Ms));
     const max = Math.max(...rs.map((r) => r.tickMaxMs));
     if (p99 > PERF.tickP99MaxMs || max > PERF.tickMaxMs) {
@@ -154,6 +151,18 @@ for (const profile of profiles) {
         `${profile}/${difficulty}: tick p99 ${p99.toFixed(1)} ms, worst ${max.toFixed(0)} ms`,
       );
     }
+    const start = median(rs.map((r) => r.startMs));
+    if (start > PERF.startMaxMs)
+      verdicts.push(
+        `${profile}/${difficulty}: the tick that ends the spawn phase takes ${start.toFixed(0)} ms, max ${String(PERF.startMaxMs)} ms`,
+      );
+    const fightMinutes = rs.flatMap((r) =>
+      r.firstFightMinute === undefined ? [] : [r.firstFightMinute],
+    );
+    if (fightMinutes.length && median(fightMinutes) > FUN.firstFightMaxMinute)
+      verdicts.push(
+        `${profile}/${difficulty}: first fight at minute ${String(median(fightMinutes))}, max ${String(FUN.firstFightMaxMinute)}`,
+      );
     for (const r of rs)
       for (const v of r.violations)
         verdicts.push(`RULE seed ${String(r.setup.seed)} ${profile}/${difficulty}: ${v}`);

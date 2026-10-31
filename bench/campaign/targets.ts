@@ -25,12 +25,10 @@ export const SURVIVAL_EASY_MIN: Record<ProfileName, number> = {
 export const FUN = {
   /** Median share of minutes with no land change, % at most. */
   deadMinutesMaxPercent: 25,
-  /** Median minute of the first fight at most, in normal. */
+  /** Median minute of the first fight, at most. */
   firstFightMaxMinute: 8,
   /** Games that stall undecided for 10 min, % at most. */
   stalemateMaxPercent: 5,
-  /** Orders refused for a profile that clicks right, % at most. */
-  refusedMaxPercentVeteran: 10,
 };
 
 /** Perf: engine tick cost, ms. */

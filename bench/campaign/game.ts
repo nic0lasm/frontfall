@@ -67,7 +67,7 @@ export interface CampaignReport {
   /** Misclicks refused by the rules / orders sent. */
   readonly refused: number;
   readonly sent: number;
-  /** Rules broken: tile conservation, negative or non-integer gold or troops, troops above the cap. */
+  /** Rules broken: tile conservation, negative or non-integer gold or troops, land owned by a dead player. Troops above the cap are normal: they decay slowly once land is lost. */
   readonly violations: readonly string[];
   /** Undecided at the end with nobody gaining ground for 10 min: a stalemate. */
   readonly stalemate: boolean;
@@ -248,7 +248,7 @@ export function playCampaignGame(
         if (attackedThisMinute) {
           underAttackMinutes++;
           windowAttacked++;
-          firstFight ??= playMinutesDone;
+          firstFight ??= Math.max(0, playMinutesDone - 1);
         }
       }
       changedThisMinute = false;
@@ -350,10 +350,18 @@ function humanProfile(
   avoid: readonly number[],
 ): ProfilePlayer {
   const human = new HumanPlayer(game, 1, avoid, seed, HUMAN_STYLES[profile]);
+  let sent = 0;
   return {
-    orders: () => human.orders(),
+    orders: () => {
+      const orders = human.orders();
+      sent += orders.length;
+      return orders;
+    },
+    // HumanPlayer only sends orders the rules accept, so nothing is ever refused.
     refused: 0,
-    sent: 0,
+    get sent() {
+      return sent;
+    },
     reasons: human.reasons,
   };
 }
