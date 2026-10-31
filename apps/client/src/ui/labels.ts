@@ -18,6 +18,9 @@ const OVERFLOW = 1.15;
 /** Line height of name and troops together, in ems. */
 const LINES_EM = 2.1;
 
+/** Narrowest land, in CSS pixels, that carries a name at the smallest size. */
+const MIN_ACROSS = FONT_SIZES[0] * LINES_EM;
+
 /** A rectangle on the screen, in CSS pixels; a DOMRect is one. */
 interface Box {
   readonly left: number;
@@ -27,9 +30,16 @@ interface Box {
 }
 
 interface Label {
-  readonly root: HTMLElement;
-  readonly troops: HTMLElement;
+  /** Built the first time the land is big enough to carry a name: city-states rarely are. */
+  root?: HTMLElement;
+  troops?: HTMLElement;
   name: string;
+  /** The troops as text, kept here so that a label out of sight costs no DOM write. */
+  count: string;
+  /** What the styles of the element say now, to write only what changed. */
+  transform: string;
+  size: number;
+  shown: boolean;
 }
 
 /**
@@ -44,29 +54,45 @@ export class PlayerLabels {
   private obstacles: readonly Box[] = [];
 
   update(players: readonly PlayerView[], anchors: readonly LabelAnchor[] | undefined): void {
-    if (anchors) this.anchors = anchors;
+    // Largest lands first: where two names would overlap, the smaller one gives way.
+    if (anchors) this.anchors = [...anchors].sort((a, b) => b.depth - a.depth);
     for (const player of players) {
       let label = this.labels.get(player.id);
       if (!label) {
-        const troops = h("span", { class: "label-troops" });
-        const root = h(
-          "div",
-          { class: "label" },
-          h("span", { class: "label-name" }, player.name),
-          troops,
-        );
-        this.element.append(root);
-        label = { root, troops, name: player.name };
+        label = {
+          name: player.name,
+          count: "",
+          transform: "",
+          size: 0,
+          shown: false,
+        };
         this.labels.set(player.id, label);
       }
       // A player hidden or shown again on this screen changes name (R-DIPLO-08).
       if (label.name !== player.name) {
         label.name = player.name;
-        const name = label.root.querySelector(".label-name");
+        const name = label.root?.querySelector(".label-name");
         if (name) name.textContent = player.name;
       }
-      setText(label.troops, formatCount(player.troops));
+      label.count = formatCount(player.troops);
+      if (label.troops) setText(label.troops, label.count);
     }
+  }
+
+  private build(label: Label): HTMLElement {
+    if (label.root) return label.root;
+    const troops = h("span", { class: "label-troops" }, label.count);
+    const root = h(
+      "div",
+      { class: "label" },
+      h("span", { class: "label-name" }, label.name),
+      troops,
+    );
+    root.hidden = true;
+    this.element.append(root);
+    label.root = root;
+    label.troops = troops;
+    return root;
   }
 
   /** Parts of the screen labels must leave clear, such as the panels of the HUD. */
@@ -80,15 +106,16 @@ export class PlayerLabels {
     const { viewportWidth, viewportHeight } = camera;
     // Largest lands first: where two names would overlap, the smaller one gives way.
     const taken: Box[] = [...this.obstacles];
-    const anchors = [...this.anchors].sort((a, b) => b.depth - a.depth);
-    for (const anchor of anchors) {
+    for (const anchor of this.anchors) {
       const label = this.labels.get(anchor.player);
       if (!label) continue;
       // The size follows the depth of the land alone, so it does not jump with the name.
       const across = 2 * anchor.depth * scale;
+      // Anchors come largest first: from here on no land carries even the smallest name.
+      if (across < MIN_ACROSS) break;
       const room = across * OVERFLOW;
       // Widest line in ems: the name, or the troops below it at three quarters of its size.
-      const length = Math.max(label.name.length, 0.75 * label.troops.textContent.length) * CHAR_EM;
+      const length = Math.max(label.name.length, 0.75 * label.count.length) * CHAR_EM;
       const { x, y } = camera.tileToScreen(anchor.tile);
       // From the largest size that fits the land down: where a name would overlap
       // another or the HUD, it shrinks a step, and is hidden only at the smallest.
@@ -119,11 +146,24 @@ export class PlayerLabels {
       }
       if (!placed) continue;
       const { size, left, top } = placed;
-      label.root.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) translate(-50%, -50%)`;
-      label.root.style.fontSize = `${String(size)}px`;
+      const root = this.build(label);
+      const transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) translate(-50%, -50%)`;
+      if (transform !== label.transform) {
+        label.transform = transform;
+        root.style.transform = transform;
+      }
+      if (size !== label.size) {
+        label.size = size;
+        root.style.fontSize = `${String(size)}px`;
+      }
       shown.add(anchor.player);
     }
-    for (const [id, label] of this.labels) label.root.hidden = !shown.has(id);
+    for (const [id, label] of this.labels) {
+      const show = shown.has(id);
+      if (show === label.shown) continue;
+      label.shown = show;
+      if (label.root) label.root.hidden = !show;
+    }
   }
 }
 
