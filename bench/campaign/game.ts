@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import {
   createGame,
   DEFAULT_BALANCE,
+  installCityStates,
   installNations,
+  CITY_STATES_PER_NATION,
   loadMap,
   type BotDifficulty,
   type GameRules,
@@ -10,6 +12,7 @@ import {
   type Terrain,
   type Turn,
 } from "@frontfall/engine";
+import { HumanPlayer, type HumanStyle } from "../balance/human.ts";
 import { StyledPlayer, STYLES, type ProfileName, type ProfilePlayer } from "./profiles.ts";
 
 export interface CampaignSetup {
@@ -94,6 +97,13 @@ export function playCampaignGame(
     players.push({ id, name, start: tile } as never);
     nations.push(id);
   }
+  // After the nations, as the client numbers them.
+  const cities: number[] = [];
+  for (let i = 0; i < manifest.nations.length * CITY_STATES_PER_NATION; i++) {
+    const id = players.length + 1;
+    players.push({ id, name: `City ${String(id)}` } as never);
+    cities.push(id);
+  }
   const game = createGame({
     terrain,
     seed: setup.seed,
@@ -101,11 +111,14 @@ export function playCampaignGame(
     balance,
     ...(setup.rules ? { rules: setup.rules } : {}),
   });
+  if (cities.length > 0) installCityStates(game, cities);
   installNations(game, nations, setup.difficulty);
   const avoid = manifest.nations.map((n) => n.tile);
   const me: ProfilePlayer = makePlayer
     ? makePlayer(game, setup.seed, avoid)
-    : new StyledPlayer(game, 1, STYLES[setup.profile], setup.seed, avoid);
+    : setup.profile === "beginner"
+      ? new StyledPlayer(game, 1, STYLES.beginner, setup.seed, avoid)
+      : humanProfile(game, setup.profile, setup.seed, avoid);
 
   const perMinute = 60 * balance.ticksPerSecond;
   const lastTick = balance.spawnPhaseTicks + setup.minutes * perMinute;
@@ -216,5 +229,39 @@ export function playCampaignGame(
     tickP99Ms: sorted[Math.floor(sorted.length * 0.99)] ?? 0,
     hash: game.hash(),
     ms: Math.round(performance.now() - began),
+  };
+}
+
+/** Nico plays quicker and a little braver than the bench's reference; a veteran waits for the odds. */
+const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
+  nico: {
+    everySeconds: 2,
+    ratioPercent: 40,
+    keepPercent: 35,
+    warPercent: 55,
+    oddsPercent: 140,
+    allySeconds: 600,
+  },
+  veteran: {
+    everySeconds: 1,
+    ratioPercent: 30,
+    keepPercent: 40,
+    warPercent: 60,
+    oddsPercent: 120,
+    allySeconds: 900,
+  },
+};
+
+function humanProfile(
+  game: ConstructorParameters<typeof HumanPlayer>[0],
+  profile: "nico" | "veteran",
+  seed: number,
+  avoid: readonly number[],
+): ProfilePlayer {
+  const human = new HumanPlayer(game, 1, avoid, seed, HUMAN_STYLES[profile]);
+  return {
+    orders: () => human.orders(),
+    refused: 0,
+    sent: 0,
   };
 }
