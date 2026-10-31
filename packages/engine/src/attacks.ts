@@ -419,7 +419,8 @@ export function installAttacks(game: Game): void {
         pocketDefender = defender;
         pocketAttacker = attacker;
         const size = pocketFill.fill(start, inPocket, balance.encircleMaxTiles);
-        if (size > 0 && !holds(defender)) {
+        // A pocket that is all the defender has left is fought for, not taken at once.
+        if (size > 0 && size < territory.tileCount(defender) && !holds(defender)) {
           for (const pocket of pocketFill.tiles()) territory.setOwner(pocket, attacker);
         } else {
           for (const open of pocketFill.reached()) examined[open] = examination;

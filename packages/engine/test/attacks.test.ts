@@ -260,13 +260,15 @@ describe("encirclement", () => {
     expect(game.territory.ownerOf(grid.index(2, 1))).toBe(2);
   });
 
-  it("captures all that is left of a player when it is enclosed", () => {
+  it("leaves all that is left of a player to be fought for, enclosed or not", () => {
     const { grid, game, ada, bea, run, attack } = pocketGame(2);
     game.territory.setOwner(grid.index(5, 1), NEUTRAL);
     ada.troops = 1000;
     bea.troops = 10;
+    const before = game.territory.tileCount(2);
     run([attack(1, grid.index(4, 1), 100)]);
-    expect(game.territory.tileCount(2)).toBe(0);
+    expect(game.territory.ownerOf(grid.index(4, 1))).toBe(1);
+    expect(game.territory.tileCount(2)).toBe(before - 1);
   });
 
   it("captures the pocket of a player the attack was not aimed at", () => {
