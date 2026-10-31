@@ -266,20 +266,6 @@ export class DiplomacyPanel {
             },
       );
     } else if (!teammate) {
-      // Only a clearly stronger player takes tribute (B-TRIBUTE-LEAD), and it costs gold.
-      const payer = update.players.find((p) => p.id === update.you);
-      buttons.push({
-        key: "diplo.tribute",
-        params: { gold: formatCount(diplomacy.tributePrice) },
-        action: () => {
-          this.actions.onTribute(id);
-        },
-        enabled:
-          playing &&
-          (payer?.gold ?? 0) >= diplomacy.tributePrice &&
-          player.tiles * 100 >= (payer?.tiles ?? 0) * TRIBUTE_LEAD_PERCENT,
-        className: "tribute",
-      });
       buttons.push({
         key: asked
           ? "diplo.accept"
@@ -293,6 +279,20 @@ export class DiplomacyPanel {
         },
         enabled: playing && (asked || (!pending && !waiting)),
         className: "ask",
+      });
+      // Only a clearly stronger player takes tribute (B-TRIBUTE-LEAD), and it costs gold.
+      const payer = update.players.find((p) => p.id === update.you);
+      buttons.push({
+        key: "diplo.tribute",
+        params: { gold: formatCount(diplomacy.tributePrice) },
+        action: () => {
+          this.actions.onTribute(id);
+        },
+        enabled:
+          playing &&
+          (payer?.gold ?? 0) >= diplomacy.tributePrice &&
+          player.tiles * 100 >= (payer?.tiles ?? 0) * TRIBUTE_LEAD_PERCENT,
+        className: "tribute",
       });
     }
 

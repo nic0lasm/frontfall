@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import {
+  tributeError,
   createGame,
   goldIncome,
   DEFAULT_BALANCE,
@@ -43,6 +44,8 @@ export interface BalanceSetup {
   readonly intermediate?: boolean;
   /** Whether player 1 is the scripted average player instead, starting away from the nations. */
   readonly average?: boolean;
+  /** Whether player 1 buys a truce from the leading player whenever it can (R-DIPLO-10). */
+  readonly tribute?: boolean;
   /** Minutes of play after the spawn phase before the run stops undecided. */
   readonly minutes: number;
   /** Balance values to try instead of the defaults. */
@@ -272,6 +275,13 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
       });
     }
     const orders: Order[] = casual ? casual.orders() : [];
+    if (setup.tribute && game.phase === "play" && game.tick % 50 === 0) {
+      const payer = game.player(1);
+      const leading = leaderNow();
+      if (payer?.alive && leading.id !== 1 && tributeError(game, payer, leading.id) === undefined) {
+        orders.push({ type: "tribute", target: leading.id });
+      }
+    }
     const turn: Turn = { tick: game.tick, orders: orders.map((order) => ({ player: 1, order })) };
     game.step(turn);
 

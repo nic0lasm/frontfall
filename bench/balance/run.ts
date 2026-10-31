@@ -38,6 +38,8 @@ const { values } = parseArgs({
     intermediate: { type: "boolean", default: false },
     // The stronger scripted player, in place of the casual one.
     average: { type: "boolean", default: false },
+    // The scripted player buys a truce from the leader whenever it can (R-DIPLO-10).
+    tribute: { type: "boolean", default: false },
     seeds: { type: "string", default: "1-8" },
     minutes: { type: "string", default: "20" },
     jobs: { type: "string", default: String(availableParallelism()) },
@@ -94,6 +96,7 @@ const setups: BalanceSetup[] = seeds.map((seed) => ({
   ...(values.casual || values.intermediate ? { casual: true } : {}),
   ...(values.intermediate ? { intermediate: true } : {}),
   ...(values.average ? { average: true } : {}),
+  ...(values.tribute ? { tribute: true } : {}),
   minutes: Number(values.minutes),
   ...(values.set.length ? { balance: balance } : {}),
   ...(values.rule.length ? { rules: Object.fromEntries(values.rule.map((r) => [r, true])) } : {}),
