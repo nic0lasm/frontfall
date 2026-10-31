@@ -143,3 +143,48 @@ test("plays the whole diplomacy from the player's side: ignore, accept, embargo,
   await expect(host.locator(".events-feed")).toContainText("are now allies");
   expect(pageErrors).toEqual([]);
 });
+
+test("renews an alliance in its last minute, when both ask", async ({ browser, baseURL }) => {
+  test.skip(Boolean(process.env.E2E_BASE_URL), "local server only");
+  test.skip(test.info().project.name !== "root", "one browser is enough");
+  test.setTimeout(GAME_START_TIMEOUT + 240_000);
+  if (!baseURL) throw new Error("baseURL is not configured");
+  const host = await browser.newPage();
+  const ana = await browser.newPage();
+  const pageErrors: Error[] = [];
+  for (const page of [host, ana]) page.on("pageerror", (error) => pageErrors.push(error));
+  await twoPlayers(host, ana, baseURL, 4);
+  const hostMenu = host.locator("#player-menu");
+  const anaMenu = ana.locator("#player-menu");
+
+  // A plain click on Accept is enough.
+  await ana.locator('.leader-button[aria-description$="Host"]').click();
+  await anaMenu.locator(".menu-action.ask").click();
+  await expect(host.locator(".requests .request")).toHaveCount(1, { timeout: 20_000 });
+  await host.locator(".requests .request-accept").click();
+  await expect(host.locator(".leader .badge-ally:visible")).toContainText("Ally");
+
+  // The last minute of the five: the menus offer to renew.
+  await host.locator('.leader-button[aria-description$="Ana"]').click();
+  const renew = hostMenu.locator(".menu-action.renew");
+  await expect(renew).toBeEnabled({ timeout: 120_000 });
+  const secondsLeft = async () =>
+    Number(
+      /(\d+) s left/.exec((await hostMenu.locator(".player-menu-status").textContent()) ?? "")?.[1],
+    );
+  const before = await secondsLeft();
+  await renew.click();
+  await expect(renew).toHaveText("Renewal asked");
+  await expect(renew).toBeDisabled();
+
+  // Ana, asked to renew, agrees: the alliance runs again from the full five minutes.
+  if (!(await anaMenu.isVisible())) {
+    await ana.locator('.leader-button[aria-description$="Host"]').click();
+  }
+  const anaRenew = anaMenu.locator(".menu-action.renew");
+  await expect(anaRenew).toBeEnabled({ timeout: 20_000 });
+  await anaRenew.click();
+  await expect.poll(secondsLeft, { timeout: 20_000 }).toBeGreaterThan(before);
+  await expect(renew).toBeHidden();
+  expect(pageErrors).toEqual([]);
+});
