@@ -2454,6 +2454,10 @@ button.feed-entry:focus-visible {
   color: var(--ff-slate-300);
 }
 
+.pop-long {
+  display: none;
+}
+
 .pop-bar.full .pop-fill {
   background: var(--ff-warning);
 }
@@ -2472,7 +2476,7 @@ button.feed-entry:focus-visible {
   .bar .pop-bar {
     position: static;
     justify-content: center;
-    width: 104px;
+    width: 56px;
     padding: 0 0 0 12px;
     border-left: 1px solid var(--ff-night-500);
   }
@@ -2500,6 +2504,14 @@ button.feed-entry:focus-visible {
 @media (width >= 1500px) and (height >= 560px) {
   .bar .pop-bar {
     width: 230px;
+  }
+
+  .bar .pop-short {
+    display: none;
+  }
+
+  .bar .pop-long {
+    display: inline;
   }
 
   .bar .pop-zone {
