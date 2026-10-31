@@ -44,21 +44,30 @@ const ALLIANCE_SIZE_PERCENT = 100;
  * Bots do not pick a start: the spawn phase places them at random when it
  * ends (R-SPAWN-03).
  *
- * `spared` names players the bots never attack, by land or by sea: the
- * practice game keeps its learner out of reach. Real games spare nobody.
+ * `shelter` is the practice game's: it names players the bots never attack,
+ * by land or by sea, and the share of the map past which a bot stops taking
+ * land, so that no bot can win while the learner is still reading. Real
+ * games have no shelter.
  */
+export interface BotShelter {
+  /** Players the bots leave alone. */
+  readonly spared: readonly number[];
+  /** In % of the ownable land: a bot that holds this much stops expanding and attacking. */
+  readonly landCapPercent: number;
+}
+
 export function installBots(
   game: Game,
   ids: readonly number[],
   difficulty: BotDifficulty,
-  spared: readonly number[] = [],
+  shelter?: BotShelter,
 ): void {
   const { territory, balance } = game;
   const params = BOT_DIFFICULTIES[difficulty];
   const interval = Math.max(1, params.intervalSeconds * balance.ticksPerSecond);
   const retryTicks = RETRY_DECISIONS * interval;
   const bots = [...new Set(ids)].sort((a, b) => a - b);
-  const spare = new Set(spared);
+  const spare = new Set(shelter?.spared ?? []);
   const accept = (owner: number): boolean => !spare.has(owner);
   for (const id of bots) {
     if (!game.player(id)) throw new RangeError(`unknown player ${String(id)}`);
@@ -89,6 +98,8 @@ export function installBots(
     answerAlliances(game, bot, ALLIANCE_SIZE_PERCENT, ALLIANCE_MAX);
     buildCity(game, bot, cityCooldowns, retryTicks);
     buildPort(game, bot, portCooldowns, retryTicks);
+    // The practice game's bots hold back once they own their share of the map.
+    if (shelter && tiles * 100 >= game.terrain.ownableCount * shelter.landCapPercent) return;
     const reserve = percentOf(populationCap(game, bot), params.reservePercent);
     const troops = Math.min(percentOf(bot.troops, params.attackRatioPercent), bot.troops - reserve);
     // Less than the price of one tile would come straight back.

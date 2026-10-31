@@ -6,6 +6,7 @@ import {
   installCityStates,
   installNations,
   type Balance,
+  type BotShelter,
   type Game,
   type GameSetup,
   type PlayerSetup,
@@ -21,6 +22,13 @@ import type { Difficulty, SoloOptions } from "./solo-game.ts";
  */
 
 export const HUMAN_ID = 1;
+
+/**
+ * What keeps the tutorial from being lost: its computer players leave the
+ * learner alone, and stop at a quarter of the map each, so that neither can
+ * reach the win share while the learner reads the guide.
+ */
+export const TUTORIAL_SHELTER: BotShelter = { spared: [HUMAN_ID], landCapPercent: 25 };
 
 /** Options that decide the setup, and only those. */
 export type SetupOptions = Pick<
@@ -187,7 +195,7 @@ export function newSetup(
 
 /**
  * A game with every rule installed, then the bots, the city-states and the nations, in that order.
- * The bots leave `spared` players alone: the tutorial's learner, who is there to learn, not to lose.
+ * The tutorial's bots leave its learner alone and stop at a share of the map (`shelter`): it is there to learn, not to lose.
  */
 export function createSimulation(
   setup: GameSetup,
@@ -195,10 +203,10 @@ export function createSimulation(
   nationIds: readonly number[],
   difficulty: Difficulty,
   cityStateIds: readonly number[] = [],
-  spared: readonly number[] = [],
+  shelter?: BotShelter,
 ): Game {
   const game = createGame(setup);
-  installBots(game, botIds, difficulty, spared);
+  installBots(game, botIds, difficulty, shelter);
   installCityStates(game, cityStateIds);
   installNations(game, nationIds, difficulty);
   return game;

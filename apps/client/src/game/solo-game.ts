@@ -28,7 +28,7 @@ import type {
 import { orderForClick, previewForClick } from "./click-orders.ts";
 import { gameUpdate } from "./game-update.ts";
 import { labelSpace, type LabelSpace } from "./label-anchors.ts";
-import { HUMAN_ID, createSimulation, newSetup } from "./simulation.ts";
+import { HUMAN_ID, TUTORIAL_SHELTER, createSimulation, newSetup } from "./simulation.ts";
 
 export type * from "./game-view.ts";
 export { HUMAN_ID, MAX_BOTS } from "./simulation.ts";
@@ -98,7 +98,7 @@ export class SoloGame {
         nationIds,
         difficulty,
         cityStateIds,
-        options.tutorial ? [HUMAN_ID] : [],
+        options.tutorial ? TUTORIAL_SHELTER : undefined,
       );
     const { snapshot } = options;
     const loaded =
