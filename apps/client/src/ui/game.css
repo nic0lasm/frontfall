@@ -2696,7 +2696,9 @@ button.feed-entry:focus-visible {
   margin-inline: auto;
   padding: 12px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--panel, #14171c) 92%, transparent);
+  /* Opaque: the guide and the bar must not show through the cards. */
+  border: 1px solid var(--ff-slate-400);
+  background: var(--ff-night-800);
   color: var(--text, #f2f4f7);
   box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
 }
@@ -2863,4 +2865,10 @@ button.feed-entry:focus-visible {
 
 .build-button.unaffordable .build-why:not(:empty) {
   display: block;
+}
+
+/* The achievements' badge is a 40 px tile (styles.css): a row's badges are small tags. */
+.leader .badge {
+  width: auto;
+  height: auto;
 }
