@@ -53,26 +53,26 @@ Since 0.9.5 the economy follows the long-standing reference of the genre, value 
 
 ## Attacks
 
-| Key                   |       Value | Unit                        | Used by       | Notes                                                          |
-| --------------------- | ----------: | --------------------------- | ------------- | -------------------------------------------------------------- |
-| `B-ATTACK-RATIO-MIN`  |           5 | %                           | `R-ATTACK-02` | Default ratio in the interface is 30 %                         |
-| `B-TILE-WEIGHT`       | 8 / 10 / 12 | troops                      | `R-MAP-06`    | Plains / hills / mountains: what a tile's price is measured in |
-| `B-NEUTRAL-SHARE`     |          20 | % of the tile's weight      | `R-ATTACK-04` | 1.6 troops a plains tile                                       |
-| `B-BOT-NEUTRAL-SHARE` |          10 | % of the tile's weight      | `R-ATTACK-04` | For bots                                                       |
-| `B-LOSS-BASE`         |       0.463 | × the tile's weight         | `R-ATTACK-03` | Of a player's tile, times the odds                             |
-| `B-LOSS-DENSITY`      |       0.039 | × weight per soldier/tile   | `R-ATTACK-03` | The defender's soldiers per tile, times the odds               |
-| `B-ODDS-MIN`          |         0.6 | defender soldiers per troop | `R-ATTACK-03` | A larger attack pays no less than this                         |
-| `B-ODDS-MAX`          |           2 | defender soldiers per troop | `R-ATTACK-03` | A smaller attack pays no more than this                        |
-| `B-LARGE-MID`         |      300000 | tiles                       | `R-ATTACK-03` | Size at which a territory has half its size bonus              |
-| `B-LARGE-ATTACKER`    |          70 | % off the base              | `R-ATTACK-03` | For a huge attacker                                            |
-| `B-LARGE-DEFENDER`    |          30 | % off the base              | `R-ATTACK-03` | For a huge defender                                            |
-| `B-BOT-DEFENSE`       |          70 | % of the price              | `R-ATTACK-03` | Of a bot's tile, for players and nations                       |
-| `B-ATTACK-SPEED`      |           4 | divisor                     | `R-ATTACK-03` | Tiles taken per tick: 1 + isqrt(troops) / 4                    |
-| `B-ATTACK-PACE`       |          20 | % of the front per tick     | `R-ATTACK-03` | Against a player, at full strength                             |
-| `B-ATTACK-PACE-ODDS`  |         3.0 | × the garrison facing it    | `R-ATTACK-03` | Troops for full pace; less goes slower                         |
-| `B-ATTACK-SPREAD`     |           4 | tiles                       | `R-ATTACK-03` | Head start per side shared with own land                       |
-| `B-ENCIRCLE-MAX`      |        4000 | tiles                       | `R-ATTACK-08` | Larger pockets must be conquered                               |
-| `B-RETREAT-PENALTY`   |          25 | % of returning troops       | `R-ATTACK-06` |                                                                |
+| Key                   |       Value | Unit                         | Used by       | Notes                                                          |
+| --------------------- | ----------: | ---------------------------- | ------------- | -------------------------------------------------------------- |
+| `B-ATTACK-RATIO-MIN`  |           5 | %                            | `R-ATTACK-02` | Default ratio in the interface is 30 %                         |
+| `B-TILE-WEIGHT`       | 8 / 10 / 12 | troops                       | `R-MAP-06`    | Plains / hills / mountains: what a tile's price is measured in |
+| `B-NEUTRAL-SHARE`     |          20 | % of the tile's weight       | `R-ATTACK-04` | 1.6 troops a plains tile                                       |
+| `B-BOT-NEUTRAL-SHARE` |          10 | % of the tile's weight       | `R-ATTACK-04` | For bots                                                       |
+| `B-LOSS-BASE`         |       0.463 | × the tile's weight          | `R-ATTACK-03` | Of a player's tile, times the odds                             |
+| `B-LOSS-DENSITY`      |       0.039 | × weight per soldier/tile    | `R-ATTACK-03` | The defender's soldiers per tile, times the odds               |
+| `B-ODDS-MIN`          |         0.6 | defender soldiers per troop  | `R-ATTACK-03` | A larger attack pays no less than this                         |
+| `B-ODDS-MAX`          |           2 | defender soldiers per troop  | `R-ATTACK-03` | A smaller attack pays no more than this                        |
+| `B-LARGE-MID`         |      300000 | tiles                        | `R-ATTACK-03` | Size at which a territory has half its size bonus              |
+| `B-LARGE-ATTACKER`    |          70 | % off the base               | `R-ATTACK-03` | For a huge attacker                                            |
+| `B-LARGE-DEFENDER`    |          30 | % off the base               | `R-ATTACK-03` | For a huge defender                                            |
+| `B-BOT-DEFENSE`       |          70 | % of the price               | `R-ATTACK-03` | Of a bot's tile, for players and nations                       |
+| `B-ATTACK-SPEED`      |         150 | troops per tile              | `R-ATTACK-03` | Most tiles taken per tick: 1 + troops / 150                    |
+| `B-ATTACK-PACE`       |          52 | % of the front per tick      | `R-ATTACK-03` | Against a player, at odds of 1 to 1; 20.8 % at odds of 2.5     |
+| `B-ATTACK-PACE-ODDS`  |         0.8 | defender's soldiers ÷ troops | `R-ATTACK-03` | Odds below which more troops stop speeding the attack up       |
+| `B-ATTACK-SPREAD`     |           4 | tiles                        | `R-ATTACK-03` | Head start per side shared with own land                       |
+| `B-ENCIRCLE-MAX`      |        4000 | tiles                        | `R-ATTACK-08` | Larger pockets must be conquered                               |
+| `B-RETREAT-PENALTY`   |          25 | % of returning troops        | `R-ATTACK-06` |                                                                |
 
 ## Collapsing fronts
 
@@ -95,7 +95,7 @@ Since 0.9.5 the economy follows the long-standing reference of the genre, value 
 
 | Key            | Value | Unit             | Used by     | Notes                                             |
 | -------------- | ----: | ---------------- | ----------- | ------------------------------------------------- |
-| `B-BOAT-SPEED` |     2 | water tiles/tick | `R-UNIT-02` | An ocean of 500 tiles takes 25 s                  |
+| `B-BOAT-SPEED` |     1 | water tiles/tick | `R-UNIT-02` | An ocean of 500 tiles takes 50 s at pace 1        |
 | `B-BOAT-MAX`   |     3 | ships per player | `R-UNIT-02` | Transport ships at sea at once                    |
 | `B-BOAT-RANGE` |  1000 | water tiles      | `R-UNIT-02` | Longest route; also bounds the cost of the search |
 
@@ -182,7 +182,7 @@ Distances and land are given for a map of 2^19 tiles, like the spawn values: on 
 | `B-SILO-RELOAD`          |      30 | s              | `R-BUILD-04` | From a launch to the next one from the same silo                      |
 | `B-COST-MISSILE`         |  750000 | gold           | `R-UNIT-05`  | Every missile; it does not grow                                       |
 | `B-COST-HEAVY-MISSILE`   | 5000000 | gold           | `R-UNIT-05`  | Every heavy missile                                                   |
-| `B-MISSILE-SPEED`        |       8 | tiles per tick | `R-UNIT-05`  | 80 tiles a second: across World in under 13 s                         |
+| `B-MISSILE-SPEED`        |      10 | tiles per tick | `R-UNIT-05`  | 100 tiles a second: across World in about 10 s                        |
 | `B-MISSILE-RADIUS`       |      12 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 24 on World                                   |
 | `B-HEAVY-MISSILE-RADIUS` |      45 | tiles          | `R-UNIT-05`  | On a map of 2^19 tiles; 90 on World                                   |
 | `B-FALLOUT-TIME`         |      90 | s              | `R-UNIT-06`  | Under a heavy missile                                                 |
@@ -369,3 +369,5 @@ First values. A landmark is worth a detour but not a game: a gold landmark is ab
 | `B-WIN-SHARE` |    75 | % of ownable land | `R-WIN-01` |       |
 
 Nico's targets (30 October): a player getting the hang of the game (`--intermediate`: an order every 3 s with 40 % of its troops) wins or leads with more than 40 % of the land after 22.5 minutes of play, which is 30 minutes at the normal pace (`B-BASE-PACE`), in 80 % of games at easy, 50 % at normal and 30 % at hard. Nations at normal and hard used to send 40 % and 60 % of their troops after 140 and 115 s: this player was eliminated after about 5 minutes, and won or led 2 games of 12 at normal and 1 at hard. With 20 % of their troops at normal, 30 % at hard and a grace of 600 s for both, it wins or leads 11 games of 24 at normal and 6 of 24 at hard (after the disc-shaped missiles, 6 of 24 at normal and 7 at hard; normal then got odds of 80 % and a hold of 50 %: 10 of 24); at easy, with the values of 0.9.3, 12 of 12 (and the casual player about 9 of 12). Measured with `pnpm balance -- --map world --bots normal:0 --nations normal --intermediate --minutes 22.5 --seeds 1-24 --rule collapsingFronts`. A win alone is too rare to measure at normal and hard, because nations stall near 61 % of the land, so "won or led" is the figure. Variations of a few points are noise: the same values with a ratio of 22 % gave 1 game of 12 instead of 5.
+
+Sending more soldiers did not conquer faster (31 October). An attack was capped at 1 + isqrt(troops) / 4 tiles a tick, so four times the troops took twice the tiles, and its pace reached its ceiling at three times the garrison on its front alone, a small share of the defender's army: past that, extra soldiers changed nothing. The reference game divides a share of the front by the odds, the defender's whole army over the attack, between 0.82 and 7.5, and slows a hopeless attack further past 20. The pace now does the same (`B-ATTACK-PACE` 52 % at odds of 1, 20.8 % at 2.5, where the old ceiling of 20 % sat), with a cap of 1 + troops / 150 tiles, the old cap at 1,000 troops. Measured with the command of 30 October, twelve seeds each, nations at easy: 12 of 12 wins before and after; at normal: 4 of 12 won or led before, 2 after on seeds 1-12, and 2 of 12 against 3 of 12 on seeds 13-24, which is the noise. Fights keep their length (5.0 s median against 4.9 s).

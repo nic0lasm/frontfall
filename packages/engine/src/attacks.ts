@@ -12,6 +12,11 @@ import { TileKind } from "./terrain.ts";
 import { BoundedFloodFill } from "./territory/bounded-flood-fill.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
 
+/** Odds, in hundredths, past which a bigger garrison no longer slows an attack on its own. */
+const ATTACK_ODDS_CEILING = 750;
+/** Odds, in hundredths per hundredth of the hopeless factor, from which a hopeless attack slows again (odds of 20 to 1). */
+const ATTACK_HOPELESS_ODDS = 20;
+
 /** A wave of troops pushing into the land of one opponent, or into unowned land. */
 export interface Attack {
   readonly id: number;
@@ -85,9 +90,7 @@ export function installAttacks(game: Game): void {
       const alive = game.player(attack.player)?.alive === true;
       // The most an attack of this size can take, before its front is measured.
       speeds[a] =
-        alive && attack.troops > 0
-          ? 1 + divFloor(isqrt(attack.troops), balance.attackSpeedDivisor)
-          : 0;
+        alive && attack.troops > 0 ? 1 + divFloor(attack.troops, balance.attackSpeedDivisor) : 0;
       if (speeds[a] === 0) continue;
       const own = attacksOf.get(attack.player);
       if (own) own.push(a);
@@ -139,11 +142,14 @@ export function installAttacks(game: Game): void {
   }
 
   /**
-   * R-ATTACK-03: tiles an attack on a player takes this tick. At full
-   * strength, troops of B-ATTACK-PACE-ODDS times the garrison facing them,
-   * a share B-ATTACK-PACE of the front's length; a weaker attack in
-   * proportion, at least one tile; never more than its size allows
-   * (B-ATTACK-SPEED). Unowned land only knows the last limit.
+   * R-ATTACK-03: tiles an attack on a player takes this tick: a share
+   * B-ATTACK-PACE of the front's length divided by the odds against the
+   * attack, the defender's soldiers over the attack's troops. The odds count
+   * from B-ATTACK-PACE-ODDS (an overwhelming attack gains nothing more) up to
+   * ATTACK_ODDS_CEILING times the attack, and past ATTACK_HOPELESS_ODDS a
+   * hopeless attack slows again in proportion; at least one tile; never more
+   * than its size allows (B-ATTACK-SPEED). Unowned land only knows the last
+   * limit.
    */
   function pace(a: number): number {
     const attack = attacks[a] as Attack;
@@ -152,12 +158,16 @@ export function installAttacks(game: Game): void {
     const defender = game.player(attack.target);
     const front = frontLengths[a] as number;
     if (!defender?.alive || front === 0) return most;
-    const garrison = Math.max(1, defensePerTile(game, defender) * front);
-    const full = Math.max(1, mulDiv(garrison, balance.attackPaceOddsTenths, 10));
-    const strength = Math.min(attack.troops, full);
+    // Odds in hundredths: 100 is parity.
+    const odds = divFloor(soldiers(defender) * 100, Math.max(1, attack.troops));
+    const counted = Math.min(
+      ATTACK_ODDS_CEILING,
+      Math.max(odds, balance.attackPaceOddsTenths * 10),
+    );
+    const hopeless = Math.min(5000, Math.max(100, divFloor(odds, ATTACK_HOPELESS_ODDS)));
     // R-DOCTRINE: and the pace of the player's attacks.
     const doctrine = doctrinePercent(game, attack.player, "pace");
-    const tiles = mulDiv(front * balance.attackPacePercent * doctrine, strength, full * 10_000);
+    const tiles = divFloor(front * balance.attackPacePercent * doctrine, counted * hopeless);
     return Math.min(most, Math.max(1, tiles));
   }
 

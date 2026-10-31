@@ -110,10 +110,10 @@ describe("expansion into unowned land", () => {
 
   it("speeds up with more troops (B-ATTACK-SPEED)", () => {
     const { grid, game, ada, run, attack } = newGame({ 1: [0] }, undefined, {
-      attackSpeedDivisor: 5,
+      attackSpeedDivisor: 100,
     });
     ada.troops = 200;
-    // 1 + isqrt(200) / 5 = 3 tiles in the first tick.
+    // 1 + 200 / 100 = 3 tiles in the first tick.
     run([attack(1, grid.index(5, 1), 200)]);
     expect(game.territory.tileCount(1)).toBe(3 + 3);
   });
@@ -354,8 +354,8 @@ describe("pace of an attack on a player (R-ATTACK-03)", () => {
       balance: {
         ...balance,
         attackSpeedDivisor: 1,
-        attackPacePercent: 20,
-        attackPaceOddsTenths: 30,
+        attackPacePercent: 50,
+        attackPaceOddsTenths: 8,
         ...overrides,
       },
     });
@@ -366,7 +366,7 @@ describe("pace of an attack on a player (R-ATTACK-03)", () => {
     }
     const ada = game.player(1) as Player;
     const bea = game.player(2) as Player;
-    // 320 tiles at 10 soldiers each: a garrison of 400 on the front, full pace from 1,200 troops.
+    // 320 tiles and 3,200 soldiers: odds of 1 to 1 against an attack of 3,200.
     bea.troops = 3200;
     const strike = (troops: number) => {
       ada.troops = troops;
@@ -379,13 +379,20 @@ describe("pace of an attack on a player (R-ATTACK-03)", () => {
     return { strike };
   }
 
-  it("takes B-ATTACK-PACE of the front per tick at full strength, however large the attack", () => {
-    expect(front().strike(1200)).toBe(8);
-    expect(front().strike(5000)).toBe(8);
+  it("takes B-ATTACK-PACE of the front per tick at odds of 1 to 1", () => {
+    // A front of 40 tiles: half of it.
+    expect(front().strike(3200)).toBe(20);
   });
 
-  it("slows in proportion below B-ATTACK-PACE-ODDS, never under one tile", () => {
-    expect(front().strike(300)).toBe(2);
+  it("goes faster the more soldiers it holds, down to odds of B-ATTACK-PACE-ODDS", () => {
+    expect(front().strike(1600)).toBe(10);
+    expect(front().strike(3200)).toBe(20);
+    expect(front().strike(4000)).toBe(25);
+    expect(front().strike(8000)).toBe(25);
+  });
+
+  it("slows in proportion to the odds against it, never under one tile", () => {
+    expect(front().strike(400)).toBe(2);
     expect(front().strike(40)).toBe(1);
   });
 

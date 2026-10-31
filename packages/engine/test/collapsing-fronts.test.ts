@@ -14,7 +14,7 @@ const balance: Balance = {
   ...WHOLE_PRICES,
   tileWeightTenths: [100, 100, 100],
   // One tile per tick, so a stretch giving way stands out.
-  attackSpeedDivisor: 1000,
+  attackSpeedDivisor: 1_000_000,
   attackSpread: 0,
   collapseOddsTenths: 30,
   collapseBuildupTicks: 3,

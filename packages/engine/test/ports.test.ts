@@ -105,8 +105,8 @@ describe("trade", () => {
     run(5 + 10);
     expect(game.tradeShips.map((ship) => ship.player)).toEqual([1, 2]);
     expect(game.tradeShips[0]?.path.length).toBe(20);
-    // 20 tiles at B-BOAT-SPEED 2: ten ticks at sea.
-    run(9);
+    // 20 tiles at B-BOAT-SPEED 1: twenty ticks at sea.
+    run(19);
     expect(ada.gold).toBe(0);
     run(1);
     // Both ships arrive: each side is paid for its own and for the other's, 1016 each for 20 tiles.
@@ -117,7 +117,7 @@ describe("trade", () => {
 
   it("tells the interface what each side was paid, at the dock (R-UNIT-03)", () => {
     const { game, grid, run } = trading();
-    run(5 + 10 + 10);
+    run(5 + 10 + 20);
     const trades = game.diplomacyEvents.filter((event) => event.type === "trade");
     // Two ships arrive and each pays both sides: four events, one gain each.
     expect(trades).toHaveLength(4);
@@ -154,7 +154,7 @@ describe("trade", () => {
     expect(ada.gold + bea.gold).toBe(0);
     step([{ player: 2, order: { type: "embargo", target: 1, on: 0 } }]);
     expect(game.diplomacyEvents.at(-1)).toMatchObject({ type: "lifted", a: 2, b: 1 });
-    run(20);
+    run(40);
     expect(ada.gold).toBeGreaterThan(0);
   });
 
@@ -179,7 +179,7 @@ describe("trade", () => {
     const { game, grid, ada, bea, step, run } = trading();
     run(5 + 10);
     step([{ player: 2, order: { type: "demolish", tile: grid.index(30, 10) } }]);
-    run(10);
+    run(20);
     // Bea's ship still reaches Ada's port and pays both; Ada's finds no port.
     expect(ada.gold).toBe(1016);
     expect(bea.gold).toBe(1016);

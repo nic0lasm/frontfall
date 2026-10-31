@@ -39,11 +39,11 @@ export interface Balance {
   neutralSharePercent: number;
   /** B-BOT-NEUTRAL-SHARE, percent of a tile's weight that unowned land costs a bot */
   botNeutralSharePercent: number;
-  /** B-ATTACK-SPEED: an attack takes 1 + isqrt(troops) / attackSpeedDivisor tiles per tick */
+  /** B-ATTACK-SPEED: an attack takes at most 1 + troops / attackSpeedDivisor tiles per tick */
   attackSpeedDivisor: number;
-  /** B-ATTACK-PACE, percent of its front's length an attack on a player at full strength takes per tick; 0 leaves only B-ATTACK-SPEED */
+  /** B-ATTACK-PACE, percent of its front's length an attack on a player takes per tick at odds of 1 to 1; 0 leaves only B-ATTACK-SPEED */
   attackPacePercent: number;
-  /** B-ATTACK-PACE-ODDS, in tenths: troops, as a multiple of the garrison facing them, an attack needs for full pace */
+  /** B-ATTACK-PACE-ODDS, in tenths: the odds against an attack (the defender's soldiers over its troops) below which it stops going faster */
   attackPaceOddsTenths: number;
   /** B-ATTACK-SPREAD, tiles of distance to the aim that each side shared with the attacker's land is worth */
   attackSpread: number;
@@ -242,9 +242,9 @@ export const DEFAULT_BALANCE: Balance = {
   tileWeightTenths: [80, 100, 120],
   neutralSharePercent: 20,
   botNeutralSharePercent: 10,
-  attackSpeedDivisor: 4,
-  attackPacePercent: 20,
-  attackPaceOddsTenths: 30,
+  attackSpeedDivisor: 150,
+  attackPacePercent: 52,
+  attackPaceOddsTenths: 8,
   attackSpread: 4,
   lossBaseThousandths: 463,
   lossDensityThousandths: 39,
@@ -260,7 +260,7 @@ export const DEFAULT_BALANCE: Balance = {
   collapseBuildupTicks: 3 * 10,
   collapseDepth: 5,
   collapseCostPercent: 50,
-  boatSpeed: 2,
+  boatSpeed: 1,
   boatMax: 3,
   boatRange: 1000,
   buildTicks: 5 * 10,
@@ -302,7 +302,7 @@ export const DEFAULT_BALANCE: Balance = {
   heavyMissileCost: 5_000_000,
   missileRadius: 12,
   heavyMissileRadius: 45,
-  missileSpeed: 8,
+  missileSpeed: 10,
   falloutCostPercent: 200,
   falloutTicks: 90 * 10,
   lightFalloutTicks: 30 * 10,
