@@ -27,6 +27,8 @@ export class PopulationBar {
   private readonly fill = h("span", { class: "pop-fill" });
   private readonly band = h("span", { class: "pop-band" });
   private readonly rate = h("span", { class: "pop-rate" });
+  private readonly zone = h("span", { class: "pop-zone" });
+  private lastRate = "";
   private span = { from: 0, to: 0 };
   private bandCap = -1;
 
@@ -35,7 +37,7 @@ export class PopulationBar {
       "button",
       { type: "button", class: "pop-bar", "aria-describedby": "build-tip" },
       h("span", { class: "pop-track", "aria-hidden": "true" }, this.fill, this.band),
-      h("span", { class: "pop-figures" }, this.rate),
+      h("span", { class: "pop-figures" }, this.rate, this.zone),
     );
     // A finger has no tooltip: a press shows the figures, which a phone hides, and how growth works.
     this.element.addEventListener("click", () => {
@@ -51,6 +53,10 @@ export class PopulationBar {
     const { from, to } = this.span;
     this.band.style.left = `${String(from * 100)}%`;
     this.band.style.width = `${String((to - from) * 100)}%`;
+    this.zone.textContent = t("hud.growthZone", {
+      from: String(Math.round(from * 100)),
+      to: String(Math.round(to * 100)),
+    });
   }
 
   update(troops: number, cap: number, growth: number): void {
@@ -61,7 +67,10 @@ export class PopulationBar {
     this.element.classList.toggle("in-band", growth > 0 && fill >= from && fill <= to);
     this.element.classList.toggle("full", growth === 0 && fill >= 1);
     const count = formatCount(growth);
-    this.rate.textContent = t("hud.growthRate", { troops: count });
+    if (count !== this.lastRate) {
+      this.lastRate = count;
+      this.rate.textContent = t("hud.growthRate", { troops: count });
+    }
     // The name starts with the figures shown, so a voice command can name the button by them.
     this.element.setAttribute("aria-label", t("hud.growthNow", { troops: count }));
     this.element.title = t("hud.growthHelp");

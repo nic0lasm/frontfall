@@ -2431,7 +2431,8 @@ button.feed-entry:focus-visible {
 .pop-band {
   position: absolute;
   inset: 0 auto;
-  background: rgb(60 203 127 / 45%);
+  background: rgb(60 203 127 / 55%);
+  box-shadow: inset 0 0 0 1px rgb(60 203 127 / 80%);
 }
 
 .pop-fill {
@@ -2447,6 +2448,10 @@ button.feed-entry:focus-visible {
 
 .pop-bar.in-band .pop-rate {
   color: var(--ff-success);
+}
+
+.pop-zone {
+  color: var(--ff-slate-300);
 }
 
 .pop-bar.full .pop-fill {
@@ -2467,18 +2472,38 @@ button.feed-entry:focus-visible {
   .bar .pop-bar {
     position: static;
     justify-content: center;
-    width: 56px;
+    width: 104px;
     padding: 0 0 0 12px;
     border-left: 1px solid var(--ff-night-500);
   }
 
   .bar .pop-track {
-    height: 6px;
-    border-radius: 3px;
+    height: 10px;
+    border-radius: 5px;
   }
 
   .bar .pop-figures {
     display: flex;
+  }
+
+  .bar .pop-rate {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .bar .pop-zone {
+    display: none;
+  }
+}
+
+/* Room enough for the best zone to be named beside the figure. */
+@media (width >= 1500px) and (height >= 560px) {
+  .bar .pop-bar {
+    width: 230px;
+  }
+
+  .bar .pop-zone {
+    display: inline;
   }
 }
 
