@@ -51,6 +51,8 @@ export interface CampaignReport {
   /** Slowest tick and the 99th percentile, in ms: the engine's cost. */
   readonly tickMaxMs: number;
   readonly tickP99Ms: number;
+  /** Cost of the tick that ends the spawn phase, ms: a one-time hitch at the start. */
+  readonly startMs: number;
   readonly hash: number;
   readonly ms: number;
 }
@@ -128,6 +130,7 @@ export function playCampaignGame(
     if (violations.size < 20) violations.add(what);
   };
   const stepMs: number[] = [];
+  let startMs = 0;
   let decidedAt: number | undefined;
   let eliminatedAt: number | undefined;
   let peak = 0;
@@ -151,7 +154,10 @@ export function playCampaignGame(
       flag(`exception at tick ${String(game.tick)}: ${String(error)}`);
       break;
     }
-    stepMs.push(performance.now() - t0);
+    const cost = performance.now() - t0;
+    // The step that ends the spawn phase places every player once: counted apart.
+    if (game.tick <= balance.spawnPhaseTicks + 1) startMs = Math.max(startMs, cost);
+    else stepMs.push(cost);
     if (game.phase !== "play") continue;
     const p = game.player(1);
     if (!p) continue;
@@ -226,6 +232,7 @@ export function playCampaignGame(
     violations: [...violations],
     stalemate,
     tickMaxMs: sorted.at(-1) ?? 0,
+    startMs,
     tickP99Ms: sorted[Math.floor(sorted.length * 0.99)] ?? 0,
     hash: game.hash(),
     ms: Math.round(performance.now() - began),
