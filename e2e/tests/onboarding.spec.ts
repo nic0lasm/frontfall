@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { spiral, startByTheWater } from "./by-the-water.ts";
 
 /** Starts a solo game on a small map, as a new player does. */
-async function startSolo(page: import("@playwright/test").Page): Promise<void> {
-  await page.goto("./?map=skirmish&bots=2&difficulty=easy");
+async function startSolo(page: import("@playwright/test").Page, query = ""): Promise<void> {
+  await page.goto(`./?map=skirmish&bots=2&difficulty=easy${query}`);
   await page.locator("#play").click();
   await expect(page.locator("#map")).toBeVisible();
 }
@@ -78,7 +78,8 @@ test("the first steps follow the player, and stay hidden once put away", async (
 });
 
 test("a refused build names what was refused", async ({ page }) => {
-  await startSolo(page);
+  // The line comes once the placement phase is over: at ×5 that is seconds, not the test's whole time.
+  await startSolo(page, "&speed=5");
   const box = await page.locator("#map").boundingBox();
   if (!box) throw new Error("the map has no size");
   // Water in a corner of the view: never a place for a city.
@@ -212,8 +213,16 @@ test("the line about expanding goes away for good after the first attack", async
   await page.goto("./?map=strait&bots=1&difficulty=easy&nations=0&speed=5");
   await page.locator("#play").click();
   await expect(page.locator("#map")).toBeVisible();
-  await page.mouse.click(start.x, start.y);
-  await expect(page.locator(".stats .stat").nth(2).locator(".stat-value")).not.toHaveText("0%");
+  // A click that comes before the game takes orders is lost: click again until the start is placed.
+  await expect
+    .poll(
+      async () => {
+        await page.mouse.click(start.x, start.y);
+        return page.locator(".stats .stat").nth(2).locator(".stat-value").textContent();
+      },
+      { timeout: 30_000, intervals: [500] },
+    )
+    .not.toBe("0%");
   await expect(banner).toBeHidden({ timeout: 30_000 });
 });
 
@@ -229,6 +238,8 @@ for (const viewport of [
     }) => {
       // At ×1 the placement phase lasts a full minute: a slow browser cannot outrun it.
       await page.goto("./?speed=1");
+      // A window that is not in front can be held back by the browser, and the game with it.
+      await page.bringToFront();
       await page.locator("#tutorial").click();
       await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
       // The game answers once its terrain and its first update are in: slow in a software browser.
