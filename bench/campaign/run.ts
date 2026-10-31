@@ -39,6 +39,24 @@ const profiles = values.profiles.split(",") as ProfileName[];
 const difficulties = values.difficulties.split(",") as BotDifficulty[];
 const rules = Object.fromEntries(values.rule.map((r) => [r, true]));
 
+const KNOWN = {
+  profile: ["beginner", "nico", "veteran"],
+  difficulty: ["easy", "normal", "hard"],
+};
+for (const [kind, given] of [
+  ["profile", profiles],
+  ["difficulty", difficulties],
+] as const)
+  for (const name of given)
+    if (!KNOWN[kind].includes(name)) {
+      console.error(`Unknown ${kind} "${name}" (known: ${KNOWN[kind].join(", ")})`);
+      process.exit(2);
+    }
+if (seeds.length === 0 || seeds.some((s) => !Number.isInteger(s) || s < 0)) {
+  console.error(`No usable seed in "${values.seeds}": give 1-24 or 1,5,9`);
+  process.exit(2);
+}
+
 const setups: CampaignSetup[] = [];
 for (const profile of profiles)
   for (const difficulty of difficulties)
@@ -55,27 +73,34 @@ for (const profile of profiles)
 const run = promisify(execFile);
 const child = fileURLToPath(new URL("child.ts", import.meta.url));
 const reports: CampaignReport[] = [];
+const GAME_TIMEOUT_MS = 20 * 60_000;
 let next = 0;
 async function worker(): Promise<void> {
   while (next < setups.length) {
-    const setup = setups[next++] as CampaignSetup;
+    const index = next++;
+    const setup = setups[index] as CampaignSetup;
     try {
       const { stdout } = await run(
         process.execPath,
         ["--import", "tsx", child, JSON.stringify(setup)],
         {
           maxBuffer: 64 << 20,
+          timeout: GAME_TIMEOUT_MS,
         },
       );
-      reports.push(JSON.parse(stdout.trim().split("\n").at(-1) ?? "") as CampaignReport);
+      reports[index] = JSON.parse(stdout.trim().split("\n").at(-1) ?? "") as CampaignReport;
     } catch (error) {
-      console.error(`CRASH ${JSON.stringify(setup)}: ${String(error).slice(0, 300)}`);
+      console.error(
+        `CRASH ${JSON.stringify(setup)}: ${String((error as { stderr?: string }).stderr?.slice(-400) ?? error).slice(0, 400)}`,
+      );
       process.exitCode = 1;
     }
   }
 }
 const began = performance.now();
 await Promise.all(Array.from({ length: Math.max(1, Number(values.jobs)) }, worker));
+const crashed = setups.length - reports.filter(Boolean).length;
+reports.splice(0, reports.length, ...reports.filter(Boolean));
 
 const pct = (n: number, d: number): number => (d === 0 ? 0 : (n * 100) / d);
 const median = (xs: number[]): number => {
@@ -83,6 +108,7 @@ const median = (xs: number[]): number => {
   return s[Math.floor(s.length / 2)] ?? 0;
 };
 const verdicts: string[] = [];
+if (crashed) verdicts.push(`${String(crashed)} games crashed or timed out`);
 const rows: Record<string, string | number>[] = [];
 const winRate: Record<string, number> = {};
 for (const profile of profiles) {
