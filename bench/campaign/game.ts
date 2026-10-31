@@ -330,7 +330,7 @@ const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
     warPercent: 55,
     oddsPercent: 140,
     allySeconds: 600,
-    measured: true,
+    crushPercent: 300,
   },
   veteran: {
     everySeconds: 1,
@@ -339,7 +339,7 @@ const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
     warPercent: 60,
     oddsPercent: 160,
     allySeconds: 300,
-    measured: true,
+    crushPercent: 300,
   },
 };
 

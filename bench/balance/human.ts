@@ -28,8 +28,8 @@ export interface HumanStyle {
   readonly oddsPercent: number;
   /** Seconds of play during which it asks any neighbour for an alliance; later only stronger ones. */
   readonly allySeconds: number;
-  /** It answers an attacker with what cancels the attack, counting the troops it already sent back, instead of all it can spare each look. */
-  readonly measured?: boolean;
+  /** Under its war threshold, it still turns on a neighbour it outnumbers by this %, sending what lies above its keep. */
+  readonly crushPercent?: number;
 }
 
 /** A player getting the hang of the genre: a look every 3 s, a 30 % slider, alliances in the first 5 min. */
@@ -190,12 +190,9 @@ export class HumanPlayer {
     if (attacker !== NEUTRAL) {
       const tile = this.borderWith(attacker);
       const incoming = this.incoming(attacker);
-      const sent = style.measured === true ? this.outgoing(attacker) : 0;
       const back = Math.min(
         me.troops - divFloor(cap, 10),
-        style.measured === true
-          ? incoming + divFloor(incoming, 10) - sent
-          : Math.max(incoming + divFloor(incoming, 10), spare),
+        Math.max(incoming + divFloor(incoming, 10), spare),
       );
       this.why = tile < 0 ? "answer: no border" : back < cheapest ? "answer: no troops" : "answer";
       if (tile >= 0 && back >= cheapest) return { type: "attack", target: tile, troops: back };
@@ -215,7 +212,14 @@ export class HumanPlayer {
       }
     }
     this.why = "under war threshold";
-    if (me.troops * 100 < cap * style.warPercent) return undefined;
+    if (me.troops * 100 < cap * style.warPercent) {
+      // Its army is short of its cap, yet it outnumbers a neighbour many times over.
+      const crush = style.crushPercent;
+      const weak = enemy >= 0 ? (game.player(game.territory.ownerOf(enemy))?.troops ?? 0) : 0;
+      if (crush === undefined || enemy < 0 || me.troops * 100 < weak * crush) return undefined;
+      this.why = "crushable neighbour";
+      return { type: "attack", target: enemy, troops: spare };
+    }
     // A full army grows no more: then any neighbour with fewer troops is worth it.
     const odds = me.troops * 100 >= cap * 90 ? 100 : style.oddsPercent;
     const beatable = (owner: number): boolean =>
@@ -232,7 +236,12 @@ export class HumanPlayer {
         return { type: "embark", target: tile, troops: spare };
       }
     }
-    this.why = enemy >= 0 ? "neighbours too strong" : "no neighbour";
+    this.why =
+      enemy >= 0
+        ? "neighbours too strong"
+        : this.neighbours().some((owner) => !game.bots.has(owner))
+          ? "only allies around"
+          : "no land neighbour";
     return undefined;
   }
 
@@ -305,15 +314,6 @@ export class HumanPlayer {
     let total = 0;
     for (const attack of this.game.attacks) {
       if (attack.target === this.id && attack.player === owner) total += attack.troops;
-    }
-    return total;
-  }
-
-  /** Troops in its own attacks on `owner`'s land. */
-  private outgoing(owner: number): number {
-    let total = 0;
-    for (const attack of this.game.attacks) {
-      if (attack.player === this.id && attack.target === owner) total += attack.troops;
     }
     return total;
   }
