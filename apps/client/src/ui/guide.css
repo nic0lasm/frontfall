@@ -297,6 +297,13 @@
   }
 }
 
+/* The open tray rises over the cards and the place under the banner: the guide goes up under the figures. */
+@media (width < 720px), (height < 560px) {
+  .game:has(.doctrine-picker:not([hidden])):has(.build.open) .guide {
+    top: 96px;
+  }
+}
+
 /* A landscape phone has no room for both: the cards carry the step, the guide returns with the attacks. */
 @media (height < 560px) {
   .game:has(.doctrine-picker:not([hidden])) .guide {
