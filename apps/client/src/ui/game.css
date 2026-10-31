@@ -656,6 +656,77 @@
   pointer-events: auto;
 }
 
+/* The gold a trade ship brings, rising over its port (ui/gold-floats.ts). */
+
+.gold-floats {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.gold-float {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+
+.gold-float-text {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  color: var(--ff-warning);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 2px color-mix(in srgb, var(--ff-night-800) 90%, transparent),
+    0 0 6px color-mix(in srgb, var(--ff-night-800) 80%, transparent);
+  animation: gold-float 1.6s ease-out forwards;
+}
+
+@keyframes gold-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -28px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-float-text {
+    animation-name: gold-float-still;
+  }
+}
+
+@keyframes gold-float-still {
+  0%,
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -8px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
 /* The answer to a click on the map (ui/click-marks.ts). */
 
 .click-marks {

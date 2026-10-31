@@ -338,16 +338,17 @@ export interface DiplomacyEvent {
     | "capital"
     | "razed"
     | "eliminated"
-    | "landmark";
+    | "landmark"
+    | "trade";
   a: number;
   b: number;
   /** For "landmark": which one `a` took from `b`, by its index in the map's list (R-LAND-03). */
   landmark?: number;
-  /** Where a front collapsed, for "collapsed" (R-ATTACK-10). */
+  /** Where a front collapsed, for "collapsed" (R-ATTACK-10); the port a trade ship docked on, for "trade". */
   tile?: number;
   /** A quick message, by number (R-DIPLO-07). */
   phrase?: number;
-  /** The gold an "eliminated" player's taker got (R-ECO-08). */
+  /** The gold an "eliminated" player's taker got (R-ECO-08), or a "trade" ship brought `a`. */
   gold?: number;
 }
 

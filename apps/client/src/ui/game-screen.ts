@@ -32,6 +32,7 @@ import type { Sound } from "../audio/sound.ts";
 import type { ReplayBar } from "./replay-bar.ts";
 import { REPLAY_MAP_CHANGED, REPLAY_SPEEDS } from "../game/replay-file.ts";
 import { ClickMarks } from "./click-marks.ts";
+import { GoldFloats } from "./gold-floats.ts";
 import { DiplomacyPanel } from "./diplomacy.ts";
 import type { FeedTarget } from "./events-feed.ts";
 import type { LandLost } from "./feed-events.ts";
@@ -141,6 +142,7 @@ export class GameScreen {
   /** The HUD's panels may have changed since they were last measured (`clearPanels`). */
   private panelsMoved = true;
   private readonly marks = new ClickMarks();
+  private readonly goldFloats = new GoldFloats();
   private readonly labels = new PlayerLabels();
   /** Players hidden on this screen (R-DIPLO-08), for this game only. */
   private readonly hidden = new Set<number>();
@@ -308,6 +310,7 @@ export class GameScreen {
       this.surface,
       this.labels.element,
       this.marks.element,
+      this.goldFloats.element,
       this.hud.element,
       this.marks.note,
     );
@@ -576,6 +579,7 @@ export class GameScreen {
       this.labels.place(camera, camera.scale);
       this.feed?.expire(now);
       this.marks.place(camera, now);
+      this.goldFloats.place(camera, now);
       this.previews.place();
       this.frameHandle = requestAnimationFrame(frame);
     };
@@ -773,6 +777,12 @@ export class GameScreen {
     update = withHidden(update, this.hidden);
     if (!this.replayBar) this.stats.observe(update);
     this.labels.update(update.players, update.labels);
+    // A trade ship docked: the gold it brought this player rises over the port.
+    for (const event of update.events) {
+      if (event.type === "trade" && event.a === update.you && event.tile !== undefined) {
+        this.goldFloats.add(event.tile, event.gold ?? 0, performance.now());
+      }
+    }
     this.hud.update(update, performance.now());
     this.doctrines.update(update, this.ticksPerSecond);
     this.diplomacy.update(update);

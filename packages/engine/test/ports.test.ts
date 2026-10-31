@@ -115,6 +115,18 @@ describe("trade", () => {
     expect(bea.gold).toBe(2 * 1016);
   });
 
+  it("tells the interface what each side was paid, at the dock (R-UNIT-03)", () => {
+    const { game, grid, run } = trading();
+    run(5 + 10 + 10);
+    const trades = game.diplomacyEvents.filter((event) => event.type === "trade");
+    // Two ships arrive and each pays both sides: four events, one gain each.
+    expect(trades).toHaveLength(4);
+    for (const event of trades) expect(event.gold).toBe(1016);
+    expect(trades.filter((event) => event.a === 1)).toHaveLength(2);
+    const docks = new Set(trades.map((event) => event.tile));
+    expect(docks).toEqual(new Set([grid.index(9, 10), grid.index(30, 10)]));
+  });
+
   it("keeps at most B-TRADE-MAX ships of one port at sea", () => {
     const { game, run } = trading({ tradeIntervalTicks: 2, tradeMax: 2 });
     run(5 + 8);

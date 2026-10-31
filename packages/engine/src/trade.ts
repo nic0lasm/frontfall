@@ -1,6 +1,6 @@
 import { withDoctrine } from "./doctrines.ts";
-import { embargoed, isAllied } from "./diplomacy.ts";
-import type { Game } from "./game.ts";
+import { embargoed, isAllied, logEvent } from "./diplomacy.ts";
+import type { Game, Player } from "./game.ts";
 import { DrawUsage, derivedRandom } from "./random.ts";
 import { detExp, mulDiv } from "./integer-math.ts";
 import { LandmarkEffect, withLandmarks } from "./landmarks.ts";
@@ -206,19 +206,34 @@ export function installTrade(game: Game): void {
     if (!sender || !receiver) return;
     const { landmarkTradePercent } = balance;
     // R-DOCTRINE: each side's doctrine changes what the ship brings it.
-    sender.gold += withLandmarks(
-      game,
-      sender.id,
-      LandmarkEffect.Trade,
-      landmarkTradePercent,
-      withDoctrine(game, sender.id, "trade", gain),
-    );
-    receiver.gold += withLandmarks(
-      game,
-      receiver.id,
-      LandmarkEffect.Trade,
-      landmarkTradePercent,
-      withDoctrine(game, receiver.id, "trade", gain),
-    );
+    const earned = (player: Player): number =>
+      withLandmarks(
+        game,
+        player.id,
+        LandmarkEffect.Trade,
+        landmarkTradePercent,
+        withDoctrine(game, player.id, "trade", gain),
+      );
+    const toSender = earned(sender);
+    const toReceiver = earned(receiver);
+    sender.gold += toSender;
+    receiver.gold += toReceiver;
+    // Told to the interface only, never read by the rules: each side sees its gain at the dock.
+    logEvent(game, {
+      tick: game.tick,
+      type: "trade",
+      a: sender.id,
+      b: receiver.id,
+      gold: toSender,
+      tile: ship.to,
+    });
+    logEvent(game, {
+      tick: game.tick,
+      type: "trade",
+      a: receiver.id,
+      b: sender.id,
+      gold: toReceiver,
+      tile: ship.to,
+    });
   }
 }

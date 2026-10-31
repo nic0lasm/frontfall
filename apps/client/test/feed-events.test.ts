@@ -51,6 +51,16 @@ describe("landLost", () => {
 });
 
 describe("FeedWatcher", () => {
+  it("leaves a trade ship's gold to the map: no line in the feed", () => {
+    const watcher = new FeedWatcher(true);
+    const entries = watcher.observe(
+      update({ events: [{ type: "trade", a: 1, b: 2, gold: 1016, tile: 7 }] }),
+      new Map(),
+      mine,
+    );
+    expect(entries).toEqual([]);
+  });
+
   it("tells of a city-state's fall only when the player took it (R-BOT-29)", () => {
     const players = [
       { id: 1, name: "Ada", troops: 500, cap: 900, gold: 1200, tiles: 50, alive: true },

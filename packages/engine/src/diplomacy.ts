@@ -58,6 +58,8 @@ export interface DiplomacyEvent {
    * "eliminated": `a` took the last tile of `b`, and with it `gold` (R-ECO-08).
    * "landmark": `a` took the landmark numbered `landmark` from `b`, NEUTRAL
    * when nobody held it (R-LAND-03).
+   * "trade": a trade ship docked on the port at `tile` and brought `a` `gold`,
+   * `b` being the other side of the route (R-UNIT-03); one event for each side.
    */
   readonly type:
     | "allied"
@@ -75,14 +77,15 @@ export interface DiplomacyEvent {
     | "capital"
     | "razed"
     | "eliminated"
-    | "landmark";
+    | "landmark"
+    | "trade";
   readonly a: number;
   readonly b: number;
   /** A "quick" event's message, by number (R-DIPLO-07). */
   readonly phrase?: number;
-  /** Where a "collapsed" front broke: the tile its attacker took closest to the aim. */
+  /** Where a "collapsed" front broke (the tile its attacker took closest to the aim), or the port a "trade" ship docked on. */
   readonly tile?: number;
-  /** What an "eliminated" player's taker got (R-ECO-08). */
+  /** What an "eliminated" player's taker got (R-ECO-08), or what a "trade" ship brought. */
   readonly gold?: number;
   /** A "landmark" event's landmark, by its index in the map's list. */
   readonly landmark?: number;

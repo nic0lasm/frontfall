@@ -26,7 +26,8 @@ const ATTACK_QUIET_TICKS = 150;
 /** Ticks before the same pair is told of another collapsed front, about 5 s (R-ATTACK-10). */
 const COLLAPSE_QUIET_TICKS = 50;
 
-const EVENT_TEXT: Readonly<Record<DiplomacyEvent["type"], MessageKey>> = {
+/** A "trade" event is drawn on the map at the dock, never written in the feed. */
+const EVENT_TEXT: Readonly<Record<Exclude<DiplomacyEvent["type"], "trade">, MessageKey>> = {
   allied: "diplo.eventAllied",
   ended: "diplo.eventEnded",
   betrayed: "diplo.eventBetrayed",
@@ -253,6 +254,7 @@ export class FeedWatcher {
       case "razed":
         return "bad";
       case "eliminated":
+      case "trade":
         return "good";
       case "landmark":
         return target ? "bad" : "good";
@@ -269,7 +271,7 @@ export class FeedWatcher {
     if (event.type === "eliminated" && (event.gold ?? 0) > 0) {
       return mine && event.a === you ? "feed.eliminatedGold" : "diplo.eventEliminatedGold";
     }
-    return EVENT_TEXT[event.type];
+    return EVENT_TEXT[event.type as Exclude<DiplomacyEvent["type"], "trade">];
   }
 
   private eventEntry(
@@ -279,6 +281,7 @@ export class FeedWatcher {
   ): FeedEntry | undefined {
     // A quick message is for its sender and its receiver only (R-DIPLO-07).
     if (event.type === "quick" && event.a !== you && event.b !== you) return undefined;
+    if (event.type === "trade") return undefined;
     const mine = this.personal && (event.a === you || event.b === you);
     const other = event.a === you ? event.b : event.a;
     const tone = mine ? this.tone(event, you) : "info";
