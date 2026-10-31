@@ -208,6 +208,26 @@ test("shows the card of the player whose land the mouse rests on", async ({ page
   await expect(tip).toBeHidden();
 });
 
+test("hides the card of a player when the mouse is let go outside the map or the window loses focus", async ({
+  page,
+}) => {
+  const spawn = await startGame(page, 1);
+  const tip = page.locator("#player-tip");
+  await page.mouse.move(spawn.x + 1, spawn.y + 1);
+  await expect(tip).toBeVisible();
+  // The window loses focus (Cmd+Tab): the mouse never leaves the map.
+  await page.evaluate(`window.dispatchEvent(new Event("blur"))`);
+  await expect(tip).toBeHidden();
+  await page.mouse.move(spawn.x + 2, spawn.y + 2);
+  await expect(tip).toBeVisible();
+  // A drag that ends past the edge of the page: the pointer was captured, no pointerleave comes.
+  await page.mouse.down();
+  await page.mouse.move(spawn.x + 40, spawn.y + 40, { steps: 4 });
+  await page.mouse.move(2, 2, { steps: 4 });
+  await page.mouse.up();
+  await expect(tip).toBeHidden();
+});
+
 test("closes the player menu with Esc before pausing", async ({ page }) => {
   await startGame(page);
   await page.locator(".leader-button").first().click();

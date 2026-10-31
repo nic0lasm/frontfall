@@ -152,8 +152,12 @@ export class PointerGestures {
     this.release(sample.id);
     // A mouse or a pen let go after a drag hovers where it stopped.
     if (!sample.finger && this.pointers.size === 0) {
-      this.hoverAt = { x: sample.x, y: sample.y };
-      this.hover(sample.x, sample.y);
+      // Let go outside the map, a drag the pointer was captured for: no pointerleave
+      // comes, and the land it ended on must not stay lit.
+      if (this.within(sample.x, sample.y)) {
+        this.hoverAt = { x: sample.x, y: sample.y };
+        this.hover(sample.x, sample.y);
+      } else this.leave();
     }
     const tile = click ? this.camera.screenToTile(sample.x, sample.y) : undefined;
     if (tile === undefined || held) this.unpress();
@@ -199,7 +203,8 @@ export class PointerGestures {
     this.mode = "idle";
     this.pinch = undefined;
     this.unpress();
-    this.endTouchHover();
+    // The window lost focus or was torn down: no pointerleave will come for a mouse.
+    this.leave();
   }
 
   /**
@@ -224,6 +229,10 @@ export class PointerGestures {
     if (!this.pressing) return;
     this.pressing = false;
     this.callbacks.onPress?.(undefined);
+  }
+
+  private within(x: number, y: number): boolean {
+    return x >= 0 && y >= 0 && x < this.camera.viewportWidth && y < this.camera.viewportHeight;
   }
 
   private endTouchHover(): void {

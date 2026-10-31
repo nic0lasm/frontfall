@@ -246,6 +246,27 @@ describe("PointerGestures", () => {
     ]);
   });
 
+  it("drops the hover when a drag is let go outside the map", () => {
+    const { gestures, onHover } = setup();
+    gestures.move({ id: 1, x: 300, y: 200 });
+    gestures.down({ id: 1, x: 300, y: 200 });
+    gestures.move({ id: 1, x: 500, y: 300 });
+    onHover.mockClear();
+    // The pointer was captured: it is let go past the edge and no pointerleave follows.
+    gestures.up({ id: 1, x: 1500, y: 300 });
+    expect(onHover).toHaveBeenLastCalledWith(undefined);
+    gestures.refreshHover();
+    expect(onHover).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the hover when the window loses focus", () => {
+    const { gestures, onHover } = setup();
+    gestures.move({ id: 1, x: 300, y: 200 });
+    onHover.mockClear();
+    gestures.reset();
+    expect(onHover).toHaveBeenLastCalledWith(undefined);
+  });
+
   it("keeps a mouse's hover through its presses", () => {
     const { camera, gestures, onHover } = setup();
     gestures.move({ id: 1, x: 600, y: 400 });

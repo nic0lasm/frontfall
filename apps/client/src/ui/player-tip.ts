@@ -162,6 +162,8 @@ export class PlayerTip {
   private owner = 0;
   /** A mouse has moved over the map: until then the pointer position is unknown. */
   private mouse = false;
+  /** A button is down: the card stays away until the mouse moves free again. */
+  private held = false;
   private x = 0;
   private y = 0;
   private key = "";
@@ -199,7 +201,8 @@ export class PlayerTip {
       this.mouse = true;
       this.x = event.clientX;
       this.y = event.clientY;
-      if (event.buttons !== 0) this.hide();
+      this.held = event.buttons !== 0;
+      if (this.held) this.hide();
       else this.place();
     };
     const leave = (): void => {
@@ -211,12 +214,44 @@ export class PlayerTip {
     const down = (): void => {
       if (this.pinned !== undefined) this.unpin();
     };
+    // A drag captures the pointer, so letting go outside the surface raises no
+    // pointerleave: the card would stay where the mouse last was.
+    const up = (event: PointerEvent): void => {
+      if (event.pointerType !== "mouse") return;
+      const rect = surface.getBoundingClientRect();
+      const inside =
+        event.clientX >= rect.left &&
+        event.clientX < rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY < rect.bottom;
+      this.held = false;
+      if (!inside) leave();
+    };
+    // The window lost focus or the mouse left the page: no pointermove or pointerleave tells us.
+    const away = (): void => {
+      leave();
+    };
+    const hidden = (): void => {
+      if (document.visibilityState === "hidden") leave();
+    };
+    surface.addEventListener("pointerup", up);
+    surface.addEventListener("pointercancel", away);
+    surface.addEventListener("lostpointercapture", up);
+    window.addEventListener("blur", away);
+    document.addEventListener("visibilitychange", hidden);
+    document.documentElement.addEventListener("mouseleave", away);
     surface.addEventListener("pointerdown", down);
     surface.addEventListener("pointermove", move);
     surface.addEventListener("pointerleave", leave);
     surface.addEventListener("wheel", leave, { passive: true });
     return () => {
       this.unpin();
+      surface.removeEventListener("pointerup", up);
+      surface.removeEventListener("pointercancel", away);
+      surface.removeEventListener("lostpointercapture", up);
+      window.removeEventListener("blur", away);
+      document.removeEventListener("visibilitychange", hidden);
+      document.documentElement.removeEventListener("mouseleave", away);
       surface.removeEventListener("pointerdown", down);
       surface.removeEventListener("pointermove", move);
       surface.removeEventListener("pointerleave", leave);
@@ -327,7 +362,7 @@ export class PlayerTip {
     const update = this.last;
     const id = this.owner;
     const player = update?.players.find((p) => p.id === id);
-    if (!update || !player?.alive || id === 0 || !this.mouse) {
+    if (!update || !player?.alive || id === 0 || !this.mouse || this.held) {
       this.hide();
       return;
     }
