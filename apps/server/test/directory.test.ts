@@ -74,7 +74,7 @@ describe("Directory", () => {
     expect(special?.settings.rules).toEqual({
       collapsingFronts: true,
       capitals: false,
-      doctrines: false,
+      doctrines: true,
     });
     special?.configure(
       host,
@@ -96,7 +96,7 @@ describe("Directory", () => {
     expect(next?.settings.rules).toEqual({
       collapsingFronts: true,
       capitals: false,
-      doctrines: false,
+      doctrines: true,
     });
   });
 
@@ -155,7 +155,7 @@ describe("Directory", () => {
       nations: true,
       teams: 0,
       disabled: 0,
-      rules: { collapsingFronts: true, capitals: false, doctrines: false },
+      rules: { collapsingFronts: true, capitals: false, doctrines: true },
       players: 2,
       capacity: 16,
       state: "waiting",

@@ -111,7 +111,7 @@ export type GameRules = z.infer<typeof GameRules>;
 export const DEFAULT_RULES: Readonly<GameRules> = {
   collapsingFronts: true,
   capitals: false,
-  doctrines: false,
+  doctrines: true,
 };
 
 export function isDefaultRules(rules: GameRules): boolean {

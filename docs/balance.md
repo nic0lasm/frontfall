@@ -76,20 +76,20 @@ Since 0.9.5 the economy follows the long-standing reference of the genre, value 
 
 ## Collapsing fronts
 
-| Key                   |           Value | Unit                                                      | Used by         | Notes                                                               |
-| --------------------- | --------------: | --------------------------------------------------------- | --------------- | ------------------------------------------------------------------- |
-| `B-COLLAPSE-ODDS`     |             3.0 | × the garrison facing the attack                          | `R-ATTACK-10`   | Garrison: defender's soldiers per tile × tiles on the front         |
-| `B-COLLAPSE-BUILDUP`  |               3 | s of overwhelming advance                                 | `R-ATTACK-10`   | Before a front gives way, then again                                |
-| `B-COLLAPSE-DEPTH`    |               5 | tiles                                                     | `R-ATTACK-10`   | On a map of 2^19 tiles, 10 on World                                 |
-| `B-COLLAPSE-COST`     |              50 | % of the usual price per tile                             | `R-ATTACK-10`   | The defender still loses their troops per tile                      |
-| `B-SPECIAL-RULES`     |              on | collapsing fronts                                         | `R-MODE-08`     | In public games and quick play; capital mode and doctrines stay off |
-| `B-DOCTRINE-PACE`     |  110 / 100 / 90 | % of the attack pace (conqueror / merchant / bastion)     | `R-DOCTRINE-02` | Tiles an attack takes each tick                                     |
-| `B-DOCTRINE-ATTACKER` |  92 / 108 / 100 | % of the troops an attack loses on a player's tile        | `R-DOCTRINE-02` | Land cost for the attacker                                          |
-| `B-DOCTRINE-DEFENDER` |  100 / 100 / 88 | % of the troops lost with each tile taken from the player | `R-DOCTRINE-02` | Defender's loss                                                     |
-| `B-DOCTRINE-GOLD`     |  90 / 110 / 100 | % of the fixed income (`B-GOLD-BASE`)                     | `R-DOCTRINE-02` | Workers' bonus follows it                                           |
-| `B-DOCTRINE-CAP`      |  96 / 100 / 108 | % of the population cap                                   | `R-DOCTRINE-02` |                                                                     |
-| `B-DOCTRINE-TRADE`    | 100 / 120 / 100 | % of the gold a trade ship brings its owner               | `R-DOCTRINE-02` | Both ports each get their own                                       |
-| `B-DOCTRINE-FORT`     |  100 / 100 / 80 | % of the price of a fort                                  | `R-DOCTRINE-02` |                                                                     |
+| Key                   |           Value | Unit                                                      | Used by         | Notes                                                       |
+| --------------------- | --------------: | --------------------------------------------------------- | --------------- | ----------------------------------------------------------- |
+| `B-COLLAPSE-ODDS`     |             3.0 | × the garrison facing the attack                          | `R-ATTACK-10`   | Garrison: defender's soldiers per tile × tiles on the front |
+| `B-COLLAPSE-BUILDUP`  |               3 | s of overwhelming advance                                 | `R-ATTACK-10`   | Before a front gives way, then again                        |
+| `B-COLLAPSE-DEPTH`    |               5 | tiles                                                     | `R-ATTACK-10`   | On a map of 2^19 tiles, 10 on World                         |
+| `B-COLLAPSE-COST`     |              50 | % of the usual price per tile                             | `R-ATTACK-10`   | The defender still loses their troops per tile              |
+| `B-SPECIAL-RULES`     |              on | collapsing fronts, doctrines                              | `R-MODE-08`     | In public games and quick play; capital mode stays off      |
+| `B-DOCTRINE-PACE`     |  110 / 100 / 90 | % of the attack pace (conqueror / merchant / bastion)     | `R-DOCTRINE-02` | Tiles an attack takes each tick                             |
+| `B-DOCTRINE-ATTACKER` |  92 / 108 / 100 | % of the troops an attack loses on a player's tile        | `R-DOCTRINE-02` | Land cost for the attacker                                  |
+| `B-DOCTRINE-DEFENDER` |  100 / 100 / 88 | % of the troops lost with each tile taken from the player | `R-DOCTRINE-02` | Defender's loss                                             |
+| `B-DOCTRINE-GOLD`     |  90 / 110 / 100 | % of the fixed income (`B-GOLD-BASE`)                     | `R-DOCTRINE-02` | Workers' bonus follows it                                   |
+| `B-DOCTRINE-CAP`      |  96 / 100 / 108 | % of the population cap                                   | `R-DOCTRINE-02` |                                                             |
+| `B-DOCTRINE-TRADE`    | 100 / 120 / 100 | % of the gold a trade ship brings its owner               | `R-DOCTRINE-02` | Both ports each get their own                               |
+| `B-DOCTRINE-FORT`     |  100 / 100 / 80 | % of the price of a fort                                  | `R-DOCTRINE-02` |                                                             |
 
 ## Ships
 

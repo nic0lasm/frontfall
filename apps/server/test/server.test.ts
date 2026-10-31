@@ -338,7 +338,7 @@ describe("WebSocket", () => {
           nations: true,
           teams: 0,
           disabled: 0,
-          rules: { collapsingFronts: true, capitals: false, doctrines: false },
+          rules: { collapsingFronts: true, capitals: false, doctrines: true },
           players: 1,
           capacity: 16,
           state: "waiting",

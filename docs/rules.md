@@ -167,7 +167,7 @@ A special rule (`R-MODE-08`), off by default, in private and solo games. Every p
 
 ### Doctrines
 
-A special rule (`R-MODE-08`), off by default until the balance pass has measured it. Every player plays one of three doctrines, each a small edge bought with a small cost.
+A special rule (`R-MODE-08`), on by default since the balance pass measured it (1000 games, no doctrine above 1.02 of its fair share). Every player plays one of three doctrines, each a small edge bought with a small cost.
 
 - **R-DOCTRINE-01** During the spawn phase, a player picks a doctrine, and may pick again until the phase ends. A player who has not picked plays the balanced doctrine, which changes nothing. Nobody can change doctrine once play starts.
 - **R-DOCTRINE-02** The doctrines and their effects, as a change to the usual figure (`B-DOCTRINE-*`):

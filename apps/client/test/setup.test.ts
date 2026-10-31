@@ -114,7 +114,7 @@ describe("game setup", () => {
     expect(defaultSetup(maps).rules).toEqual({
       collapsingFronts: true,
       capitals: false,
-      doctrines: false,
+      doctrines: true,
     });
     const items = new Map<string, string>();
     const storage = {

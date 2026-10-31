@@ -143,11 +143,15 @@ describe("UsageStats", () => {
       {
         ...GAME,
         game: "b".repeat(16),
-        rules: { collapsingFronts: true, capitals: false, doctrines: false },
+        rules: { collapsingFronts: true, capitals: false, doctrines: true },
       },
       NOW,
     );
-    expect(usage.export(NOW).total.rules).toEqual({ collapsingFronts: 2, capitals: 1 });
+    expect(usage.export(NOW).total.rules).toEqual({
+      collapsingFronts: 2,
+      capitals: 1,
+      doctrines: 1,
+    });
   });
 
   it("counts a game once however often it is reported, and one vote per game", () => {
