@@ -78,6 +78,12 @@ export class GuideHost {
     }
     if (update.phase === "play") this.tilesAtPlay ??= tiles;
     const you = update.players.find((player) => player.id === update.you);
+    // Eliminated: the steps ahead no longer apply, so the card goes.
+    if (you && !you.alive && update.phase === "play") {
+      guide.element.remove();
+      this.guide = undefined;
+      return;
+    }
     const mine = (type: string): number =>
       update.structures.filter((s) => s.player === update.you && s.type === type).length;
     const cityStates = new Set(update.players.filter((p) => p.cityState).map((p) => p.id));
