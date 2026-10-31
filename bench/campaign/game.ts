@@ -5,6 +5,7 @@ import {
   populationCap,
   installCityStates,
   installNations,
+  NATION_DIFFICULTIES,
   CITY_STATES_PER_NATION,
   Doctrine,
   loadMap,
@@ -24,6 +25,8 @@ export interface CampaignSetup {
   readonly difficulty: BotDifficulty;
   readonly minutes: number;
   readonly rules?: Partial<GameRules>;
+  /** Nation values tried in place of docs/balance.md's, for this game only. */
+  readonly nations?: Readonly<Record<string, number>>;
 }
 
 /** The game at one moment: where the player stands, who leads, and why the player held back since the last one. */
@@ -138,6 +141,13 @@ export function playCampaignGame(
     rules: { doctrines: true, ...setup.rules },
   });
   if (cities.length > 0) installCityStates(game, cities);
+  // Nations read their values all game long: a tried value stays for the
+  // process, which plays this one game (child.ts).
+  const tried = NATION_DIFFICULTIES[setup.difficulty] as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(setup.nations ?? {})) {
+    if (typeof tried[key] !== "number") throw new Error(`no numeric nation value ${key}`);
+    tried[key] = value;
+  }
   installNations(game, nations, setup.difficulty);
   const avoid = manifest.nations.map((n) => n.tile);
   const me: ProfilePlayer = makePlayer

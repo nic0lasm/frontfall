@@ -25,6 +25,8 @@ const { values } = parseArgs({
     minutes: { type: "string", default: "30" },
     jobs: { type: "string", default: String(availableParallelism()) },
     rule: { type: "string", multiple: true, default: [] },
+    // A nation value tried in place of docs/balance.md's, e.g. --nation hard.capPercent=92.
+    nation: { type: "string", multiple: true, default: [] },
     json: { type: "string" },
   },
 });
@@ -38,6 +40,14 @@ const seeds = values.seeds.split(",").flatMap((part) => {
 const profiles = values.profiles.split(",") as ProfileName[];
 const difficulties = values.difficulties.split(",") as BotDifficulty[];
 const rules = Object.fromEntries(values.rule.map((r) => [r, true]));
+const nationValues: Partial<Record<BotDifficulty, Record<string, number>>> = {};
+for (const entry of values.nation) {
+  const match = /^(easy|normal|hard)\.(\w+)=(-?\d+)$/.exec(entry);
+  if (!match) throw new Error(`--nation ${entry}: want difficulty.key=number`);
+  const [, difficulty, key, value] = match as unknown as [string, BotDifficulty, string, string];
+  (nationValues[difficulty] ??= {})[key] = Number(value);
+}
+if (values.nation.length) console.log(`nation values tried: ${values.nation.join(", ")}`);
 
 const setups: CampaignSetup[] = [];
 for (const profile of profiles)
@@ -50,6 +60,7 @@ for (const profile of profiles)
         difficulty,
         minutes: Number(values.minutes),
         ...(values.rule.length ? { rules } : {}),
+        ...(nationValues[difficulty] ? { nations: nationValues[difficulty] } : {}),
       });
 
 const run = promisify(execFile);
@@ -83,6 +94,8 @@ const median = (xs: number[]): number => {
   return s[Math.floor(s.length / 2)] ?? 0;
 };
 const verdicts: string[] = [];
+if (reports.length < setups.length)
+  verdicts.push(`${String(setups.length - reports.length)} games crashed: see CRASH above`);
 const rows: Record<string, string | number>[] = [];
 const winRate: Record<string, number> = {};
 for (const profile of profiles) {
