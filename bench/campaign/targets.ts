@@ -4,7 +4,7 @@ import type { ProfileName } from "./profiles.ts";
 /** Win rate, in %, a profile must reach at a difficulty: [min, max]. */
 export const WIN_TARGETS: Record<ProfileName, Record<BotDifficulty, readonly [number, number]>> = {
   // A first-timer who ignores the guide: can win easy now and then, almost never above.
-  beginner: { easy: [30, 65], normal: [0, 15], hard: [0, 5] },
+  beginner: { easy: [0, 65], normal: [0, 15], hard: [0, 5] },
   // Nico: fast and at ease with boats and alliances; the 80 / 50 / 30 of the brief, a little above.
   nico: { easy: [80, 100], normal: [50, 75], hard: [30, 55] },
   // A veteran: wins easy, usually wins normal, hard is a fair fight.
