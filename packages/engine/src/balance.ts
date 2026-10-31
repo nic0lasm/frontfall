@@ -167,6 +167,8 @@ export interface Balance {
   lightFalloutTicks: number;
   /** B-MISSILE-TROOPS, troops a strike kills, in % of the share of the land it took */
   missileTroopsPercent: number;
+  /** B-HEAVY-MISSILE-TROOPS, the same for a heavy missile, in %; 100 kills the share of the land it took */
+  heavyMissileTroopsPercent: number;
   /** B-AIR-DEFENSE-RADIUS, in tiles on a map of 2^19 tiles */
   airDefenseRadius: number;
   /** B-AIR-DEFENSE-CHANCE, percent chance to stop a missile */
@@ -305,6 +307,7 @@ export const DEFAULT_BALANCE: Balance = {
   falloutTicks: 90 * 10,
   lightFalloutTicks: 30 * 10,
   missileTroopsPercent: 300,
+  heavyMissileTroopsPercent: 100,
   airDefenseRadius: 60,
   airDefenseChancePercent: 75,
   airDefenseReloadTicks: 10 * 10,

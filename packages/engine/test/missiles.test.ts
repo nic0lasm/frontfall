@@ -40,6 +40,7 @@ const balance: Balance = {
   // Tests below read a light strike alone; fallout and the troops it kills have their own.
   lightFalloutTicks: 0,
   missileTroopsPercent: 100,
+  heavyMissileTroopsPercent: 100,
   airDefenseRadius: 8,
   airDefenseReloadTicks: 15,
   goldPerThousandTroops: 0,
@@ -301,6 +302,23 @@ describe("fallout (R-UNIT-06)", () => {
     for (let i = 0; i <= cleared; i++) step();
     expect(game.irradiated(target)).toBe(false);
     expect(game.fallout).toHaveLength(0);
+  });
+});
+
+describe("a heavy strike (R-UNIT-05)", () => {
+  it("kills B-HEAVY-MISSILE-TROOPS of the share of troops its land held, not the light rate", () => {
+    const { game, grid, bea, step } = newGame({
+      missileTroopsPercent: 300,
+      heavyMissileTroopsPercent: 100,
+    });
+    const target = grid.index(50, 10);
+    const tilesBefore = game.territory.tileCount(2);
+    const troopsBefore = bea.troops;
+    step([{ player: 1, order: launch(target, MissileSize.Heavy) }]);
+    while (game.missiles.length > 0) step();
+    const hit = tilesBefore - game.territory.tileCount(2);
+    expect(hit).toBeGreaterThan(0);
+    expect(bea.troops).toBe(troopsBefore - Math.floor((troopsBefore * hit) / tilesBefore));
   });
 });
 

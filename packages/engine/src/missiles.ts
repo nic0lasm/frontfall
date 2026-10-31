@@ -380,7 +380,11 @@ export function installMissiles(game: Game): void {
       if (!player) continue;
       const share = Math.min(
         territory.tileCount(owner),
-        mulDiv(tiles, balance.missileTroopsPercent, 100),
+        mulDiv(
+          tiles,
+          heavy ? balance.heavyMissileTroopsPercent : balance.missileTroopsPercent,
+          100,
+        ),
       );
       player.troops -= mulDiv(player.troops, share, territory.tileCount(owner));
     }

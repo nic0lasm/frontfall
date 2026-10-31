@@ -23,6 +23,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Changed
 
+- **A heavy missile no longer wipes out a whole army.** It used to kill three times the share of troops that matched the land it took, so a blast over a third of a player's land killed every soldier they had. It now kills the share that matches the land it took. The light missile is unchanged.
 - **The first steps of a first game** now also cover the doctrine, the share of troops that attacks, a fort and asking a neighbour for an alliance, and end on how a game is won.
 - **Pay tribute for peace.** A weaker player can pay a clearly stronger one for a two-minute truce: neither can attack the other, and the stronger keeps the gold. A truce is not an alliance, so it takes no gifts, and either side may break it as a traitor.
 - **Diplomacy takes a step.** Attack or land on a player and their ports shut to you for five minutes, unless you become allies first. They can keep the embargo longer or lift it. Gifts of troops and gold now go to allies and teammates only. An alliance can be renewed in its last 30 seconds instead of 60. Each row of the leaderboard says what a player is to you: at war, embargoed, hostile, wary, friendly or neutral.

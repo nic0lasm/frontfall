@@ -846,6 +846,7 @@ function checkBalance(balance: Balance): void {
     "lightFalloutTicks",
     "falloutCostPercent",
     "missileTroopsPercent",
+    "heavyMissileTroopsPercent",
     "airDefenseRadius",
     "airDefenseReloadTicks",
     "allianceRenewTicks",

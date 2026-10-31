@@ -151,6 +151,8 @@ export type RecordedGame = Omit<DesyncReport, "version" | "build" | "hashes">;
 const BEFORE_LIGHT_FALLOUT = {
   lightFalloutTicks: 0,
   missileTroopsPercent: 100,
+  // A heavy missile killed three times the share of the land it took, as a light one still does.
+  heavyMissileTroopsPercent: 300,
   falloutCostPercent: 100,
 } as const;
 
