@@ -204,14 +204,16 @@ export class DiplomacyPanel {
     const nation = id >= this.rules.firstNation;
 
     const truce = diplomacy.truces.find((x) => x.id === id);
-    let status: string;
-    if (truce) status = t("diplo.truceFor", { seconds: this.seconds(truce.ticksLeft) });
-    else if (teammate) status = t("diplo.teammate");
-    else if (ally) status = t("diplo.allyFor", { seconds: this.seconds(ally.ticksLeft) });
-    else if (asked) status = t("diplo.asksYou");
-    else if (pending) status = t("diplo.asked");
-    else if (nation) status = t("diplo.nation");
-    else status = t("diplo.notAllied");
+    let statusKey: MessageKey;
+    if (truce) statusKey = "diplo.truceFor";
+    else if (teammate) statusKey = "diplo.teammate";
+    else if (ally) statusKey = "diplo.allyFor";
+    else if (asked) statusKey = "diplo.asksYou";
+    else if (pending) statusKey = "diplo.asked";
+    else if (nation) statusKey = "diplo.nation";
+    else statusKey = "diplo.notAllied";
+    const left = truce?.ticksLeft ?? ally?.ticksLeft;
+    const status = t(statusKey, left === undefined ? {} : { seconds: this.seconds(left) });
     const traitorText = traitor
       ? t("diplo.traitorFor", { seconds: this.seconds(traitor.ticksLeft) })
       : "";
@@ -399,22 +401,36 @@ export class DiplomacyPanel {
       id,
       player.name,
       hiddenText,
-      status,
+      statusKey,
       moodText,
-      traitorText,
+      Boolean(traitorText),
       embargoText,
       warText,
       this.confirming,
       this.messaging,
       this.reporting,
       this.refused,
-      ...buttons.map((b) => `${b.key}:${JSON.stringify(b.params ?? {})}:${String(b.enabled)}`),
+      ...buttons.map((b) => `${b.key}:${String(b.enabled)}`),
     ].join("|");
-    // Troops and gold move with every update: the line is rewritten in place, the menu is not.
+    // Troops, gold, prices and countdowns move with every update: their texts are rewritten
+    // in place and the menu is not, or a button would be replaced under the pointer.
     const factsText = this.facts?.(update, id, this.rules) ?? "";
-    const live = this.menu.querySelector(".player-menu-facts");
-    if (live) live.textContent = factsText;
-    if (key === this.menuKey) return;
+    if (key === this.menuKey) {
+      const write = (selector: string, text: string) => {
+        const node = this.menu.querySelector(selector);
+        if (node && node.textContent !== text) node.textContent = text;
+      };
+      write(".player-menu-facts", factsText);
+      write(".player-menu-status", status);
+      write(".player-menu-traitor", traitorText);
+      const actions = this.menu.querySelectorAll(":scope > .menu-action");
+      buttons.forEach(({ key: label, params }, i) => {
+        const node = actions[i];
+        const text = t(label, params);
+        if (node && node.textContent !== text) node.textContent = text;
+      });
+      return;
+    }
     // Focus stays on the button of the same kind when the menu is redrawn.
     const focused = this.menu.contains(document.activeElement)
       ? (document.activeElement as HTMLElement).dataset.kind

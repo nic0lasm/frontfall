@@ -101,9 +101,9 @@ test("asks a bot for an alliance from the leaderboard, then betrays it (R-DIPLO)
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
   // One bot, which grows while the player stays put: it accepts a smaller player (R-BOT-10).
-  // It also wins within half a minute at ×5 (the betrayal is disabled once a game is won), which
-  // a loaded runner takes to the end: ×2 leaves it more than a minute.
-  await startGame(page, 1, "", 2);
+  // It also wins in about 80 s of game time (the betrayal is disabled once a game is won), which
+  // ×2 leaves too short on a loaded runner: ×1 leaves it more than a minute.
+  await startGame(page, 1, "", 1);
   const menu = page.locator("#player-menu");
   const ally = page.locator(".leader-button .badge-ally");
   await page.locator(".leader-button").click();

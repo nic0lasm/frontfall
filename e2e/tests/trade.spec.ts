@@ -54,8 +54,8 @@ test("buys a warship at its port and sends it on patrol (R-UNIT-04)", async ({ p
   await expect(cost).toHaveText("250K");
   // The port went on the coast closest to the click: a click near it buys there.
   await buildAround(page, port, "KeyV", "#build-warship");
-  // The next one costs B-COST-GROWTH more.
-  await expect(cost).toHaveText("375K");
+  // The next one costs one more B-COST-WARSHIP.
+  await expect(cost).toHaveText("500K");
 
   // A click on the channel, in the middle of the map, sends it there.
   const box = await page.locator("#map").boundingBox();

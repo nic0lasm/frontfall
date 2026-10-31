@@ -1,5 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { loadMap, readDesyncReport, replayDesyncReport } from "@frontfall/engine";
+import {
+  CITY_STATES_PER_NATION,
+  loadMap,
+  readDesyncReport,
+  replayDesyncReport,
+} from "@frontfall/engine";
 import { MapManifest, encodeServerMessage, parseServerMessage } from "@frontfall/protocol";
 import { expect, test } from "@playwright/test";
 
@@ -71,8 +76,10 @@ test("a player whose game drifts apart is told, and can download a report that r
   const manifest = MapManifest.parse(
     JSON.parse(await readFile(new URL("world.json", MAPS), "utf8")),
   );
-  // Three players and two bots, then the map's nations, which the replay plays too.
-  expect(saved.players).toHaveLength(5 + manifest.nations.length);
+  // Three players and two bots, then the map's nations and their city-states, which the replay plays too.
+  const nations = manifest.nations.length;
+  expect(saved.players).toHaveLength(5 + nations * (1 + CITY_STATES_PER_NATION));
+  expect(saved.cityStates).toHaveLength(nations * CITY_STATES_PER_NATION);
   expect(saved.nations).toHaveLength(manifest.nations.length);
   const { terrain } = loadMap(
     new Uint8Array(await readFile(new URL(manifest.terrain.file, MAPS))),

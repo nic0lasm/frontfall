@@ -51,12 +51,13 @@ export async function startByTheWater(
 
 /**
  * Clicks around `start` with `key`'s build mode on until the cost in
- * `button` changes: the structure went up on a tile of the player's.
+ * `button` changes, or the mode lets go for a structure of a flat price:
+ * the structure went up on a tile of the player's.
  * Returns the point that took it.
  *
  * Each click is answered before the next one, by a ring on the map: a
  * refusal, whose reason the note gives and which leaves the mode on, or an
- * order, which raises the cost. A click with no answer fails the test, as
+ * order, which raises the cost or ends the mode. A click with no answer fails the test, as
  * does an order that builds nothing.
  */
 export async function buildAround(
@@ -107,9 +108,16 @@ export async function buildAround(
       refusals.push((await page.locator(".click-note").textContent()) ?? "");
       continue;
     }
-    await expect(cost, "the cost after an order to build").not.toHaveText(first ?? "", {
-      timeout: 5_000,
-    });
+    // Most structures cost more once one stands; a silo costs the same (B-COST-SILO),
+    // and shows its order by the mode letting go.
+    await expect
+      .poll(
+        async () =>
+          (await cost.textContent()) !== first ||
+          (await mode.getAttribute("aria-pressed")) !== "true",
+        { message: "the cost or the mode after an order to build", timeout: 5_000 },
+      )
+      .toBe(true);
     // Refused clicks before this one are expected on a coast; their reasons help when not.
     if (refusals.length > 0) console.log(`${key} built after: ${refusals.join(" / ")}`);
     return point;
