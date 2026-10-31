@@ -98,8 +98,8 @@ describe("player labels", () => {
     fakeDocument();
     const labels = new PlayerLabels();
     const players = [
-      { ...player(1), alive: true, tiles: 30 },
-      { ...player(2), alive: true, tiles: 90 },
+      { ...player(1), cityState: false, alive: true, tiles: 30 },
+      { ...player(2), cityState: false, alive: true, tiles: 90 },
     ] as unknown as PlayerView[];
     labels.update(players, [
       { player: 1, tile: 505, depth: 40 },
