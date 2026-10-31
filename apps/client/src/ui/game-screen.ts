@@ -528,6 +528,7 @@ export class GameScreen {
     this.cleanups.push(
       () => {
         this.guide.dispose();
+        document.body.classList.remove("doctrines-open");
       },
       () => {
         window.removeEventListener("keydown", keydown);

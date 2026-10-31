@@ -338,3 +338,10 @@
     display: none;
   }
 }
+
+/* A phone's screen holds the doctrine cards or the card of the guide, not both. */
+@media (pointer: coarse) {
+  .doctrines-open .guide {
+    display: none;
+  }
+}

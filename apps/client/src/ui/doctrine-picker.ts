@@ -96,6 +96,8 @@ export class DoctrinePicker {
     const open = update.doctrines === true && update.phase === "spawn";
     if (this.element.hidden === open) {
       this.element.hidden = !open;
+      // Lets the stylesheet clear the first-steps card on a phone while the cards are up.
+      document.body.classList.toggle("doctrines-open", open);
       if (!open) this.pending = undefined;
     }
     if (!open) return;
