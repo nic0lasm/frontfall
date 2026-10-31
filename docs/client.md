@@ -253,6 +253,7 @@ visuals will still change. Vite passes the version to the page
 | `M`, `N`                                      | Launch a missile or a heavy missile from your closest loaded silo: then click the target                                                                        |
 | Right click, long press, or a leaderboard row | Open that player's menu: ask for an alliance, accept, renew or betray, embargo their trade, send a gift or a message                                            |
 | `Esc`                                         | Close the player menu, or leave a build mode                                                                                                                    |
+| `Home`, `Space`                               | Take the map back to the player's land (Space only when no button has the focus); the minimap has a button for it                                               |
 | `P` or `Esc`                                  | Pause and resume                                                                                                                                                |
 | `T`                                           | Solo: run the game at ×0.5, ×1, ×2 or ×4, in turn (`R-MODE-07`); the round button after pause and the pause banner do the same                                  |
 | `H` or `?`                                    | How to play: the controls, and every building with its cost                                                                                                     |
@@ -267,6 +268,21 @@ While attacks are under way, a panel at the bottom left lists each one, its
 target and its troops, with a Retreat button that calls it back
 (`R-ATTACK-06`): the troops come home, less `B-RETREAT-PENALTY`, which the
 button's tooltip states.
+
+Under them (`ui/threats.ts`) the panel lists the attacks on the player's land
+(attacker and troops; a click centres the map on the attacker, Counter sends
+back the troops of the attack or the attack ratio's share of the soldiers,
+whichever is less, at the attacker's land) and the ships at sea: the player's
+own, with target and time left, and any other player's heading for the
+player's coast, in red. `GameUpdate.incoming` and the `target` and `ticksLeft`
+of `BoatView` are read from the game for it; no rule and no message change.
+`ui/alert-frame.ts` flashes a red rim for a second when land is lost (the
+sound's threshold) or such a ship is first seen; reduced motion turns the fade
+off. The banner warns when troops reach 95 % of the cap or fall under 1 000.
+`PlayerLabels.setRelations` puts marks before each player's troops (crown for
+the biggest player, tick for an ally, warning sign for a traitor, barred circle
+for an embargo, envelope for an alliance request); it runs once per update and
+writes a text only when a player's marks change, never per frame.
 
 `Esc` also closes a dialog: on the end screen it does what "Keep watching"
 does, and the menu button of the HUD stays the way out.

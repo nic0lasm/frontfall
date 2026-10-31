@@ -2,6 +2,8 @@ import { TileKind } from "@frontfall/engine";
 import { describe, expect, it } from "vitest";
 import { GENERATED_MAPS, generateMap } from "../src/game/maps.ts";
 import { HUMAN_ID, SoloGame, type SoloOptions } from "../src/game/solo-game.ts";
+import { gameUpdate } from "../src/game/game-update.ts";
+import { labelSpace } from "../src/game/label-anchors.ts";
 import { CITY_STATES_PER_NATION, cityStateName } from "../src/game/simulation.ts";
 
 const options: SoloOptions = {
@@ -191,6 +193,35 @@ describe("SoloGame attacks", () => {
     expect(attack?.target).toBe(0);
     update = solo.step([{ type: "retreat", attack: attack?.id ?? -1 }]);
     expect(update.attacks).toEqual([]);
+  });
+});
+
+describe("SoloGame incoming attacks", () => {
+  it("lists the attacks other players send at the human's land, and not the human's own", () => {
+    const solo = newGame({ ...options, bots: 1 });
+    let update = solo.step([{ type: "spawn", tile: firstLand(options.map) }]);
+    while (update.phase === "spawn") update = solo.step([]);
+    expect(update.incoming).toEqual([]);
+    const { attacks } = solo.game;
+    attacks.push({
+      id: 9001,
+      player: 2,
+      target: HUMAN_ID,
+      aim: 0,
+      troops: 77,
+      pressure: 0,
+    });
+    attacks.push({
+      id: 9002,
+      player: HUMAN_ID,
+      target: 2,
+      aim: 0,
+      troops: 5,
+      pressure: 0,
+    });
+    const { width, height } = solo.game.terrain.topology;
+    update = gameUpdate(solo.game, HUMAN_ID, labelSpace(width, height));
+    expect(update.incoming).toEqual([{ id: 9001, attacker: 2, troops: 77 }]);
   });
 });
 
@@ -771,7 +802,8 @@ describe("SoloGame clicks", () => {
 
     update = solo.step(["order" in result ? result.order : []].flat());
     expect(update.boats).toHaveLength(1);
-    expect(update.boats[0]).toMatchObject({ player: HUMAN_ID });
+    expect(update.boats[0]).toMatchObject({ player: HUMAN_ID, target: 0 });
+    expect(update.boats[0]?.ticksLeft).toBeGreaterThan(0);
     for (let i = 0; i < 30 && solo.game.territory.ownerOf(coast) !== HUMAN_ID; i++) {
       update = solo.step([]);
     }

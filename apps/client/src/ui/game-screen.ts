@@ -39,6 +39,7 @@ import type { LandLost } from "./feed-events.ts";
 import type { FeedHost } from "./screen/feed-host.ts";
 import type { ShipRef } from "./player-tip.ts";
 import { DoctrinePicker } from "./doctrine-picker.ts";
+import { AlertFrame } from "./alert-frame.ts";
 import { Hud } from "./hud.ts";
 import { withHidden } from "./hidden-players.ts";
 import { PlayerLabels } from "./labels.ts";
@@ -161,6 +162,8 @@ export class GameScreen {
   /** What happens in the game, bottom right; a click centres the map on it. */
   /** The feed and the player card, once their code is fetched; none before. */
   private feed: FeedHost | undefined;
+  /** A red rim while the player loses land or a ship sails for their coast. */
+  private readonly alert = new AlertFrame();
   /** Where each player's name goes, as of the last update that said: a place to centre the map on. */
   private anchors: readonly { player: number; tile: number }[] = [];
   /** What a build click would do, shown before it is made. */
@@ -211,6 +214,9 @@ export class GameScreen {
     this.surface.setAttribute("aria-label", t("game.map"));
     this.surface.setAttribute("aria-busy", "true");
 
+    this.scene.home = () => {
+      this.goHome();
+    };
     this.hud = new Hud(
       {
         onPause: () => {
@@ -224,6 +230,13 @@ export class GameScreen {
         },
         onRetreat: (attack) => {
           this.orders.retreat(attack);
+        },
+        onCentre: (target) => {
+          this.centre(target);
+        },
+        onCounter: (attacker, troops) => {
+          const anchor = this.anchors.find((a) => a.player === attacker);
+          if (anchor) this.orders.retaliate(anchor.tile, troops);
         },
         onMode: (mode) => {
           this.setMode(mode);
@@ -312,6 +325,7 @@ export class GameScreen {
       this.marks.element,
       this.goldFloats.element,
       this.hud.element,
+      this.alert.element,
       this.marks.note,
     );
     this.layOut();
@@ -528,6 +542,7 @@ export class GameScreen {
     this.cleanups.push(
       () => {
         this.guide.dispose();
+        this.alert.dispose();
       },
       () => {
         window.removeEventListener("keydown", keydown);
@@ -741,8 +756,15 @@ export class GameScreen {
     if (!this.latest) return;
     const update = { ...withHidden(this.latest, this.hidden), events: [] };
     this.labels.update(update.players, undefined);
+    this.labels.setRelations(update);
     this.hud.update(update, performance.now());
     this.diplomacy.rename(update);
+  }
+
+  /** Back to the player's own land, wherever the map was moved to. */
+  private goHome(): void {
+    const you = this.latest?.you;
+    if (you !== undefined) this.centre({ player: you });
   }
 
   /** Centres the map on a tile, else on the land of a player. */
@@ -766,6 +788,7 @@ export class GameScreen {
     if (human) this.peakTiles = Math.max(this.peakTiles, human.tiles);
     this.achievements.observe(update);
     this.sound?.observe(update);
+    if (this.options.record === undefined) this.alert.observe(update);
     if (human) this.guide.follow(update, human.tiles);
     if (!this.focused && human && human.tiles > 0) {
       // Once, when the player's start appears.
@@ -783,6 +806,7 @@ export class GameScreen {
         this.goldFloats.add(event.tile, event.gold ?? 0, performance.now());
       }
     }
+    this.labels.setRelations(update);
     this.hud.update(update, performance.now());
     this.doctrines.update(update, this.ticksPerSecond);
     this.diplomacy.update(update);
@@ -862,6 +886,10 @@ export class GameScreen {
       watching: this.replayBar !== undefined,
       disabled: this.disabled,
       globeAllowed: this.scene.globeAllowed,
+      plainTarget: !(
+        event.target instanceof HTMLElement &&
+        event.target.closest("button, a, [role=button], summary")
+      ),
     });
     if (!action) return;
     if (action.type === "closeOverlay") this.overlays.close();
@@ -871,6 +899,7 @@ export class GameScreen {
     else if (action.type === "pause") this.togglePause();
     else if (action.type === "speed") this.speed?.next();
     else if (action.type === "switchView") this.switchView();
+    else if (action.type === "home") this.goHome();
     else this.showHelp();
     event.preventDefault();
   }

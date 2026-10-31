@@ -123,6 +123,13 @@ export interface AttackView {
   troops: number;
 }
 
+/** An attack on the human's land: who sends it and how many troops it still carries. */
+export interface IncomingAttackView {
+  id: number;
+  attacker: number;
+  troops: number;
+}
+
 /** Per second, at the current troops: zero outside play and once eliminated. */
 export interface EconomyView {
   /** Troops gained (R-ECO-02). */
@@ -141,6 +148,8 @@ export interface GameUpdate {
   players: PlayerView[];
   /** Troops of the human's attacks under way, one entry per attack. */
   attacks: AttackView[];
+  /** Attacks on the human's land, from any other player. */
+  incoming?: IncomingAttackView[];
   /** Tiles that changed owner this tick, and their new owners, pair by pair. */
   changedTiles: Int32Array;
   changedOwners: Uint16Array;
@@ -430,6 +439,10 @@ export interface BoatView {
   troops: number;
   /** The coastal tile it lands on. */
   to?: number;
+  /** Who owns the landing tile, 0 when unclaimed. */
+  target?: number;
+  /** Ticks left before it lands. */
+  ticksLeft?: number;
   /** It lands on the next tick; one that leaves without this was sunk. */
   arriving?: boolean;
 }

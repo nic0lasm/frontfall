@@ -292,6 +292,35 @@
   border-color: var(--ff-slate-400);
 }
 
+/* Attacks on the player and ships under way (ui/threats.ts): lines that centre the map. */
+.attack-list:not(:empty) + .attack-list:not(:empty) {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ff-night-500);
+}
+
+.threat-focus {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.threat-focus:hover,
+.threat-focus:focus-visible {
+  text-decoration: underline;
+}
+
+.threat-incoming .threat-focus,
+.threat-boatIn .threat-focus {
+  color: var(--ff-danger);
+}
+
 .toolbar {
   position: absolute;
   right: 12px;
@@ -2208,8 +2237,8 @@ button.feed-entry:focus-visible {
   right: 12px;
   bottom: 64px;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 8px;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px 4px;
   align-items: center;
   box-sizing: border-box;
   padding: 6px;
@@ -2949,4 +2978,22 @@ button.feed-entry:focus-visible {
   .build-button.unaffordable .build-why:not(:empty) {
     display: none;
   }
+}
+
+/* A red rim on the screen while the player loses land or a ship comes for it (ui/alert-frame.ts). */
+.alert-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  box-shadow:
+    inset 0 0 0 4px var(--ff-danger),
+    inset 0 0 48px 8px rgb(240 76 94 / 45%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease-out;
+}
+
+.alert-frame[data-on] {
+  opacity: 1;
+  transition-duration: 0.08s;
 }

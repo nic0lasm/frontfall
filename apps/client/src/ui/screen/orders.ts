@@ -91,6 +91,21 @@ export class Orders {
     this.session.sendOrder({ type: "quick", target, phrase });
   }
 
+  /**
+   * Sends troops back at the land of a player who attacks, at most as many
+   * as theirs and the attack ratio's share of the soldiers.
+   */
+  retaliate(tile: number, troops: number): void {
+    const update = this.playing();
+    if (!update) return;
+    const you = update.players.find((p) => p.id === update.you);
+    if (!you) return;
+    const send = Math.min(troops, Math.floor((soldiersOf(you) * this.state.ratio()) / 100));
+    if (send < 1) return;
+    this.ordered(update);
+    this.session.sendOrder({ type: "attack", target: tile, troops: send });
+  }
+
   retreat(attack: number): void {
     const update = this.state.latest();
     if (!update || this.state.held()) return;

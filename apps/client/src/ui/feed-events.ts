@@ -86,6 +86,8 @@ export class FeedWatcher {
   private requests = new Set<number>();
   private structures = new Map<number, { type: StructureType; tile: number }>();
   private readonly attackedAt = new Map<number, number>();
+  /** Enemy ships already told of, by id. */
+  private readonly landings = new Set<number>();
   private readonly collapsedAt = new Map<string, number>();
   private readonly alliances = new Set<string>();
   /** Who threatened the player's capital at the last update (R-CAP-05), 0 for nobody. */
@@ -178,6 +180,19 @@ export class FeedWatcher {
           tone: "ask",
           text: t("feed.request", { name: name(from) }),
           player: from,
+          mine: true,
+        });
+      }
+      for (const boat of update.boats) {
+        if (boat.player === update.you || boat.target !== update.you) continue;
+        if (this.landings.has(boat.id)) continue;
+        this.landings.add(boat.id);
+        entries.push({
+          key: `boat:${String(boat.player)}`,
+          tone: "bad",
+          text: t("feed.boatIn", { name: name(boat.player) }),
+          tile: boat.tile,
+          player: boat.player,
           mine: true,
         });
       }

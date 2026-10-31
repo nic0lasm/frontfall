@@ -1,4 +1,5 @@
 import type { LabelAnchor } from "../game/label-anchors.ts";
+import type { GameUpdate } from "../game/game-view.ts";
 import type { PlayerView } from "../game/solo-game.ts";
 import type { Camera } from "../render/camera.ts";
 import { h, setText } from "./dom.ts";
@@ -21,6 +22,13 @@ const LINES_EM = 2.1;
 /** Narrowest land, in CSS pixels, that carries a name at the smallest size. */
 const MIN_ACROSS = FONT_SIZES[0] * LINES_EM;
 
+/** Marks beside the troops of a player (setRelations). */
+const MARK_LEADER = "\u265B";
+const MARK_ALLY = "\u2713";
+const MARK_TRAITOR = "\u26A0";
+const MARK_EMBARGO = "\u2298";
+const MARK_ASK = "\u2709";
+
 /** A rectangle on the screen, in CSS pixels; a DOMRect is one. */
 interface Box {
   readonly left: number;
@@ -36,6 +44,10 @@ interface Label {
   name: string;
   /** The troops as text, kept here so that a label out of sight costs no DOM write. */
   count: string;
+  /** The troops alone, as text. */
+  raw: string;
+  /** Marks of the player's standing, then a space; empty when there are none. */
+  badges: string;
   /** What the styles of the element say now, to write only what changed. */
   transform: string;
   size: number;
@@ -62,6 +74,8 @@ export class PlayerLabels {
         label = {
           name: player.name,
           count: "",
+          raw: "",
+          badges: "",
           transform: "",
           size: 0,
           shown: false,
@@ -74,9 +88,48 @@ export class PlayerLabels {
         const name = label.root?.querySelector(".label-name");
         if (name) name.textContent = player.name;
       }
-      label.count = formatCount(player.troops);
+      label.raw = formatCount(player.troops);
+      label.count = label.badges + label.raw;
       // Only city-states wait to be big enough: everyone else keeps an element, there are few.
       if (!player.cityState) this.build(label);
+      if (label.troops) setText(label.troops, label.count);
+    }
+  }
+
+  /**
+   * Marks beside the troops of each player, from one update: the leader, an
+   * ally, a traitor, an embargo and an alliance request. Texts are written
+   * only for a player whose marks changed, on updates and not on frames.
+   */
+  setRelations(update: GameUpdate): void {
+    const marks = new Map<number, string>();
+    const add = (id: number, mark: string): void => {
+      marks.set(id, (marks.get(id) ?? "") + mark);
+    };
+    if (update.phase === "play") {
+      let top = 0;
+      let leader = 0;
+      for (const player of update.players) {
+        if (!player.alive || player.cityState === true || player.tiles <= top) continue;
+        top = player.tiles;
+        leader = player.id;
+      }
+      if (leader !== 0) add(leader, MARK_LEADER);
+    }
+    const { diplomacy } = update;
+    for (const ally of diplomacy.allies) add(ally.id, MARK_ALLY);
+    for (const traitor of diplomacy.traitors) add(traitor.id, MARK_TRAITOR);
+    for (const id of new Set([...diplomacy.embargoes, ...diplomacy.embargoedBy])) {
+      add(id, MARK_EMBARGO);
+    }
+    for (const request of diplomacy.incoming) add(request.from, MARK_ASK);
+    for (const id of diplomacy.outgoing) add(id, MARK_ASK);
+    for (const [id, label] of this.labels) {
+      const found = marks.get(id);
+      const badges = found === undefined ? "" : `${found} `;
+      if (badges === label.badges) continue;
+      label.badges = badges;
+      label.count = badges + label.raw;
       if (label.troops) setText(label.troops, label.count);
     }
   }

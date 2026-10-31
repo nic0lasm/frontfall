@@ -10,18 +10,23 @@ const DRAW_MS = 300;
 const STORAGE_KEY = "frontfall.minimap";
 
 /** These texts travel with the minimap's code, so the first visit does not carry them. */
-const TEXTS: Record<Language, { title: string; hide: string; show: string; hint: string }> = {
+const TEXTS: Record<
+  Language,
+  { title: string; hide: string; show: string; hint: string; home: string }
+> = {
   en: {
     title: "Map",
     hide: "Hide the minimap",
     show: "Show the minimap",
     hint: "Minimap: click or drag to move the view",
+    home: "Back to my land (Home or Space)",
   },
   fr: {
     title: "Carte",
     hide: "Masquer la mini-carte",
     show: "Afficher la mini-carte",
     hint: "Mini-carte : cliquez ou faites glisser pour déplacer la vue",
+    home: "Revenir sur mes terres (Début ou Espace)",
   },
 };
 
@@ -44,6 +49,8 @@ export interface MinimapOptions {
   readonly camera: () => ViewCamera;
   /** The player picked a place on the minimap: the camera goes to this tile. */
   readonly onMove: (tile: number) => void;
+  /** The player asked to go back to their own land. */
+  readonly onHome?: (() => void) | undefined;
   readonly storage?: Storage | undefined;
 }
 
@@ -68,6 +75,7 @@ export class Minimap {
   private readonly map: HTMLElement;
   private readonly title = h("h2", { class: "minimap-title" });
   private readonly toggle = h("button", { type: "button", class: "minimap-toggle" });
+  private readonly home = h("button", { type: "button", class: "minimap-toggle minimap-home" });
   private readonly glyph = document.createElementNS(SVG, "path");
   /** The picture as the canvas takes it, sharing the image's pixels. */
   private readonly data: ImageData;
@@ -102,6 +110,21 @@ export class Minimap {
     this.glyph.setAttribute("stroke-linejoin", "round");
     svg.append(this.glyph);
     this.toggle.append(svg);
+    const target = document.createElementNS(SVG, "svg");
+    target.setAttribute("viewBox", "0 0 24 24");
+    target.setAttribute("class", "minimap-icon");
+    target.setAttribute("aria-hidden", "true");
+    const aim = document.createElementNS(SVG, "path");
+    aim.setAttribute("d", "M12 3v4M12 17v4M3 12h4M17 12h4M12 9a3 3 0 1 0 0 6a3 3 0 0 0 0-6z");
+    aim.setAttribute("fill", "none");
+    aim.setAttribute("stroke", "currentColor");
+    aim.setAttribute("stroke-width", "2");
+    aim.setAttribute("stroke-linecap", "round");
+    target.append(aim);
+    this.home.append(target);
+    this.home.addEventListener("click", () => {
+      options.onHome?.();
+    });
     this.toggle.addEventListener("click", () => {
       this.setOpen(!this.open);
     });
@@ -139,6 +162,7 @@ export class Minimap {
       "section",
       { class: "panel minimap", id: "minimap" },
       this.title,
+      ...(options.onHome ? [this.home] : []),
       this.toggle,
       this.map,
     );
@@ -168,6 +192,8 @@ export class Minimap {
     const label = this.open ? texts.hide : texts.show;
     this.toggle.setAttribute("aria-label", label);
     this.toggle.title = label;
+    this.home.setAttribute("aria-label", texts.home);
+    this.home.title = texts.home;
   }
 
   /** Whether the open minimap is a sheet over the map: on a phone, or a window as short as one. */
@@ -196,6 +222,7 @@ export class Minimap {
     this.element.toggleAttribute("data-open", this.open);
     this.map.hidden = !this.open;
     this.title.hidden = !this.open;
+    this.home.hidden = !this.open;
     this.toggle.setAttribute("aria-expanded", String(this.open));
     this.glyph.setAttribute("d", this.open ? FOLD : MAP);
   }

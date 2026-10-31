@@ -50,6 +50,7 @@ export type GameKey =
   | { readonly type: "pause" }
   | { readonly type: "speed" }
   | { readonly type: "switchView" }
+  | { readonly type: "home" }
   | { readonly type: "help" };
 
 /** What the screen shows when the key goes down. */
@@ -63,6 +64,8 @@ export interface KeyState {
   /** What the game leaves out (R-MODE-03): its build keys do nothing. */
   readonly disabled: number;
   readonly globeAllowed: boolean;
+  /** The key goes to the map or the page, not to a button or a link that Space would press. */
+  readonly plainTarget?: boolean;
 }
 
 /**
@@ -86,6 +89,9 @@ export function gameKey(
     if (event.shiftKey) return { type: "ratio", percent: digit === 0 ? 100 : digit * 10 };
     const built = state.watching ? undefined : BUILD_DIGITS[digit];
     return built && offers(built, state.disabled) ? { type: "mode", mode: built } : undefined;
+  }
+  if (event.code === "Home" || (event.code === "Space" && state.plainTarget === true)) {
+    return { type: "home" };
   }
   if (command === "KeyP" || event.code === "Escape") return { type: "pause" };
   if (command === "KeyT" && !state.watching) return { type: "speed" };

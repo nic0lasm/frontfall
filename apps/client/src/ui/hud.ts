@@ -10,6 +10,7 @@ import { formatCount, formatDuration, formatPercent } from "./format.ts";
 import { icon } from "./icons.ts";
 import { pieceIcon } from "./painted-icons.ts";
 import { LeaderList } from "./leader-list.ts";
+import { ThreatList, type ThreatTarget } from "./threats.ts";
 import { PopulationBar } from "./population-bar.ts";
 import { BUILD_MODES, costOf, numberOf, offers } from "./build-modes.ts";
 import { safeStorage } from "./setup.ts";
@@ -28,6 +29,9 @@ const WORK_STEP = 5;
 const NARROW = "(width < 720px), (height < 560px)";
 /** How long the attack preview stays once the pointer or the finger has left the land it was about. */
 const PREVIEW_LINGER_MS = 1500;
+/** Troops under which the army is nearly gone, and the share of the cap that counts as full. */
+const LOW_TROOPS = 1000;
+const FULL_SHARE = 0.95;
 /** The HUD is redrawn at most this often; the map keeps its own pace. */
 const REFRESH_MS = 250;
 /** Leaders listed at rest, then when the player opens the leaderboard. */
@@ -44,6 +48,10 @@ export interface HudActions {
   onMenu(): void;
   /** Calls back one of the player's attacks, by id. */
   onRetreat(attack: number): void;
+  /** A line of the threats was picked: show where it happens. */
+  onCentre(target: ThreatTarget): void;
+  /** Send troops back at the player who attacks the human. */
+  onCounter(attacker: number, troops: number): void;
   /** A build button was pressed: what clicks on the map do next. */
   onMode(mode: ClickMode): void;
   /** A row of the leaderboard was picked: the menu of that player. */
@@ -142,6 +150,8 @@ export class Hud {
   /** One row per attack under way, kept across renders so a button under the pointer stays put. */
   private readonly attackRows = new Map<number, { row: HTMLElement; text: HTMLElement }>();
   private readonly onRetreat: (attack: number) => void;
+  /** The attacks on the player and the ships under way, under the player's own attacks. */
+  private readonly threats: ThreatList;
   private readonly buildButtons = new Map<ClickMode, HTMLButtonElement>();
   /** The price in each button's bubble, kept up to date with the cost under its icon. */
   private readonly tipPrices = new Map<ClickMode, HTMLElement>();
@@ -202,6 +212,15 @@ export class Hud {
     this.onRetreat = (attack) => {
       actions.onRetreat(attack);
     };
+    this.threats = new ThreatList({
+      onCentre: (target) => {
+        actions.onCentre(target);
+      },
+      onCounter: (attacker, troops) => {
+        actions.onCounter(attacker, troops);
+      },
+    });
+    this.attackPanel.append(this.threats.element);
     this.leaders = new LeaderList((player) => {
       actions.onPlayer(player);
     });
@@ -629,6 +648,7 @@ export class Hud {
     this.banner.classList.toggle("danger", this.besieged(update, human));
     this.renderLeaders(update);
     this.renderGoal(update, human);
+    this.threats.render(update, this.rules.ticksPerSecond);
     this.renderAttacks(update);
     this.renderPreview(update);
   }
@@ -801,7 +821,8 @@ export class Hud {
           ? send
           : `${send}\n${workText("previewGain", { cap: formatCount(preview.capGain) })}`;
     }
-    this.attackPanel.hidden = this.attackRows.size === 0 && this.preview.hidden;
+    this.attackPanel.hidden =
+      this.attackRows.size === 0 && this.threats.size === 0 && this.preview.hidden;
   }
 
   /** Costs of the next city and fort, greyed out while the player cannot pay or has no room. */
@@ -910,7 +931,7 @@ export class Hud {
       entry.row.remove();
       this.attackRows.delete(id);
     }
-    this.attackPanel.hidden = current.size === 0 && this.preview.hidden;
+    this.attackPanel.hidden = current.size === 0 && this.threats.size === 0 && this.preview.hidden;
   }
 
   /** Share of the land; a start on the World is a few hundredths of a percent. */
@@ -990,15 +1011,24 @@ export class Hud {
       });
     }
     if (this.mode !== "attack" && this.mode !== "boat") return this.say(MODE_BANNERS[this.mode]);
+    const notice = this.troopNotice(human);
     if (update.attacks.length > 0) {
       if (!this.hintDone) {
         this.hintDone = true;
         setHintSeen(safeStorage());
       }
-      // The attack panel names each attack and its troops: the banner stays quiet.
-      return "";
+      // The attack panel names each attack and its troops: the banner only warns.
+      return notice;
     }
-    return this.hintDone ? "" : this.say("hud.playHint");
+    return notice || (this.hintDone ? "" : this.say("hud.playHint"));
+  }
+
+  /** A word on the army when it is full (growth stops there) or nearly gone, else nothing. */
+  private troopNotice(human: PlayerView | undefined): string {
+    if (!human?.alive || human.tiles === 0) return "";
+    if (human.troops < LOW_TROOPS) return t("hud.troopsLow");
+    if (human.cap > 0 && human.troops >= human.cap * FULL_SHARE) return t("hud.troopsFull");
+    return "";
   }
 
   /** The text of a click instruction, or its tap twin when a finger plays. */

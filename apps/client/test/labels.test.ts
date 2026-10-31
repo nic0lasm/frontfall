@@ -93,4 +93,41 @@ describe("player labels", () => {
     for (let frame = 0; frame < 10; frame++) labels.place(camera, 1);
     expect(FakeElement.styleWrites).toBe(writes);
   });
+
+  it("marks the leader and an ally by rewriting a troops text only when the marks change", () => {
+    fakeDocument();
+    const labels = new PlayerLabels();
+    const players = [
+      { ...player(1), alive: true, tiles: 30 },
+      { ...player(2), alive: true, tiles: 90 },
+    ] as unknown as PlayerView[];
+    labels.update(players, [
+      { player: 1, tile: 505, depth: 40 },
+      { player: 2, tile: 1010, depth: 40 },
+    ]);
+    labels.place(camera, 1);
+    const diplomacy = (allies: number[]) => ({
+      allies: allies.map((id) => ({ id })),
+      traitors: [],
+      embargoes: [],
+      embargoedBy: [],
+      incoming: [],
+      outgoing: [],
+    });
+    const relations = (allies: number[]): never =>
+      ({ phase: "play", players, diplomacy: diplomacy(allies) }) as never;
+    labels.setRelations(relations([1]));
+    const texts = (): string[] =>
+      [...(labels as unknown as { labels: Map<number, { count: string }> }).labels.values()].map(
+        (label) => label.count,
+      );
+    expect(texts()[0]).toMatch(/^\u2713 /);
+    expect(texts()[1]).toMatch(/^\u265B /);
+    const writes = FakeElement.styleWrites;
+    labels.setRelations(relations([1]));
+    expect(texts()[0]).toMatch(/^\u2713 /);
+    labels.setRelations(relations([]));
+    expect(texts()[0]).toBe("10");
+    expect(FakeElement.styleWrites).toBe(writes);
+  });
 });

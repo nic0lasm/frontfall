@@ -177,6 +177,9 @@ export class MapScene {
     return this.viewKind;
   }
 
+  /** Where the minimap's home button goes: the screen knows the player's land. */
+  home: (() => void) | undefined;
+
   /** The minimap's element, for the screen to put in its HUD; none while its code is missing. */
   get minimapElement(): HTMLElement | undefined {
     return this.minimap?.element;
@@ -252,6 +255,9 @@ export class MapScene {
       camera: () => this.cam,
       onMove: (tile) => {
         this.cam.focus(tile);
+      },
+      onHome: () => {
+        this.home?.();
       },
       storage: safeStorage(),
     });

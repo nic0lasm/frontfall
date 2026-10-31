@@ -155,6 +155,9 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
     attacks: game.attacks
       .filter((attack) => attack.player === you)
       .map((attack) => ({ id: attack.id, target: attack.target, troops: attack.troops })),
+    incoming: game.attacks
+      .filter((attack) => attack.target === you && attack.player !== you)
+      .map((attack) => ({ id: attack.id, attacker: attack.player, troops: attack.troops })),
     changedTiles: new Int32Array(0),
     changedOwners: new Uint16Array(0),
     boats: game.boats.map((boat) => ({
@@ -164,6 +167,8 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       tile: boat.path[Math.max(0, Math.min(boat.step, boat.path.length) - 1)] ?? boat.target,
       troops: boat.troops,
       to: boat.target,
+      target: territory.ownerOf(boat.target),
+      ticksLeft: Math.max(0, Math.ceil((boat.path.length - boat.step) / game.balance.boatSpeed)),
       arriving: boat.step + game.balance.boatSpeed >= boat.path.length,
     })),
     tradeShips: game.tradeShips.map((ship) => ({

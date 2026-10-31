@@ -27,6 +27,12 @@ function key(code: string, key = code, modifiers: Partial<KeyboardEvent> = {}) {
 }
 
 describe("game keys", () => {
+  it("goes home on Home, and on Space only when it would not press a button", () => {
+    expect(gameKey(key("Home"), idle)).toEqual({ type: "home" });
+    expect(gameKey(key("Space", " "), idle)).toBeUndefined();
+    expect(gameKey(key("Space", " "), { ...idle, plainTarget: true })).toEqual({ type: "home" });
+  });
+
   it("lets Esc close a dialog, then the player menu, then a build mode, then pause", () => {
     const esc = key("Escape");
     expect(gameKey(esc, { ...idle, overlay: true, menu: true, mode: "city" })).toEqual({
@@ -236,6 +242,21 @@ describe("orders", () => {
       orders.quick(2, 0);
       expect(sent).toEqual([]);
     }
+  });
+
+  it("answers an attack with the troops it carries, or the attack share if that is less", () => {
+    const { orders, sent } = setup(playing);
+    // 101 soldiers at 50 % allow 50.
+    orders.retaliate(7, 30);
+    orders.retaliate(7, 400);
+    orders.retaliate(7, 0);
+    expect(sent).toEqual([
+      { type: "attack", target: 7, troops: 30 },
+      { type: "attack", target: 7, troops: 50 },
+    ]);
+    const held = setup(playing, true);
+    held.orders.retaliate(7, 30);
+    expect(held.sent).toEqual([]);
   });
 
   it("keeps sending once the game is won, for a player who plays on (R-WIN-03)", () => {

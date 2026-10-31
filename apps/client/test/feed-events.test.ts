@@ -13,6 +13,7 @@ function update(patch: Partial<GameUpdate> = {}): GameUpdate {
       { id: 3, name: "Cy", troops: 30, cap: 100, gold: 5, tiles: 10, alive: true },
     ],
     structures: [],
+    boats: [],
     events: [],
     changedTiles: new Int32Array(0),
     changedOwners: new Uint16Array(0),
@@ -258,6 +259,22 @@ describe("FeedWatcher", () => {
     expect(entry).toMatchObject({ key: "attacked:2", tone: "bad", tile: 42, player: 2 });
     expect(watcher.observe(update({ tick: 120 }), lost, mine)).toEqual([]);
     expect(watcher.observe(update({ tick: 400 }), lost, mine)).toHaveLength(1);
+  });
+
+  it("tells once of an enemy ship sailing for the player's coast", () => {
+    const watcher = new FeedWatcher(true);
+    watcher.observe(update(), new Map(), mine);
+    const sailing = update({
+      boats: [
+        { id: 5, player: 2, tile: 9, troops: 40, target: 1 },
+        { id: 6, player: 3, tile: 8, troops: 40, target: 2 },
+        { id: 7, player: 1, tile: 7, troops: 40, target: 1 },
+      ],
+    });
+    const entries = watcher.observe(sailing, new Map(), mine);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ key: "boat:2", tone: "bad", tile: 9, player: 2 });
+    expect(watcher.observe(sailing, new Map(), mine)).toEqual([]);
   });
 
   it("reports a building lost only when its land went to someone else", () => {
