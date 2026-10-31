@@ -24,6 +24,8 @@ export interface ProfilePlayer {
   readonly refused: number;
   /** Orders it sent in all. */
   readonly sent: number;
+  /** Why it attacked or held back, counted per decision, when the player says so. */
+  readonly reasons?: ReadonlyMap<string, number>;
 }
 
 /** A small seeded generator, so a campaign game replays exactly. */

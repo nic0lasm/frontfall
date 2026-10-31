@@ -28,6 +28,8 @@ export interface HumanStyle {
   readonly oddsPercent: number;
   /** Seconds of play during which it asks any neighbour for an alliance; later only stronger ones. */
   readonly allySeconds: number;
+  /** It answers an attacker with what cancels the attack, counting the troops it already sent back, instead of all it can spare each look. */
+  readonly measured?: boolean;
 }
 
 /** A player getting the hang of the genre: a look every 3 s, a 30 % slider, alliances in the first 5 min. */
@@ -55,6 +57,8 @@ export const INTERMEDIATE: HumanStyle = {
 export class HumanPlayer {
   private readonly around = new Int32Array(4);
   private readonly every: number;
+  /** Why each attack decision went the way it did, counted: the bench's trace of a stall. */
+  readonly reasons = new Map<string, number>();
 
   constructor(
     private readonly game: Game,
@@ -82,6 +86,7 @@ export class HumanPlayer {
     if (ally) orders.push(ally);
     const attack = this.attack(me);
     if (attack) orders.push(attack);
+    this.reasons.set(this.why, (this.reasons.get(this.why) ?? 0) + 1);
     return orders;
   }
 
@@ -169,8 +174,10 @@ export class HumanPlayer {
     return best;
   }
 
+  private why = "";
   private attack(me: Player): Order | undefined {
     const { game, style } = this;
+    this.why = "";
     const cap = populationCap(game, me);
     const keep = divFloor(cap * style.keepPercent, 100);
     const cheapest = cheapestTile(game.balance);
@@ -183,15 +190,21 @@ export class HumanPlayer {
     if (attacker !== NEUTRAL) {
       const tile = this.borderWith(attacker);
       const incoming = this.incoming(attacker);
+      const sent = style.measured === true ? this.outgoing(attacker) : 0;
       const back = Math.min(
         me.troops - divFloor(cap, 10),
-        Math.max(incoming + divFloor(incoming, 10), spare),
+        style.measured === true
+          ? incoming + divFloor(incoming, 10) - sent
+          : Math.max(incoming + divFloor(incoming, 10), spare),
       );
+      this.why = tile < 0 ? "answer: no border" : back < cheapest ? "answer: no troops" : "answer";
       if (tile >= 0 && back >= cheapest) return { type: "attack", target: tile, troops: back };
       return undefined;
     }
+    this.why = "low troops";
     if (slider < cheapest) return undefined;
     const { neutral, city, enemy } = this.scan();
+    this.why = neutral >= 0 ? "free land" : city >= 0 ? "city-state" : "free coast";
     if (neutral >= 0) return { type: "attack", target: neutral, troops: slider };
     if (city >= 0) return { type: "attack", target: city, troops: slider };
     const coasts = reachableCoasts(game, this.id, 8, (_, distance) => distance >= 16);
@@ -201,14 +214,17 @@ export class HumanPlayer {
         return { type: "embark", target: tile, troops: slider };
       }
     }
+    this.why = "under war threshold";
     if (me.troops * 100 < cap * style.warPercent) return undefined;
     // A full army grows no more: then any neighbour with fewer troops is worth it.
     const odds = me.troops * 100 >= cap * 90 ? 100 : style.oddsPercent;
     const beatable = (owner: number): boolean =>
       me.troops * 100 > (game.player(owner)?.troops ?? 0) * odds;
+    this.why = "neighbour";
     if (enemy >= 0 && beatable(game.territory.ownerOf(enemy))) {
       return { type: "attack", target: enemy, troops: spare };
     }
+    this.why = "overseas";
     for (const tile of coasts) {
       const owner = game.territory.ownerOf(tile);
       if (owner === this.id || isAllied(game, this.id, owner)) continue;
@@ -216,6 +232,7 @@ export class HumanPlayer {
         return { type: "embark", target: tile, troops: spare };
       }
     }
+    this.why = enemy >= 0 ? "neighbours too strong" : "no neighbour";
     return undefined;
   }
 
@@ -288,6 +305,15 @@ export class HumanPlayer {
     let total = 0;
     for (const attack of this.game.attacks) {
       if (attack.target === this.id && attack.player === owner) total += attack.troops;
+    }
+    return total;
+  }
+
+  /** Troops in its own attacks on `owner`'s land. */
+  private outgoing(owner: number): number {
+    let total = 0;
+    for (const attack of this.game.attacks) {
+      if (attack.player === this.id && attack.target === owner) total += attack.troops;
     }
     return total;
   }
