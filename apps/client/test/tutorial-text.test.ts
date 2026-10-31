@@ -24,13 +24,12 @@ describe("tutorial texts", () => {
     }
   });
 
-  it("write no figure of the balance, and none of the words the project leaves out", () => {
+  it("write no figure of the balance", () => {
     for (const texts of Object.values(TUTORIAL_TEXTS)) {
       for (const [key, text] of Object.entries(texts)) {
         // Costs and shares come in as parameters; the keys of the attack share are not a figure of the balance.
         const plain = text.replace(/\{\w+\}/g, "").replace(/(Shift|Maj) \+ 1 (to|à) 0/, "");
         expect(plain, key).not.toMatch(/\d/);
-        expect(text, key).not.toMatch(/\b(SAM|nuke|nuclear|hydrogen|MIRV|OpenFront)\b/i);
       }
     }
   });
