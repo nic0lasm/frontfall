@@ -202,9 +202,10 @@ test("plays against the nations of the map, named and on the board (R-BOT-07)", 
   await expect(page.locator(".banner")).toContainText("to expand", { timeout: 30_000 });
   const leaders = page.locator(".leaderboard-list .leader-name");
   await expect(leaders.filter({ hasText: "Northmark" })).toHaveCount(1);
-  // The leaderboard lists three leaders at rest, and all of them once opened.
+  // The leaderboard lists three leaders at rest, and all of them once opened:
+  // the player, the bot, the six nations and their city-states (R-BOT-29), some of them already taken.
   await page.locator("#leaderboard-toggle").click();
-  await expect(page.locator(".leaderboard-list .leader")).toHaveCount(8);
+  await expect.poll(() => page.locator(".leaderboard-list .leader").count()).toBeGreaterThan(8);
 
   // Unticked, the next game has none, and the choice is remembered.
   await page.goto("./");

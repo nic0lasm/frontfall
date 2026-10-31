@@ -75,7 +75,7 @@ describe("FeedWatcher", () => {
         alive: false,
         cityState: true,
       },
-    ];
+    ] as unknown as GameUpdate["players"];
     const watcher = new FeedWatcher(true);
     watcher.observe(update({ players }), new Map(), mine);
     const entries = watcher.observe(
@@ -83,10 +83,10 @@ describe("FeedWatcher", () => {
         tick: 200,
         players,
         events: [
-          { tick: 200, type: "eliminated", a: 2, b: 3, gold: 50 },
-          { tick: 200, type: "eliminated", a: 1, b: 4, gold: 70 },
+          { type: "eliminated", a: 2, b: 3, gold: 50 },
+          { type: "eliminated", a: 1, b: 4, gold: 70 },
         ],
-      } as Partial<GameUpdate>),
+      }),
       new Map(),
       mine,
     );
