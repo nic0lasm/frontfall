@@ -2872,3 +2872,10 @@ button.feed-entry:focus-visible {
   width: auto;
   height: auto;
 }
+
+/* In the tray the name and price sit in flow under each icon: the reason waits for a press. */
+@media (width < 720px), (height < 560px) {
+  .build-button.unaffordable .build-why:not(:empty) {
+    display: none;
+  }
+}

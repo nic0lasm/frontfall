@@ -732,11 +732,15 @@ export class Hud {
 
   /** Gold a second from the troops, with the share the slider shows. */
   private renderGold(human: PlayerView): void {
-    // Nobody earns anything once wiped out.
-    const rate = human.alive
-      ? goldPerSecond({ troops: human.troops, workShare: this.work, cap: human.cap })
-      : 0;
-    this.goldRate.textContent = workText("goldRate", { rate: formatCount(Math.floor(rate)) });
+    // Nothing comes in before the game starts; nobody earns anything once wiped out.
+    const started = this.last?.phase === "play";
+    const rate =
+      human.alive && started
+        ? goldPerSecond({ troops: human.troops, workShare: this.work, cap: human.cap })
+        : 0;
+    this.goldRate.textContent = started
+      ? workText("goldRate", { rate: formatCount(Math.floor(rate)) })
+      : "\u00a0";
   }
 
   /** Labels made here rather than from the catalogues (ui/work-text.ts). */
