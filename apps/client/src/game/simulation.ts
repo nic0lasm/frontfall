@@ -25,7 +25,15 @@ export const HUMAN_ID = 1;
 /** Options that decide the setup, and only those. */
 export type SetupOptions = Pick<
   SoloOptions,
-  "bots" | "players" | "playerName" | "nations" | "maxMinutes" | "goldRate" | "cityLand"
+  | "bots"
+  | "players"
+  | "playerName"
+  | "nations"
+  | "maxMinutes"
+  | "goldRate"
+  | "cityLand"
+  | "cityStates"
+  | "spawnSeconds"
 >;
 
 /** Names for computer players. Invented, so they never collide with real countries. */
@@ -156,7 +164,12 @@ export function newSetup(
   // City-states come with the nations, placed at random when the spawn phase ends (R-BOT-29).
   const cityStateIds: number[] = [];
   const firstCity = firstBot + bots + nationIds.length;
-  for (let i = 0; i < nationIds.length * CITY_STATES_PER_NATION; i++) {
+  // The tutorial asks for a few of them with no nation (R-BOT-29 gives them to nations otherwise).
+  const cityStateCount = Math.max(
+    0,
+    Math.floor(options.cityStates ?? nationIds.length * CITY_STATES_PER_NATION),
+  );
+  for (let i = 0; i < cityStateCount; i++) {
     cityStateIds.push(firstCity + i);
     players.push({ id: firstCity + i, name: cityStateName(i) });
   }
@@ -166,6 +179,9 @@ export function newSetup(
   }
   if (options.goldRate !== undefined) balance.goldPerThousandTroops = Math.floor(options.goldRate);
   if (options.cityLand !== undefined) balance.cityLand = Math.floor(options.cityLand);
+  if (options.spawnSeconds !== undefined) {
+    balance.spawnPhaseTicks = Math.round(options.spawnSeconds * DEFAULT_BALANCE.ticksPerSecond);
+  }
   return { players, botIds, nationIds, cityStateIds, balance };
 }
 

@@ -252,13 +252,24 @@ function play(chosen: GameSetup): void {
   }, failedToLoad);
 }
 
+/** The map of the tutorial, small and with a coast, a neck to defend and room for a port. */
+const TUTORIAL_MAP = "strait";
+
+/**
+ * What the practice game plays with beyond its setup: a few city-states with
+ * no nation to bring them (R-BOT-29), a long spawn phase to read the choices
+ * in, and double speed so that the first buildings come within minutes.
+ */
+const TUTORIAL_GAME = { cityStates: 4, spawnSeconds: 60, speed: 2 } as const;
+
 /**
  * A short guided game on a small map, for learning the basics. It is a game
  * of its own: the setup in the menu, and the one saved, stay as they were.
  */
 function tutorial(): void {
+  // The Strait: two lands joined by a narrow neck, with coasts for ports. A failed catalogue leaves the generated map.
   const practice: GameSetup = {
-    map: "skirmish",
+    map: maps.some((candidate) => candidate.id === TUTORIAL_MAP) ? TUTORIAL_MAP : "skirmish",
     bots: 2,
     difficulty: "easy",
     nations: false,
@@ -294,6 +305,7 @@ function begin(map: MapInfo, code: GameModule, chosen: GameSetup = setup, saved?
     playerName: chosen.playerName || t("menu.namePlaceholder"),
     seed,
     ...testing,
+    ...(chosen.tutorial ? { ...TUTORIAL_GAME, speed: testing.speed ?? TUTORIAL_GAME.speed } : {}),
   };
   const facts = saved?.facts ?? {
     mode: "solo" as const,
@@ -323,6 +335,9 @@ function begin(map: MapInfo, code: GameModule, chosen: GameSetup = setup, saved?
         else play(setup);
       }),
       onMenu: done(showMenu),
+      onRealGame: done(() => {
+        play(setup);
+      }),
       onFailure: (key) => {
         keepSolo(undefined);
         showMenu();

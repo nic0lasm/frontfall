@@ -424,6 +424,8 @@ test("a tutorial reloaded a few seconds in comes back to the game", async ({ pag
   await page.goto("./");
   await page.locator("#tutorial").click();
   await expect(page.locator("#map")).toBeVisible();
+  // The game waits behind the introduction until the player starts it.
+  await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
   // Kept within seconds of the start, not only once the spawn phase is over.
   await expect.poll(() => keptTick(page), { timeout: 9000 }).toBeGreaterThan(0);
 

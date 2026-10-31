@@ -76,6 +76,8 @@ export async function loadReplayBar(): Promise<void> {
 export interface GameScreenActions {
   onNewGame(): void;
   onMenu(): void;
+  /** The tutorial is over and the player wants a real game: the one their menu is set to. */
+  onRealGame?(): void;
   /** The game could not start; the key names the message to show. */
   onFailure(key: MessageKey): void;
   /** The player asked for a record of the game, to save. */
@@ -293,9 +295,13 @@ export class GameScreen {
       this.hud.element,
       this.coarsePointer,
       () => this.latest,
-      () => this.diplomacy.open,
+      () => {
+        this.showOutro();
+      },
     );
-    if (this.guided && (this.options.tutorial || !guideDone(safeStorage()))) this.guide.start();
+    if (this.guided && (this.options.tutorial || !guideDone(safeStorage()))) {
+      this.guide.start(this.options.tutorial === true);
+    }
     this.element = document.createElement("div");
     this.element.className = "game";
     this.element.append(
@@ -549,6 +555,8 @@ export class GameScreen {
   /** Call once the element is in the page, so sizes are known. */
   start(): void {
     this.scene.resize();
+    // The practice game waits behind its introduction, unless it comes back from a reload.
+    if (this.options.tutorial && !this.options.snapshot) this.showIntro();
     // `?perf` shows the frame time of the map and a report to copy, for measuring a phone.
     if (new URLSearchParams(location.search).has("perf")) {
       void import("./perf-report.ts").then(({ mountPerfReport }) => {
@@ -917,6 +925,42 @@ export class GameScreen {
     this.overlays.showPause(this.speed?.choices());
   }
 
+  /** Before the practice game: three lines on what the game is, with the clock stopped until the player starts. */
+  private showIntro(): void {
+    void import("./tutorial-dialogs.ts").then(({ introDialog }) => {
+      if (this.disposed || this.ending) return;
+      this.overlays.pause();
+      this.overlays.show(
+        introDialog(
+          () => {
+            this.overlays.close();
+          },
+          () => {
+            this.actions.onMenu();
+          },
+        ),
+      );
+    });
+  }
+
+  /** After the last step of the tutorial: five rules, and the way to a real game. */
+  private showOutro(): void {
+    void import("./tutorial-dialogs.ts").then(({ outroDialog }) => {
+      if (this.disposed || this.ending) return;
+      this.overlays.pause();
+      this.overlays.show(
+        outroDialog(
+          () => {
+            (this.actions.onRealGame ?? this.actions.onMenu)();
+          },
+          () => {
+            this.overlays.close();
+          },
+        ),
+      );
+    });
+  }
+
   /** The guide is for a solo game, not online and not in a replay. */
   private get guided(): boolean {
     return this.link === undefined && this.options.record === undefined;
@@ -959,7 +1003,7 @@ export class GameScreen {
           ? () => {
               setGuideDone(safeStorage(), false);
               this.overlays.close();
-              this.guide.start();
+              this.guide.start(this.options.tutorial === true);
             }
           : undefined,
       }),

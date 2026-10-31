@@ -52,6 +52,9 @@ export interface SoloOptions {
   goldRate?: number | undefined;
   /** For tests that build a palace on a small map: B-CITY-LAND instead of its value. */
   cityLand?: number | undefined;
+  /** The practice game: this many city-states with no nation to bring them (R-BOT-29), and a longer spawn phase (B-SPAWN-PHASE) to read the choices. */
+  cityStates?: number | undefined;
+  spawnSeconds?: number | undefined;
   /**
    * Online: the human players in their final numbering, and which one plays
    * at this screen. Bots then take the numbers after the last human, and

@@ -164,3 +164,121 @@
     animation: none;
   }
 }
+
+/* The price of the building a step asks for, and how far the player's gold is from it. */
+.guide-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--ff-slate-300);
+  font-size: 12px;
+}
+
+.guide-meter[hidden] {
+  display: none;
+}
+
+.guide-meter-bar {
+  flex: 1;
+  min-width: 40px;
+  height: 6px;
+  accent-color: var(--ff-ember);
+}
+
+.guide-meter.ready {
+  color: var(--ff-success);
+}
+
+.guide-meter.ready .guide-meter-bar {
+  accent-color: var(--ff-success);
+}
+
+/* During the spawn phase the doctrine cards fill the bottom: the banner goes under the figures. */
+@media (width < 720px), (height < 560px) {
+  .game:has(.doctrine-picker:not([hidden])) .guide {
+    top: 96px;
+    bottom: auto;
+  }
+}
+
+/* The tutorial's two dialogs (ui/tutorial-dialogs.ts). */
+.tutorial-dialog {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  text-align: left;
+}
+
+.tutorial-dialog h2 {
+  margin: 0 0 8px;
+  color: var(--ff-ember-bright);
+  text-align: center;
+}
+
+.tutorial-dialog p {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.tutorial-points,
+.tutorial-rules {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.tutorial-points li,
+.tutorial-rules li {
+  padding: 8px 0 8px 14px;
+  border-left: 3px solid var(--ff-ember);
+}
+
+.tutorial-points li + li,
+.tutorial-rules li + li {
+  margin-top: 6px;
+}
+
+.tutorial-points strong {
+  color: var(--ff-ember-bright);
+}
+
+.tutorial-rules {
+  counter-reset: rule;
+}
+
+.tutorial-rules li {
+  counter-increment: rule;
+}
+
+.tutorial-rules li::before {
+  content: counter(rule) ". ";
+  color: var(--ff-ember-bright);
+  font-weight: 700;
+}
+
+.tutorial-dialog .tutorial-note {
+  color: var(--ff-slate-300);
+  font-size: 13px;
+}
+
+.tutorial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (width < 480px) {
+  .tutorial-actions {
+    flex-direction: column-reverse;
+  }
+
+  .tutorial-actions button {
+    min-height: 44px;
+  }
+}

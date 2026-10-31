@@ -43,6 +43,9 @@ test("the first steps follow the player, and stay hidden once put away", async (
 
   // Next moves on without doing the step; the guide never blocks the game.
   await page.locator("#guide-next").click();
+  await expect(guide).toHaveAttribute("data-step", "doctrine");
+  await expect(guide).toContainText("doctrine");
+  await page.locator("#guide-next").click();
   await expect(guide).toHaveAttribute("data-step", "expand");
   await page.locator("#guide-next").click();
   await expect(guide).toHaveAttribute("data-step", "troops");
@@ -52,6 +55,8 @@ test("the first steps follow the player, and stay hidden once put away", async (
   await page.locator("#attack-ratio").fill("50");
   await expect(guide).toHaveAttribute("data-step", "build");
   await expect(guide).toContainText("City");
+  // The price of the building, and how far the player's gold is from it.
+  await expect(guide.locator(".guide-meter")).toBeVisible();
   await expect(page.locator("#build-city")).toHaveClass(/guide-target/);
   await expect(page.locator("#attack-ratio")).not.toHaveClass(/guide-target/);
   await page.locator("#guide-next").click();
@@ -93,11 +98,87 @@ test("the tutorial is a guided game of its own, even after the first steps were 
   await expect(page.locator("#tutorial")).toBeVisible();
   await page.locator("#tutorial").click();
   await expect(page.locator("#map")).toBeVisible();
+  // It opens on what the game is, with the clock stopped behind it.
+  const intro = page.locator("#tutorial-intro");
+  await expect(intro).toBeVisible();
+  await expect(intro).toContainText("Frontfall in five minutes");
+  await intro.getByRole("button", { name: "Start" }).click();
+  await expect(intro).toHaveCount(0);
   await expect(page.locator("#guide")).toHaveAttribute("data-step", "start");
 
   // Putting the guide away works there as in any game.
   await page.locator("#guide-hide").click();
   await expect(page.locator("#guide")).toHaveCount(0);
+});
+
+test("the tutorial goes through every step, says goodbye, and leads to a real game", async ({
+  page,
+}) => {
+  await page.goto("./?map=skirmish&bots=1&difficulty=easy");
+  // A real game of the player's own setup: not the tutorial's strait.
+  await page.locator("#play").click();
+  await expect(page.locator("#map")).toBeVisible();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.locator("#leave").click();
+  await page.locator("#tutorial").click();
+  await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
+
+  const guide = page.locator("#guide");
+  const steps = [
+    "start",
+    "doctrine",
+    "expand",
+    "troops",
+    "work",
+    "citystates",
+    "build",
+    "port",
+    "defend",
+    "players",
+    "diplomacy",
+    "missiles",
+    "win",
+  ];
+  for (const [index, step] of steps.entries()) {
+    await expect(guide).toHaveAttribute("data-step", step);
+    await expect(guide).toContainText(`Step ${String(index + 1)}/${String(steps.length)}`);
+    if (index < steps.length - 1) await page.locator("#guide-next").click();
+  }
+  // Nothing in it states a figure of the balance but the share that wins.
+  await expect(guide).toContainText("75 %");
+  await page.locator("#guide-next").click();
+  await expect(guide).toHaveCount(0);
+  const outro = page.locator("#tutorial-outro");
+  await expect(outro).toBeVisible();
+  await expect(outro).toContainText("You know the game");
+  await expect(outro.locator("li")).toHaveCount(5);
+  // The game waits behind it; staying puts it back in motion.
+  await outro.getByRole("button", { name: "Keep playing here" }).click();
+  await expect(outro).toHaveCount(0);
+  await expect(page.locator("#map")).toBeVisible();
+  await expect(page.locator(".overlay.paused")).toHaveCount(0);
+});
+
+test("the tutorial's last word starts a real game", async ({ page }) => {
+  await page.goto("./?map=skirmish&bots=1&difficulty=easy");
+  await page.locator("#tutorial").click();
+  await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
+  for (let step = 0; step < 13; step++) await page.locator("#guide-next").click();
+  // The practice game runs at double speed.
+  await expect(page.locator("#speed")).toContainText("2");
+  await page.locator("#tutorial-outro").getByRole("button", { name: "Play a real game" }).click();
+  await expect(page.locator("#tutorial-outro")).toHaveCount(0);
+  // The menu's own setup, at the normal pace, and no introduction.
+  await expect(page.locator("#speed")).toContainText("1");
+  await expect(page.locator("#tutorial-intro")).toHaveCount(0);
+  await expect(page.locator("#map")).toBeVisible();
+});
+
+test("the tutorial's introduction can send the player back to the menu", async ({ page }) => {
+  await page.goto("./");
+  await page.locator("#tutorial").click();
+  await page.getByRole("button", { name: "Back to the menu" }).click();
+  await expect(page.locator("#menu")).toBeVisible();
 });
 
 test.describe("in French", () => {
@@ -106,7 +187,7 @@ test.describe("in French", () => {
   test("the tutorial button is read, and reached, with the keyboard", async ({ page }) => {
     await page.goto("./");
     const button = page.locator("#tutorial");
-    await expect(button).toHaveText("Tutoriel");
+    await expect(button).toHaveText("Tutoriel · 5 min");
     await button.focus();
     await expect(button).toBeFocused();
     await expect(page.locator("#tutorial-hint")).toContainText("guidée");

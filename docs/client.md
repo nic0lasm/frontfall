@@ -308,13 +308,53 @@ tooltip does for a mouse, and that press does not pick the mode.
 A first solo game shows "First steps" (`ui/guide.ts`), a card under the stats
 (across the screen under the banner on phones), never online and never in a
 replay. It asks for one thing at a time and moves on when the player does it:
-pick a start, expand once the attacks open, build a city (with its current
-cost), open another player's menu. A step already done is skipped. Next moves
-on without doing it, and Hide puts the guide away; reaching the end or hiding
-it sets `frontfall.guide` to `done` in `localStorage`, and "Show the first
-steps again" in the help clears it. The step text sits in a polite live
-region, and the card takes no focus from the map. Without storage the guide
-simply shows again next game.
+pick a start, pick a doctrine, expand once the attacks open, set the share of
+troops that attacks, build a city (with its current cost), a fort, ask a
+neighbour for an alliance, then a last word on how a game is won. A step
+already done is skipped, and a step with no use in the game (a doctrine in a
+game without doctrines) is too. The steps that cost gold show a meter of the
+player's gold against the price. Next moves on without doing the step, and
+Hide puts the guide away; reaching the end or hiding it sets `frontfall.guide`
+to `done` in `localStorage`, and "Show the first steps again" in the help
+clears it. The step text sits in a polite live region, and the card takes no
+focus from the map. Without storage the guide simply shows again next game.
+
+## The tutorial
+
+The menu's "Tutorial · 5 min" starts a practice game of its own (`tutorial()`
+in `main.ts`), apart from the setup saved in the menu. It is meant to be
+played once, in about five minutes, and to leave a player who knows the whole
+game and wants to play it:
+
+- **A gentle game.** The Strait (two lands joined by a neck, with coasts),
+  two easy bots and four city-states with no nation to bring them
+  (`cityStates`), a spawn phase of 60 s instead of 20 to read the choices in
+  (`spawnSeconds`), and double speed so that the first buildings come within
+  minutes. All three are options of the solo setup
+  (`game/simulation.ts`), kept in the record of the game like any other
+  option. A catalogue that fails to load leaves the generated Skirmish map.
+- **An introduction** (`ui/tutorial-dialogs.ts`) opens first, with the clock
+  stopped behind it: what the game is in three lines, and what the card in the
+  corner will do. A reload of the practice game goes back to the game, not to
+  the introduction.
+- **Thirteen steps** in the same card as the first steps: start, doctrine,
+  growing on free land, the share of troops that attacks, workers and gold,
+  city-states, a city, a port and the boat, a fort, an ally, diplomacy
+  (gifts, embargo, tribute, traitors), the late game (silo, missiles, air
+  defense, warships) and how a game is won. The steps that ask for an action
+  wait for it; the ones that only explain wait for Next. The steps are in
+  `STEPS` and the shorter list of a first game in `FIRST_STEPS`
+  (`ui/guide.ts`).
+- **A last word.** Next on the last step opens a dialog with five rules to
+  keep and two ways on: a real game of the menu's setup, or staying in the
+  practice game.
+
+The texts of the card and of both dialogs are in `ui/tutorial-text.ts`, in
+both languages, not in the catalogues: they load with the guide and weigh
+nothing on the first visit. They say no figure of the balance (prices come in
+as parameters, the rest in words) so that a change to `balance.md` never
+leaves them false; `test/tutorial-text.test.ts` checks it, and that both
+languages have the same keys.
 
 ## Translations
 

@@ -62,6 +62,27 @@ describe("SoloGame", () => {
     expect(without.step([]).players).toHaveLength(4);
   });
 
+  it("gives the practice game city-states with no nation, and a longer spawn phase", () => {
+    const practice = new SoloGame(
+      { ...options, bots: 2, nations: false, cityStates: 4, spawnSeconds: 60 },
+      generateMap(options.map),
+    );
+    let update = practice.step([]);
+    expect(update.players.map((player) => player.name)).toEqual([
+      "Ada",
+      "Aldmere",
+      "Brask",
+      ...Array.from({ length: 4 }, (_, i) => cityStateName(i)),
+    ]);
+    expect([...practice.game.cityStates]).toEqual([4, 5, 6, 7]);
+    // The spawn phase lasts the 60 s asked for, not the 20 s of the balance.
+    expect(update.spawnTicksLeft).toBe(60 * practice.game.balance.ticksPerSecond - 1);
+    for (let i = 0; i < 25 * practice.game.balance.ticksPerSecond; i++) update = practice.step([]);
+    expect(update.phase).toBe("spawn");
+    // Nothing asked: no city-state, since the map has no nation to bring them.
+    expect(newGame({ ...options, nations: false }).game.cityStates.size).toBe(0);
+  });
+
   it("deals the players into teams and records them (R-MODE-02)", () => {
     const solo = newGame({ ...options, teams: 2 });
     expect(solo.teamsById()).toEqual([0, 1, 2, 1, 2]);
