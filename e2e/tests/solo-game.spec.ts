@@ -162,7 +162,7 @@ test("builds a Micho Palace, worth five cities, once (R-BUILD-08, R-BUILD-10)", 
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
   // Gold fast, and so little land per city that the starting land holds five.
-  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=5&gold=1000&cityland=1");
+  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=5&gold=4000&cityland=1");
   await page.locator("#play").click();
   await expect(page.locator("#map")).toBeVisible();
   const box = await page.locator("#map").boundingBox();
