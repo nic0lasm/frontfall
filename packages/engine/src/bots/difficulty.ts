@@ -119,9 +119,9 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
   normal: {
     intervalSeconds: 6,
     humanPercent: 75,
-    capPercent: 75,
-    startPercent: 75,
-    growthPercent: 95,
+    capPercent: 92,
+    startPercent: 92,
+    growthPercent: 100,
     graceSeconds: 0,
     answer: "after reserve",
     strategies: ["assist", "hated", "traitor", "crown", "capital", "weakest", "island"],
@@ -142,7 +142,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
     similarLandPercent: 80,
   },
   hard: {
-    intervalSeconds: 5,
+    intervalSeconds: 4,
     humanPercent: 100,
     capPercent: 100,
     startPercent: 100,
