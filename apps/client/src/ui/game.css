@@ -2658,3 +2658,102 @@ button.feed-entry:focus-visible {
 .end-achievements {
   margin-top: 12px;
 }
+
+/* Choice of a doctrine in the spawn phase (ui/doctrine-picker.ts): three cards
+   over the map, under the banner, out of the way of the corners the HUD uses. */
+.doctrine-picker {
+  position: absolute;
+  inset: auto 16px 16px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+  margin-inline: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #14171c) 92%, transparent);
+  color: var(--text, #f2f4f7);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
+}
+
+.doctrine-picker[hidden] {
+  display: none;
+}
+
+.doctrine-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.doctrine-timer {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.doctrine-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.doctrine-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 44px;
+  padding: 10px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentcolor 8%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.doctrine-card:hover,
+.doctrine-card:focus-visible {
+  border-color: color-mix(in srgb, currentcolor 45%, transparent);
+}
+
+.doctrine-card[aria-pressed="true"] {
+  border-color: currentcolor;
+  background: color-mix(in srgb, currentcolor 18%, transparent);
+}
+
+.doctrine-idea {
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.doctrine-effects {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.doctrine-good::before {
+  content: "▲ ";
+  color: #5ad17a;
+}
+
+.doctrine-bad::before {
+  content: "▼ ";
+  color: #f08a6a;
+}
+
+@media (width < 640px) {
+  .doctrine-picker {
+    inset: auto 8px 8px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .doctrine-cards {
+    grid-template-columns: 1fr;
+  }
+}

@@ -70,6 +70,18 @@ export {
   workError,
   workers,
 } from "./economy.ts";
+export {
+  DOCTRINE_COUNT,
+  DOCTRINE_EFFECTS,
+  Doctrine,
+  doctrineError,
+  doctrinePercent,
+  installDoctrines,
+  isDoctrine,
+  withDoctrine,
+  type DoctrineCode,
+  type DoctrineEffects,
+} from "./doctrines.ts";
 export { GiftError, giftError, giftedTroops, installGifts } from "./gifts.ts";
 export {
   LANDMARK_EFFECTS,

@@ -72,7 +72,12 @@ const SavedFile = z
           speed: GameSpeed.default(1),
           // Saved before the special rules of R-MODE-08: such a game had none.
           rules: z.preprocess(
-            (saved) => ({ collapsingFronts: false, capitals: false, ...(saved ?? {}) }),
+            (saved) => ({
+              collapsingFronts: false,
+              capitals: false,
+              doctrines: false,
+              ...(saved ?? {}),
+            }),
             GameRules,
           ),
           // Saved before the operator's bonuses of R-MODE-09: such a game had none.

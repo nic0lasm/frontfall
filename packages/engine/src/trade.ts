@@ -1,3 +1,4 @@
+import { withDoctrine } from "./doctrines.ts";
 import { embargoed, isAllied } from "./diplomacy.ts";
 import type { Game } from "./game.ts";
 import { DrawUsage, derivedRandom } from "./random.ts";
@@ -204,13 +205,20 @@ export function installTrade(game: Game): void {
     const receiver = game.player(ports.get(ship.to)?.player ?? 0);
     if (!sender || !receiver) return;
     const { landmarkTradePercent } = balance;
-    sender.gold += withLandmarks(game, sender.id, LandmarkEffect.Trade, landmarkTradePercent, gain);
+    // R-DOCTRINE: each side's doctrine changes what the ship brings it.
+    sender.gold += withLandmarks(
+      game,
+      sender.id,
+      LandmarkEffect.Trade,
+      landmarkTradePercent,
+      withDoctrine(game, sender.id, "trade", gain),
+    );
     receiver.gold += withLandmarks(
       game,
       receiver.id,
       LandmarkEffect.Trade,
       landmarkTradePercent,
-      gain,
+      withDoctrine(game, receiver.id, "trade", gain),
     );
   }
 }

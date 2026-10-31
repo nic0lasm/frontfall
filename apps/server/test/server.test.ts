@@ -338,7 +338,7 @@ describe("WebSocket", () => {
           nations: true,
           teams: 0,
           disabled: 0,
-          rules: { collapsingFronts: true, capitals: false },
+          rules: { collapsingFronts: true, capitals: false, doctrines: false },
           players: 1,
           capacity: 16,
           state: "waiting",
@@ -473,17 +473,17 @@ describe("WebSocket", () => {
         capacity: 16,
         autoStart: false,
         speed: 4,
-        rules: { collapsingFronts: true, capitals: true },
+        rules: { collapsingFronts: true, capitals: true, doctrines: false },
       },
     });
     expect(await bob.next("lobby")).toMatchObject({
       speed: 4,
-      rules: { collapsingFronts: true, capitals: true },
+      rules: { collapsingFronts: true, capitals: true, doctrines: false },
     });
     alice.send({ type: "start" });
     const started = await bob.next("started");
     expect(started.speed).toBe(4);
-    expect(started.rules).toEqual({ collapsingFronts: true, capitals: true });
+    expect(started.rules).toEqual({ collapsingFronts: true, capitals: true, doctrines: false });
     expect(started.players).toEqual([
       { id: 1, name: "Alice" },
       { id: 2, name: "Bob" },
@@ -1282,7 +1282,7 @@ describe("WebSocket", () => {
           teams: 0,
           disabled: 0,
           ...SEATS,
-          rules: { collapsingFronts: true, capitals: true },
+          rules: { collapsingFronts: true, capitals: true, doctrines: false },
         },
       });
       await bob.next("lobby");
@@ -1312,7 +1312,7 @@ describe("WebSocket", () => {
         game,
         you: 1,
         token,
-        rules: { collapsingFronts: true, capitals: true },
+        rules: { collapsingFronts: true, capitals: true, doctrines: false },
       });
       const turns = [];
       while (turns.length <= tick) turns.push(...(await back.next("turns")).turns);

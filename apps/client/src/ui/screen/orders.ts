@@ -78,6 +78,13 @@ export class Orders {
     this.session.sendOrder({ type: "work", share });
   }
 
+  /** Picks a doctrine (R-DOCTRINE-01); only the spawn phase takes it. */
+  doctrine(pick: number): void {
+    const update = this.state.latest();
+    if (!update || this.state.held() || update.phase !== "spawn") return;
+    this.session.sendOrder({ type: "doctrine", pick });
+  }
+
   /** Sends a player a preset quick message (R-DIPLO-07). */
   quick(target: number, phrase: number): void {
     if (!this.playing()) return;

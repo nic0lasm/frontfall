@@ -82,7 +82,7 @@ export const GOLDEN_REPLAYS: readonly Golden[] = [
     bots: 5,
     difficulty: "hard",
     nations: true,
-    rules: { collapsingFronts: true, capitals: true },
+    rules: { collapsingFronts: true, capitals: true, doctrines: false },
     ticks: 3000,
   },
 ];

@@ -1,3 +1,4 @@
+import { doctrinePercent, withDoctrine } from "./doctrines.ts";
 import type { Balance } from "./balance.ts";
 import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
 import { detPow, divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
@@ -154,7 +155,9 @@ export function installAttacks(game: Game): void {
     const garrison = Math.max(1, defensePerTile(game, defender) * front);
     const full = Math.max(1, mulDiv(garrison, balance.attackPaceOddsTenths, 10));
     const strength = Math.min(attack.troops, full);
-    const tiles = mulDiv(front * balance.attackPacePercent, strength, full * 100);
+    // R-DOCTRINE: and the pace of the player's attacks.
+    const doctrine = doctrinePercent(game, attack.player, "pace");
+    const tiles = mulDiv(front * balance.attackPacePercent * doctrine, strength, full * 10_000);
     return Math.min(most, Math.max(1, tiles));
   }
 
@@ -594,6 +597,8 @@ export function captureCost(
     : 100;
   const strength = Math.max(fort, capital, landmark);
   if (strength !== 100) cost = mulDiv(cost, strength, 100);
+  // R-DOCTRINE: what the attacker's doctrine makes the land cost them.
+  cost = withDoctrine(game, attacker, "attackerLoss", cost);
   // R-MODE-09: the operator's defense bonus doubles the price of their land.
   if (game.hasBonus(defender.id, OperatorBonus.Defense)) cost *= OPERATOR_FACTOR;
   // R-DIPLO-04: a traitor's land is cheaper to take while the mark lasts.
@@ -610,6 +615,8 @@ export function captureCost(
 export function defenderLoss(game: Game, tile: number, defender: Player): number {
   let loss = troopsPerTile(game, defender);
   if (fortified(game, tile, defender.id)) loss = mulDiv(loss, game.balance.fortLossPercent, 100);
+  // R-DOCTRINE: and what the defender's doctrine spares them.
+  loss = withDoctrine(game, defender.id, "defenderLoss", loss);
   return Math.min(defender.troops, loss);
 }
 

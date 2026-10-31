@@ -7,6 +7,7 @@ import {
   isAllied,
   tributeError,
 } from "./diplomacy.ts";
+import { doctrineError } from "./doctrines.ts";
 import { BuildError, isStructureKind, placementError } from "./structures.ts";
 import { soldiers, workError } from "./economy.ts";
 import { giftError } from "./gifts.ts";
@@ -94,6 +95,8 @@ export function orderError(game: Game, player: Player, order: Order): string | u
       return playerError(order.target) ?? quickError(game, player, order.target, order.phrase);
     case "work":
       return workError(game, order.share);
+    case "doctrine":
+      return doctrineError(game, order.pick);
   }
 }
 

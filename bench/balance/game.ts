@@ -52,15 +52,22 @@ export interface BalanceSetup {
   readonly balance?: Partial<Balance>;
   /** Special rules to play with (R-MODE-08). */
   readonly rules?: Partial<GameRules>;
+  /**
+   * One intermediate human-like player (human.ts) per entry, in player-id order from 1, each
+   * playing the doctrine of its entry (a Doctrine code; R-DOCTRINE). Turns the doctrines on.
+   */
+  readonly doctrineHumans?: readonly number[];
 }
 
-export type PlayerKind = "casual" | "average" | "bot" | "city" | "nation";
+export type PlayerKind = "casual" | "average" | "human" | "bot" | "city" | "nation";
 
 export interface PlayerReport {
   readonly id: number;
   readonly name: string;
   readonly kind: PlayerKind;
   readonly difficulty?: BotDifficulty;
+  /** The doctrine played (a Doctrine code); absent in games without doctrines. */
+  readonly doctrine?: number;
   readonly team: number;
   /** Land mass of the start tile, and whether a coast lies within the start radius. */
   readonly landmass: number;
@@ -157,6 +164,10 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
 
   const players: PlayerSetup[] = [];
   const kinds = new Map<number, { kind: PlayerKind; difficulty?: BotDifficulty }>();
+  for (const [i] of (setup.doctrineHumans ?? []).entries()) {
+    players.push({ id: i + 1, name: `Human ${String(i + 1)}` });
+    kinds.set(i + 1, { kind: "human" });
+  }
   if (setup.average) {
     players.push({ id: 1, name: "Average" });
     kinds.set(1, { kind: "average" });
@@ -199,7 +210,9 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     players,
     balance,
     ...(setup.teams ? { teams: setup.teams } : {}),
-    ...(setup.rules ? { rules: setup.rules } : {}),
+    ...(setup.rules || setup.doctrineHumans
+      ? { rules: { ...setup.rules, ...(setup.doctrineHumans ? { doctrines: true } : {}) } }
+      : {}),
   });
   for (const { ids, difficulty } of groups) installBots(game, ids, difficulty);
   if (cities.length > 0) installCityStates(game, cities);
@@ -226,6 +239,18 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
           )
         : undefined;
 
+  const humans = (setup.doctrineHumans ?? []).map(
+    (doctrine, i) =>
+      [
+        new HumanPlayer(
+          game,
+          i + 1,
+          manifest.nations.map((n) => n.tile),
+          setup.seed * 31 + i,
+        ),
+        doctrine,
+      ] as const,
+  );
   const combat = new CombatLog(game);
   const ownable = terrain.ownableCount;
   const perMinute = 60 * balance.ticksPerSecond;
@@ -282,7 +307,14 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
         orders.push({ type: "tribute", target: leading.id });
       }
     }
-    const turn: Turn = { tick: game.tick, orders: orders.map((order) => ({ player: 1, order })) };
+    const listed = orders.map((order) => ({ player: 1, order }));
+    for (const [human, doctrine] of humans) {
+      if (game.tick === 0) {
+        listed.push({ player: human.id, order: { type: "doctrine", pick: doctrine } });
+      }
+      for (const order of human.orders()) listed.push({ player: human.id, order });
+    }
+    const turn: Turn = { tick: game.tick, orders: listed };
     game.step(turn);
 
     for (const { from, to, gain } of arriving) {
@@ -370,6 +402,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
       name: p.name,
       kind: kind.kind,
       ...(kind.difficulty ? { difficulty: kind.difficulty } : {}),
+      ...(setup.doctrineHumans && kind.kind === "human" ? { doctrine: p.doctrine } : {}),
       team: p.team,
       landmass: start < 0 ? -1 : terrain.landmassOf(start),
       coastal:

@@ -45,7 +45,9 @@ export type Order =
   /** Puts `share` % of the troops at home to work (R-ECO-07). */
   | { type: "work"; share: number }
   /** Pays the price of a tribute to `target` for a truce (R-DIPLO-10). */
-  | { type: "tribute"; target: number };
+  | { type: "tribute"; target: number }
+  /** Picks the doctrine `pick` (a Doctrine code) during the spawn phase (R-DOCTRINE-01). */
+  | { type: "doctrine"; pick: number };
 
 /** Every order accepted during one tick, in the order the server accepted them (R-FAIR-03). */
 export interface Turn {
@@ -122,10 +124,12 @@ export interface GameRules {
   readonly capitals: boolean;
   /** R-ATTACK-10: outnumbered fronts give way by stretches. */
   readonly collapsingFronts: boolean;
+  /** R-DOCTRINE: each player picks one of three doctrines at the start. */
+  readonly doctrines: boolean;
 }
 
 /** A game with no special rule. */
-export const NO_RULES: GameRules = { capitals: false, collapsingFronts: false };
+export const NO_RULES: GameRules = { capitals: false, collapsingFronts: false, doctrines: false };
 
 /** Marks the special rules in the state hash. */
 const RULES_TAG = 0x72756c65;
@@ -134,7 +138,7 @@ const OPERATOR_TAG = 0x6f706572;
 
 /** One bit per special rule that is on, for the state hash and the setup digest; 0 with none. */
 export function ruleBits(rules: GameRules): number {
-  return (rules.capitals ? 1 : 0) | (rules.collapsingFronts ? 2 : 0);
+  return (rules.capitals ? 1 : 0) | (rules.collapsingFronts ? 2 : 0) | (rules.doctrines ? 4 : 0);
 }
 
 /**
@@ -176,6 +180,8 @@ export interface Player {
   readonly home: number | undefined;
   /** Team from 1, or 0 in a free-for-all (R-MODE-02). */
   readonly team: number;
+  /** Doctrine picked in the spawn phase (R-DOCTRINE-01), a Doctrine code; 0, the balanced one, without a pick or without doctrines. */
+  doctrine: number;
   /** Tile of the player's capital in capital mode (R-CAP-01); undefined before play or without one. */
   capital: number | undefined;
 }
@@ -353,6 +359,7 @@ export class Game {
         traitorUntil: 0,
         home,
         team: 0,
+        doctrine: 0,
         capital: undefined,
       });
       highest = Math.max(highest, id);
@@ -370,6 +377,7 @@ export class Game {
     this.rules = {
       capitals: setup.rules?.capitals === true,
       collapsingFronts: setup.rules?.collapsingFronts === true,
+      doctrines: setup.rules?.doctrines === true,
     };
     this.balanceDigest = digestBalance(
       this.balance,
@@ -598,6 +606,10 @@ export class Game {
         hash = mix(hash, f.by);
         hash = mix(hash, f.tile);
       }
+    }
+    // And games without doctrines.
+    if (this.rules.doctrines) {
+      for (const p of this.sortedPlayers) hash = mix(hash, p.doctrine);
     }
     return hash >>> 0;
   }

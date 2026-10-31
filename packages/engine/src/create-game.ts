@@ -2,6 +2,7 @@ import { installAttacks } from "./attacks.ts";
 import { installBoats } from "./boats.ts";
 import { installCapitals } from "./capitals.ts";
 import { installDiplomacy } from "./diplomacy.ts";
+import { installDoctrines } from "./doctrines.ts";
 import { installEconomy } from "./economy.ts";
 import { installGifts } from "./gifts.ts";
 import { installLandmarks } from "./landmarks.ts";
@@ -24,6 +25,7 @@ export function createGame(setup: GameSetup): Game {
   const game = new Game(setup);
   game.terrain.prepare();
   installSpawn(game);
+  installDoctrines(game);
   installDiplomacy(game);
   installGifts(game);
   installQuickMessages(game);

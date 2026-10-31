@@ -40,7 +40,10 @@ describe("parseUsageReport", () => {
   });
 
   it("takes the special rules of a game, or none from an older page (R-MODE-08)", () => {
-    const special = { ...GAME, rules: { collapsingFronts: true, capitals: true } };
+    const special = {
+      ...GAME,
+      rules: { collapsingFronts: true, capitals: true, doctrines: false },
+    };
     expect(parseUsageReport(JSON.stringify(special))).toEqual({ ok: true, value: special });
     expect(parseUsageReport(JSON.stringify({ ...GAME, rules: { other: true } })).ok).toBe(false);
   });

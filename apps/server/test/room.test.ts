@@ -15,7 +15,7 @@ const PUBLIC: RoomSettings = {
   disabled: 0,
   speed: 1,
   pace: 1,
-  rules: { collapsingFronts: true, capitals: false },
+  rules: { collapsingFronts: true, capitals: false, doctrines: false },
   minPlayers: 2,
   countdownMs: 10_000,
   hostIdleMs: 120_000,
@@ -230,7 +230,7 @@ describe("private lobby", () => {
       disabled: 40,
       capacity: 6,
       autoStart: false,
-      rules: { collapsingFronts: true, capitals: true },
+      rules: { collapsingFronts: true, capitals: true, doctrines: false },
     } as const;
     expect(room.configure(guest.seat, options, 0)).toBe("not_host");
     expect(room.configure(host.seat, options, 0)).toBeUndefined();
@@ -244,7 +244,7 @@ describe("private lobby", () => {
       nations: false,
       teams: 0,
       disabled: 40,
-      rules: { collapsingFronts: true, capitals: true },
+      rules: { collapsingFronts: true, capitals: true, doctrines: false },
     });
     expect(room.configure(host.seat, options, 0)).toBe("game_started");
   });
@@ -252,11 +252,15 @@ describe("private lobby", () => {
   it("keeps the special rules as they were when the host's options leave them out (R-MODE-08)", () => {
     const room = new Room(
       "game0000",
-      { ...PRIVATE, rules: { collapsingFronts: true, capitals: true } },
+      { ...PRIVATE, rules: { collapsingFronts: true, capitals: true, doctrines: false } },
       1,
     );
     const host = seated(room, "Host");
-    expect(host.peer.last("lobby").rules).toEqual({ collapsingFronts: true, capitals: true });
+    expect(host.peer.last("lobby").rules).toEqual({
+      collapsingFronts: true,
+      capitals: true,
+      doctrines: false,
+    });
     const options = {
       map: "world",
       bots: 0,
@@ -268,7 +272,11 @@ describe("private lobby", () => {
       autoStart: false,
     } as const;
     expect(room.configure(host.seat, options, 0)).toBeUndefined();
-    expect(host.peer.last("lobby").rules).toEqual({ collapsingFronts: true, capitals: true });
+    expect(host.peer.last("lobby").rules).toEqual({
+      collapsingFronts: true,
+      capitals: true,
+      doctrines: false,
+    });
   });
 
   describe("operator's bonuses (R-MODE-09)", () => {

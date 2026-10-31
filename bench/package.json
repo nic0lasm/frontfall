@@ -10,6 +10,7 @@
     "render": "tsx render/run.ts",
     "sim": "tsx sim/run.ts",
     "balance": "tsx balance/run.ts",
+    "balance:doctrines": "tsx balance/doctrines.ts",
     "load": "node --import tsx server/run.ts",
     "typecheck": "tsc -p tsconfig.json",
     "determinism": "tsx determinism/run.ts",

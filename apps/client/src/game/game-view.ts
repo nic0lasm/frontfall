@@ -100,6 +100,8 @@ export interface PlayerView {
   capital?: number;
   /** A city-state (R-BOT-29): small, takes no allies, and its fall is no news to others. */
   cityState?: true;
+  /** The doctrine played (R-DOCTRINE), a Doctrine code from 1; shown to others once play starts, and left out for the balanced one. */
+  doctrine?: number;
 }
 
 /** A capital that fell or was razed (R-CAP-03, R-CAP-04). */
@@ -125,6 +127,8 @@ export interface EconomyView {
 }
 
 export interface GameUpdate {
+  /** The game plays with doctrines (R-DOCTRINE). */
+  doctrines?: true;
   /** The player at this screen. */
   you: number;
   tick: number;

@@ -360,6 +360,8 @@ function order(value: unknown): Order {
       };
     case "work":
       return { type: "work", share: readInteger(raw.share, "work share") };
+    case "doctrine":
+      return { type: "doctrine", pick: readInteger(raw.pick, "doctrine") };
     default:
       throw new DesyncReportError(`unknown order type ${String(raw.type)}`);
   }

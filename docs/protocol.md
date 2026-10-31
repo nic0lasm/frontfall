@@ -1,6 +1,6 @@
 # Network protocol
 
-Version 28. Clients and the game server talk over one WebSocket per player. The schemas live in [`packages/protocol`](../packages/protocol/src), which the client and the server both import; this page describes them for anyone writing a bot, a replay tool or another client.
+Version 29. Clients and the game server talk over one WebSocket per player. The schemas live in [`packages/protocol`](../packages/protocol/src), which the client and the server both import; this page describes them for anyone writing a bot, a replay tool or another client.
 
 The server never simulates the game ([ADR 0001](adr/0001-deterministic-lockstep.md)). It fills games with players, gives every player a number, then closes the orders it receives into one numbered turn every 100 ms and sends the same turns to every player. Each client runs the engine on those turns and reaches the same state.
 
@@ -21,7 +21,7 @@ The server pings every 25 seconds and drops a connection that missed the previou
 
 ```text
 client                                   server
-  | -- hello { version: 28, name } ----------> |
+  | -- hello { version: 29, name } ----------> |
   | <------------------ welcome { version } -- |
   | -- play ---------------------------------> |   or create, or join { game }
   | <-------------- lobby { players, ... } --- |   again after every change
@@ -55,7 +55,7 @@ Before a game starts, a dropped connection keeps its seat for 30 seconds, unless
 ### `hello`
 
 ```json
-{ "type": "hello", "version": 28, "name": "Léa", "build": "0d25e267bbae" }
+{ "type": "hello", "version": 29, "name": "Léa", "build": "0d25e267bbae" }
 ```
 
 First message of every connection. `version` is `PROTOCOL_VERSION`. A server running another version closes the connection with `4000`: the page is out of date and must be reloaded. This message keeps the same shape in every version of the protocol, so the mismatch can always be reported.
@@ -121,7 +121,7 @@ Takes back a seat after a dropped connection; see [Reconnecting](#reconnecting).
 }
 ```
 
-The host sets the game's map, its number of bots, how hard computer players play and whether the map's nations play, and `teams`: 0 for a free-for-all, or 2, 3 or 4 teams, and `disabled`: what the game leaves out (`R-MODE-03`), as a sum of 1 for cities, 2 forts, 4 ports, 8 missile silos, 16 air defenses and 32 warships, 0 for nothing, until the game starts. `capacity`, the seats for human players, from 2 to 16, and `autoStart`, whether the game starts as soon as they are all taken. `speed`, optional, is the game's pace (`R-MODE-07`): 0.5, 1, 2 or 4 ticks per beat of the server, 0.5 being one tick every other beat; left out, it stays as it was. A public game refuses any speed but 1 with `invalid_settings`. `rules`, optional, holds the special rules (`R-MODE-08`), each one `true` or `false` by name: `collapsingFronts` (`R-ATTACK-10`) and `capitals`, capital mode (`R-CAP`), where taking a player's capital conquers them; left out, they stay as they were, and a public game refuses any but the defaults with `invalid_settings`. Every option is sent each time, `speed` and `rules` aside; `name`, optional, renames a public game and is ignored for a private one. `map` is the id of a map in `maps/index.json`; `difficulty` is `easy`, `normal` or `hard`. The server adds at most 25 bots. Bots and seats share the most players the map allows (`players.max` in the catalog): the game keeps the seats asked for when they fit and fewer otherwise, but never fewer than the players already in. Every player receives the new options and `capacity` in `lobby`. Nations come on top of the players and bots. A new game starts on World, without bots, with nations, at `normal`, with 16 seats, set to start when full, at speed 1, with collapsing fronts and without capital mode.
+The host sets the game's map, its number of bots, how hard computer players play and whether the map's nations play, and `teams`: 0 for a free-for-all, or 2, 3 or 4 teams, and `disabled`: what the game leaves out (`R-MODE-03`), as a sum of 1 for cities, 2 forts, 4 ports, 8 missile silos, 16 air defenses and 32 warships, 0 for nothing, until the game starts. `capacity`, the seats for human players, from 2 to 16, and `autoStart`, whether the game starts as soon as they are all taken. `speed`, optional, is the game's pace (`R-MODE-07`): 0.5, 1, 2 or 4 ticks per beat of the server, 0.5 being one tick every other beat; left out, it stays as it was. A public game refuses any speed but 1 with `invalid_settings`. `rules`, optional, holds the special rules (`R-MODE-08`), each one `true` or `false` by name: `collapsingFronts` (`R-ATTACK-10`) and `capitals`, capital mode (`R-CAP`), where taking a player's capital conquers them, and `doctrines` (`R-DOCTRINE`), where every player picks one of three doctrines in the spawn phase; left out, they stay as they were, and a public game refuses any but the defaults with `invalid_settings`. Every option is sent each time, `speed` and `rules` aside; `name`, optional, renames a public game and is ignored for a private one. `map` is the id of a map in `maps/index.json`; `difficulty` is `easy`, `normal` or `hard`. The server adds at most 25 bots. Bots and seats share the most players the map allows (`players.max` in the catalog): the game keeps the seats asked for when they fit and fewer otherwise, but never fewer than the players already in. Every player receives the new options and `capacity` in `lobby`. Nations come on top of the players and bots. A new game starts on World, without bots, with nations, at `normal`, with 16 seats, set to start when full, at speed 1, with collapsing fronts and without capital mode.
 
 `seq`, optional, numbers the player's `configure` messages, from 1 for each seat and again from 1 after a reconnection: `rejoin` sets `configured` back to 0. The server echoes the last one it handled as `configured` in `lobby`, so that a host who changes several settings in a row can tell an answer to an earlier change from the answer to the latest one, and keeps the form as filled until then. A refused `configure` that carries `seq` is followed by `lobby` to that player alone, with the settings that hold and `configured` set to that `seq`.
 
@@ -205,6 +205,7 @@ Binary frame. An order of the local player, in the shape of the engine's `Order`
 | `quick`    | `target` (player), `phrase` (0 to 255)          | Send a player a preset quick message, by number                                                                          |
 | `work`     | `share` (0 to 100)                              | Put a share of the troops at home to work: they earn more gold but neither attack nor defend                             |
 | `tribute`  | `target`                                        | Pay the price of a tribute to a player with clearly more land, for a truce of a few minutes that stops attacks both ways |
+| `doctrine` | `pick` (0 to 3)                                 | Pick a doctrine during the spawn phase, in a game with doctrines: 0 balanced, 1 conqueror, 2 merchant, 3 bastion         |
 
 Tiles are indexes in the map, below 2^31. The server checks only the shape of an order; whether it can be carried out is decided by the engine of every client, the same way everywhere. Orders sent outside a running game are ignored.
 
@@ -213,7 +214,7 @@ Tiles are indexes in the map, below 2^31. The server checks only the shape of an
 ### `welcome`
 
 ```json
-{ "type": "welcome", "version": 28 }
+{ "type": "welcome", "version": 29 }
 ```
 
 The hello was accepted.
@@ -408,6 +409,7 @@ A turn is its order count, then for each order the player number and the order. 
 | `13` | `quick`    | `target`, `phrase`         |
 | `14` | `work`     | `share`                    |
 | `15` | `tribute`  | `target`                   |
+| `16` | `doctrine` | `pick`                     |
 
 The table is `ORDER_KINDS` in [`orders.ts`](../packages/protocol/src/orders.ts). New orders are added at the end, so existing codes never change. A frame with trailing bytes, an unknown kind or a count larger than the rest of the frame could hold is refused. A client that receives a `turns` frame it cannot read stops and asks for a reload: skipping a turn would desynchronise its game.
 
@@ -424,7 +426,7 @@ A turn with 32 orders takes about a tenth of its JSON size (214 bytes against 2,
 
 ## Versioning
 
-Client and server ship together in one image, so a mismatch only affects pages loaded before a deployment. Two checks catch them, both answered with close code `4000` and a reload. `PROTOCOL_VERSION` changes when a message changes shape or an order kind is added: version 2 added `retreat` and `embark`, version 3 the game options (`configure`, `bots` and `difficulty` in `lobby`, `difficulty` in `started`), version 4 the hashes in `desync`, version 5 `build` and `demolish`, version 6 `ally` and `betray`, version 7 `nations` in the game options, `lobby` and `started`, version 8 `teams` in the same three places, version 9 `embargo`, version 10 `warship` and `patrol`, version 11 `missile`, version 12 `gift` and `disabled` in the game options, `lobby` and `started`, version 13 `quick`, version 14 `token` in `lobby`, `rejoin` before the start, the `restart` reason of `ended`, the `restarting` error and `maintenance`, version 15 `5`, the palace, among the structures of `build`, version 16 `visibility` and `name` in `create` for public games of one's own, `name` in `play` and `configure`, `capacity` and `autoStart` in the game options, `hold` and `active`, and `seq` in `configure`, and `name`, `autoStart`, `minPlayers`, `holdable`, `configured` and a host for every game in `lobby`, version 17 `kick`, the `removed` reason of `ended`, and the `removed` and `too_many_seats` errors, version 18 `report` and `reported`, the `too_many_reports` error and close code `4005`, version 19 `speed` in the game options, `lobby` and `started`, with as many turns per frame, version 20 `work`, version 22 `rules`, the special rules, in the game options, `lobby` and `started`, version 23 `capitals` among them, version 24 `operatorGold` in `configure`, `operator` and `goldBonus` in `lobby`, `goldBonus` in `started` and the `not_operator` error, version 25 `operatorBonuses` in their place, version 26 `0.5` among the speeds, version 27 `6`, the mosque, among the structures of `build`, version 28 `tribute`. The `build` sent in `hello` catches everything else, such as a change of the engine or the balance, which leaves the protocol as it is but would desynchronise an older page. The protocol makes no promise of compatibility between simulation builds: an older page of another one is always sent away.
+Client and server ship together in one image, so a mismatch only affects pages loaded before a deployment. Two checks catch them, both answered with close code `4000` and a reload. `PROTOCOL_VERSION` changes when a message changes shape or an order kind is added: version 2 added `retreat` and `embark`, version 3 the game options (`configure`, `bots` and `difficulty` in `lobby`, `difficulty` in `started`), version 4 the hashes in `desync`, version 5 `build` and `demolish`, version 6 `ally` and `betray`, version 7 `nations` in the game options, `lobby` and `started`, version 8 `teams` in the same three places, version 9 `embargo`, version 10 `warship` and `patrol`, version 11 `missile`, version 12 `gift` and `disabled` in the game options, `lobby` and `started`, version 13 `quick`, version 14 `token` in `lobby`, `rejoin` before the start, the `restart` reason of `ended`, the `restarting` error and `maintenance`, version 15 `5`, the palace, among the structures of `build`, version 16 `visibility` and `name` in `create` for public games of one's own, `name` in `play` and `configure`, `capacity` and `autoStart` in the game options, `hold` and `active`, and `seq` in `configure`, and `name`, `autoStart`, `minPlayers`, `holdable`, `configured` and a host for every game in `lobby`, version 17 `kick`, the `removed` reason of `ended`, and the `removed` and `too_many_seats` errors, version 18 `report` and `reported`, the `too_many_reports` error and close code `4005`, version 19 `speed` in the game options, `lobby` and `started`, with as many turns per frame, version 20 `work`, version 22 `rules`, the special rules, in the game options, `lobby` and `started`, version 23 `capitals` among them, version 24 `operatorGold` in `configure`, `operator` and `goldBonus` in `lobby`, `goldBonus` in `started` and the `not_operator` error, version 25 `operatorBonuses` in their place, version 26 `0.5` among the speeds, version 27 `6`, the mosque, among the structures of `build`, version 28 `tribute`, version 29 `doctrine`, and `doctrines` among the special rules. The `build` sent in `hello` catches everything else, such as a change of the engine or the balance, which leaves the protocol as it is but would desynchronise an older page. The protocol makes no promise of compatibility between simulation builds: an older page of another one is always sent away.
 
 ### Simulation build
 

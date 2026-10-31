@@ -37,6 +37,7 @@ import type { FeedTarget } from "./events-feed.ts";
 import type { LandLost } from "./feed-events.ts";
 import type { FeedHost } from "./screen/feed-host.ts";
 import type { ShipRef } from "./player-tip.ts";
+import { DoctrinePicker } from "./doctrine-picker.ts";
 import { Hud } from "./hud.ts";
 import { withHidden } from "./hidden-players.ts";
 import { PlayerLabels } from "./labels.ts";
@@ -96,6 +97,8 @@ export class GameScreen {
   private readonly surface: HTMLElement;
   private input: InputController;
   private readonly hud: Hud;
+  /** The choice of a doctrine in the spawn phase (R-DOCTRINE-01). */
+  private readonly doctrines: DoctrinePicker;
   /** Solo only (R-MODE-07): online, the host picked the pace in the lobby. */
   private readonly speed: SpeedControl | undefined;
   private readonly session: LocalSession;
@@ -282,6 +285,10 @@ export class GameScreen {
     }
     this.hud.leaderboard.append(this.diplomacy.menu);
     this.hud.element.append(this.diplomacy.requests);
+    this.doctrines = new DoctrinePicker((pick) => {
+      this.orders.doctrine(pick);
+    });
+    this.hud.element.append(this.doctrines.element);
     this.guide = new GuideHost(
       this.hud.element,
       this.coarsePointer,
@@ -530,6 +537,7 @@ export class GameScreen {
       onLanguageChange(() => {
         applyTranslations(this.surface);
         this.hud.refresh();
+        this.doctrines.translate();
         this.speed?.show();
         this.diplomacy.refresh();
         this.feed?.refresh();
@@ -755,6 +763,7 @@ export class GameScreen {
     if (!this.replayBar) this.stats.observe(update);
     this.labels.update(update.players, update.labels);
     this.hud.update(update, performance.now());
+    this.doctrines.update(update, this.ticksPerSecond);
     this.diplomacy.update(update);
     this.feed?.observe(update, lost ?? new Map(), performance.now());
     // The panels grow and shrink with their content: measured on the next frame.

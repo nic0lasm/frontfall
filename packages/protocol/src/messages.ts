@@ -15,7 +15,7 @@ import { Order, PlayerNumber, type Turn } from "./orders.ts";
  * turn frames, so it bumps this version too; a test pins the order kinds of
  * the current version.
  */
-export const PROTOCOL_VERSION = 28;
+export const PROTOCOL_VERSION = 29;
 
 /** Ticks per second of the simulation at speed 1. The server closes one turn per tick. */
 export const TICK_RATE = 10;
@@ -101,17 +101,24 @@ export const GameRules = z
     collapsingFronts: z.boolean(),
     /** R-CAP: taking a player's capital conquers them. */
     capitals: z.boolean(),
+    /** R-DOCTRINE: each player picks one of three doctrines at the start. */
+    doctrines: z.boolean(),
   })
   .strict();
 export type GameRules = z.infer<typeof GameRules>;
 
 /** The rules of public games and quick play, chosen by the balance pass (R-MODE-08). */
-export const DEFAULT_RULES: Readonly<GameRules> = { collapsingFronts: true, capitals: false };
+export const DEFAULT_RULES: Readonly<GameRules> = {
+  collapsingFronts: true,
+  capitals: false,
+  doctrines: false,
+};
 
 export function isDefaultRules(rules: GameRules): boolean {
   return (
     rules.collapsingFronts === DEFAULT_RULES.collapsingFronts &&
-    rules.capitals === DEFAULT_RULES.capitals
+    rules.capitals === DEFAULT_RULES.capitals &&
+    rules.doctrines === DEFAULT_RULES.doctrines
   );
 }
 

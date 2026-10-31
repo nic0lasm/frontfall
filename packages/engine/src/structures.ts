@@ -1,3 +1,4 @@
+import { withDoctrine } from "./doctrines.ts";
 import { Disable, OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
 import { divFloor, mulDiv } from "./integer-math.ts";
 import { spawnSettings } from "./spawn.ts";
@@ -123,7 +124,13 @@ function fullCost(game: Game, player: number, kind: StructureKind): number {
   if (kind === StructureKind.Silo) return balance.siloCost;
   const owned = structureCount(game, player, kind);
   if (kind === StructureKind.Port) return doublingCost(game, balance.portCost, owned);
-  return linearCost(balance.fortCost, balance.fortCostMax, owned);
+  // R-DOCTRINE: a doctrine changes the price of a fort.
+  return withDoctrine(
+    game,
+    player,
+    "fortCost",
+    linearCost(balance.fortCost, balance.fortCostMax, owned),
+  );
 }
 
 /** R-BUILD: base × B-COST-GROWTH for each one owned (a doubling), never past B-COST-MAX. */

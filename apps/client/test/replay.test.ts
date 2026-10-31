@@ -76,11 +76,11 @@ describe("replays (#50)", () => {
     expect(solo.game.rules.capitals).toBe(true);
     const record = solo.record();
     if (!record) throw new Error("no record");
-    expect(record.rules).toEqual({ collapsingFronts: false, capitals: true });
+    expect(record.rules).toEqual({ collapsingFronts: false, capitals: true, doctrines: false });
     expect(await readReplayFile(await replayFile(record), "dev")).toEqual(record);
     // The record wins over the options of the page that watches it.
     const replay = new SoloGame(
-      { ...options, rules: { collapsingFronts: false, capitals: false }, record },
+      { ...options, rules: { collapsingFronts: false, capitals: false, doctrines: false }, record },
       publishedMap(),
     );
     expect(replay.game.rules.capitals).toBe(true);

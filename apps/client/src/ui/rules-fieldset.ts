@@ -19,6 +19,7 @@ export const SPECIAL_RULES: readonly {
     hint: "setup.rules.collapsingFrontsHint",
   },
   { name: "capitals", label: "setup.rules.capitals", hint: "setup.rules.capitalsHint" },
+  { name: "doctrines", label: "setup.rules.doctrines", hint: "setup.rules.doctrinesHint" },
 ];
 
 /** The rules at their defaults, as a copy to change. */

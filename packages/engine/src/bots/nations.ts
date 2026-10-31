@@ -1,6 +1,7 @@
 import { cheapestTile } from "../attacks.ts";
 import { capitalAim, capitalAlertDistance, capitalThreat, capitalsStand } from "../capitals.ts";
 import { allyError, alliesOf, embargoError, isAllied, isTraitor } from "../diplomacy.ts";
+import { nationDoctrine } from "../doctrines.ts";
 import { populationCap, soldiers } from "../economy.ts";
 import { giftError } from "../gifts.ts";
 import type { Game, Player } from "../game.ts";
@@ -158,6 +159,13 @@ export function installNations(
   ]);
 
   game.onTick(() => {
+    // R-DOCTRINE-04: nations pick their doctrine on the first tick of the spawn phase.
+    if (game.rules.doctrines && game.tick === 0 && game.phase === "spawn") {
+      for (const id of nations) {
+        const nation = game.player(id) as Player;
+        game.apply(id, { type: "doctrine", pick: nationDoctrine(game, nation, difficulty) });
+      }
+    }
     if (game.phase !== "play") return;
     for (const id of nations) {
       // Offset by id, like bots, so that decisions spread over the interval.

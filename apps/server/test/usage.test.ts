@@ -135,9 +135,16 @@ describe("UsageStats", () => {
 
   it("counts the special rules a game was played with (R-MODE-08)", () => {
     const usage = stats();
-    usage.record({ ...GAME, rules: { collapsingFronts: true, capitals: true } }, NOW);
     usage.record(
-      { ...GAME, game: "b".repeat(16), rules: { collapsingFronts: true, capitals: false } },
+      { ...GAME, rules: { collapsingFronts: true, capitals: true, doctrines: false } },
+      NOW,
+    );
+    usage.record(
+      {
+        ...GAME,
+        game: "b".repeat(16),
+        rules: { collapsingFronts: true, capitals: false, doctrines: false },
+      },
       NOW,
     );
     expect(usage.export(NOW).total.rules).toEqual({ collapsingFronts: 2, capitals: 1 });

@@ -1,3 +1,4 @@
+import { DOCTRINE_COUNT } from "./doctrines.ts";
 import type { Game } from "./game.ts";
 import type { MissileSize } from "./missiles.ts";
 import { SnapshotError, SnapshotReader, SnapshotWriter, checksum } from "./snapshot-bytes.ts";
@@ -121,6 +122,7 @@ function writeState(game: Game, out: SnapshotWriter): void {
     out.uint(p.alive ? 1 : 0);
     out.int(p.start ?? -1);
     out.uint(p.traitorUntil);
+    if (game.rules.doctrines) out.uint(p.doctrine);
   }
 
   const { territory } = game;
@@ -238,6 +240,7 @@ function readState(game: Game, tick: number, from: SnapshotReader): void {
     if (start !== undefined && start >= size) throw new SnapshotError("start out of range");
     p.start = start;
     p.traitorUntil = from.uint();
+    if (game.rules.doctrines) p.doctrine = from.below(DOCTRINE_COUNT, "doctrine");
   }
 
   const owners = new Uint16Array(size);

@@ -65,7 +65,10 @@ describe("game setup", () => {
   });
 
   it("remembers capital mode, and never shares it in a link (R-MODE-08)", () => {
-    const setup = { ...defaultSetup(maps), rules: { collapsingFronts: true, capitals: true } };
+    const setup = {
+      ...defaultSetup(maps),
+      rules: { collapsingFronts: true, capitals: true, doctrines: false },
+    };
     expect(setupQuery(setup)).not.toContain("rules");
     expect(initialSetup("?rules=capitals", undefined, maps).rules?.capitals).toBe(false);
     const storage = new MemoryStorage() as unknown as Storage;
@@ -73,6 +76,7 @@ describe("game setup", () => {
     expect(initialSetup("", storage, maps).rules).toEqual({
       collapsingFronts: true,
       capitals: true,
+      doctrines: false,
     });
   });
 
@@ -107,22 +111,31 @@ describe("game setup", () => {
   });
 
   it("plays with the default special rules, and remembers the player's choice (R-MODE-08)", () => {
-    expect(defaultSetup(maps).rules).toEqual({ collapsingFronts: true, capitals: false });
+    expect(defaultSetup(maps).rules).toEqual({
+      collapsingFronts: true,
+      capitals: false,
+      doctrines: false,
+    });
     const items = new Map<string, string>();
     const storage = {
       getItem: (key: string) => items.get(key) ?? null,
       setItem: (key: string, value: string) => void items.set(key, value),
     } as unknown as Storage;
-    const off = { ...defaultSetup(maps), rules: { collapsingFronts: false, capitals: false } };
+    const off = {
+      ...defaultSetup(maps),
+      rules: { collapsingFronts: false, capitals: false, doctrines: false },
+    };
     saveSetup(off, storage);
     expect(initialSetup("", storage, maps).rules).toEqual({
       collapsingFronts: false,
       capitals: false,
+      doctrines: false,
     });
     // Nonsense falls back to what was there.
     expect(sanitizeSetup({ rules: { collapsingFronts: "no" } }, off, maps).rules).toEqual({
       collapsingFronts: false,
       capitals: false,
+      doctrines: false,
     });
   });
 });

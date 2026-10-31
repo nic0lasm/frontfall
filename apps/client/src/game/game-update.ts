@@ -138,8 +138,15 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
     alive: player.alive,
     ...(player.capital === undefined ? {} : { capital: player.capital }),
     ...(game.cityStates.has(player.id) ? { cityState: true as const } : {}),
+    // R-DOCTRINE-03: the choices stay private until play starts.
+    ...(game.rules.doctrines &&
+    player.doctrine !== 0 &&
+    (game.phase === "play" || player.id === you)
+      ? { doctrine: player.doctrine }
+      : {}),
   }));
   const update: GameUpdate = {
+    ...(game.rules.doctrines ? { doctrines: true as const } : {}),
     you: you,
     tick: game.tick,
     phase: game.phase,

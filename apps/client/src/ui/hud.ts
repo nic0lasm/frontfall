@@ -174,7 +174,7 @@ export class Hud {
     allianceRequestTicks: 200,
     teams: [],
     disabled: 0,
-    special: { collapsingFronts: false, capitals: false },
+    special: { collapsingFronts: false, capitals: false, doctrines: false },
     operator: NO_OPERATOR,
   };
 

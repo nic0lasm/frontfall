@@ -260,6 +260,7 @@ export class NationMemory {
       case "warship":
       case "patrol":
       case "work":
+      case "doctrine":
         return;
     }
   }

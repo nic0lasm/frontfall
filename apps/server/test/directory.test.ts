@@ -71,7 +71,11 @@ describe("Directory", () => {
     const games = directory();
     const special = games.quickMatch(undefined, "Quick");
     const host = seat(special, "Host");
-    expect(special?.settings.rules).toEqual({ collapsingFronts: true, capitals: false });
+    expect(special?.settings.rules).toEqual({
+      collapsingFronts: true,
+      capitals: false,
+      doctrines: false,
+    });
     special?.configure(
       host,
       {
@@ -83,13 +87,17 @@ describe("Directory", () => {
         disabled: 0,
         capacity: 2,
         autoStart: true,
-        rules: { collapsingFronts: true, capitals: true },
+        rules: { collapsingFronts: true, capitals: true, doctrines: false },
       },
       0,
     );
     const next = games.quickMatch(undefined, "Quick");
     expect(next).not.toBe(special);
-    expect(next?.settings.rules).toEqual({ collapsingFronts: true, capitals: false });
+    expect(next?.settings.rules).toEqual({
+      collapsingFronts: true,
+      capitals: false,
+      doctrines: false,
+    });
   });
 
   it("never sends Play now into a quick game whose host stopped the countdown", () => {
@@ -147,7 +155,7 @@ describe("Directory", () => {
       nations: true,
       teams: 0,
       disabled: 0,
-      rules: { collapsingFronts: true, capitals: false },
+      rules: { collapsingFronts: true, capitals: false, doctrines: false },
       players: 2,
       capacity: 16,
       state: "waiting",

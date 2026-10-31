@@ -31,6 +31,7 @@ export const ORDER_KINDS = [
   { type: "quick", fields: ["target", "phrase"] },
   { type: "work", fields: ["share"] },
   { type: "tribute", fields: ["target"] },
+  { type: "doctrine", fields: ["pick"] },
 ] as const;
 
 /** Player number inside one game, from 1. Zero is the neutral owner of the engine. */
@@ -74,6 +75,8 @@ export const Order = z.discriminatedUnion("type", [
   z.object({ type: z.literal("work"), share: z.number().int().min(0).max(100) }).strict(),
   /** Pays the price of a tribute to `target`, which the engine works out, for a truce. */
   z.object({ type: z.literal("tribute"), target: PlayerNumber }).strict(),
+  /** `pick`: the engine's Doctrine code, which it checks. */
+  z.object({ type: z.literal("doctrine"), pick: z.number().int().min(0).max(255) }).strict(),
 ]);
 export type Order = z.infer<typeof Order>;
 
