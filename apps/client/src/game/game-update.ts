@@ -184,6 +184,9 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
       tile: ship.tile,
       health: ship.health,
       maxHealth: game.balance.warshipHealth,
+      ...(ship.firedAt !== undefined && ship.aim !== undefined
+        ? { firedAt: ship.firedAt, aim: ship.aim }
+        : {}),
     })),
     missiles: game.missiles.map((missile) => ({
       id: missile.id,

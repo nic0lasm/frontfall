@@ -20,7 +20,7 @@ const KIND_ID: Record<ShipKind, number> = { trade: 0, transport: 1, warship: 2 }
 export const HULL_SIZES = {
   trade: { tiles: 1.6, minPixels: 21 },
   transport: { tiles: 2.5, minPixels: 27 },
-  warship: { tiles: 3.5, minPixels: 34 },
+  warship: { tiles: 3.5, minPixels: 42 },
 } as const;
 
 /** On a phone the floor is a little larger, and so is everything the finger has to find. */
@@ -55,6 +55,8 @@ export interface Hull {
   /** Tiles per second. */
   readonly speed: number;
   readonly color: string;
+  /** A warship that has just fired, from 1 on the shot to 0 as the sign of it fades; 0 for the rest. */
+  readonly flash?: number;
   /** Tells two hulls apart, for the little differences of their cargo. */
   readonly seed: number;
 }
@@ -63,10 +65,10 @@ const vertexShader = /* glsl */ `
 in vec2 iPos; in float iAng; in vec4 iKind; in vec3 iCol;
 uniform float worldWidth; uniform float worldHeight; uniform float cameraX; uniform bool wrapsX;
 uniform float tilesPerPixel; uniform float phone; uniform vec2 detail;
-out vec2 vLoc; out vec2 vWorld; flat out float vL; flat out float vKind; flat out vec3 vCol; flat out vec2 vSt; flat out float vAng; flat out float vDet;
+out vec2 vLoc; out vec2 vWorld; flat out float vL; flat out float vKind; flat out vec3 vCol; flat out vec2 vSt; flat out float vAng; flat out float vDet; flat out float vFlash;
 void main() {
   float kind = iKind.x;
-  vec2 hull = kind < 0.5 ? vec2(1.6, 21.0) : (kind < 1.5 ? vec2(2.5, 27.0) : vec2(3.5, 34.0));
+  vec2 hull = kind < 0.5 ? vec2(1.6, 21.0) : (kind < 1.5 ? vec2(2.5, 27.0) : vec2(3.5, 42.0));
   float L = max(hull.x, hull.y * phone * tilesPerPixel);
   // A tight quad: the wake to two lengths behind, the bow wave a little ahead.
   vec2 loc = vec2(mix(-2.0, 0.8, position.x + 0.5), mix(-0.85, 0.85, position.y + 0.5));
@@ -76,7 +78,7 @@ void main() {
   // The copy of the world nearest the camera, judged by the centre so that no hull is torn at the seam.
   float shift = wrapsX ? worldWidth * floor((cameraX - at.x) / worldWidth + 0.5) : 0.0;
   vec2 w = centre + vec2(c * loc.x - s * loc.y, s * loc.x + c * loc.y) * L;
-  vLoc = loc; vWorld = w; vL = L; vKind = kind; vCol = iCol; vSt = iKind.zw; vAng = iAng;
+  vLoc = loc; vWorld = w; vL = L; vKind = kind; vCol = iCol; vSt = iKind.zw; vAng = iAng; vFlash = iKind.y;
   vDet = smoothstep(detail.x, detail.y, L / tilesPerPixel);
   vec4 world = modelMatrix * vec4(w.x, worldHeight - w.y, 0.2, 1.0);
   world.x += shift;
@@ -85,7 +87,7 @@ void main() {
 
 const fragmentShader = /* glsl */ `
 precision highp float;
-in vec2 vLoc; in vec2 vWorld; flat in float vL; flat in float vKind; flat in vec3 vCol; flat in vec2 vSt; flat in float vAng; flat in float vDet;
+in vec2 vLoc; in vec2 vWorld; flat in float vL; flat in float vKind; flat in vec3 vCol; flat in vec2 vSt; flat in float vAng; flat in float vDet; flat in float vFlash;
 uniform float time; uniform float reduced; uniform vec2 light; uniform float tilesPerPixel;
 uniform sampler2D land; uniform vec2 worldSize;
 layout(location = 0) out highp vec4 outColor;
@@ -131,8 +133,10 @@ void main() {
   float speed = vSt.x, seed = vSt.y;
   vec3 own = vCol;
   vec4 hp = hullP(vKind);
-  // Far away the hull is fatter (9.5 px of beam at least), so that its colour reads, and its bow a clean arrowhead.
-  float boost = mix(max(1.0, 9.5 * tilesPerPixel / (2.0 * hp.x * L)), 1.0, det);
+  // Far away the hull is fatter, so that its colour reads, and its bow a clean arrowhead.
+  // The beam on screen tells the types apart as the length does: a slim warship, a stout trade ship.
+  float farBeam = vKind > 1.5 ? 9.0 : (vKind > 0.5 ? 10.0 : 12.5);
+  float boost = mix(max(1.0, farBeam * tilesPerPixel / (2.0 * hp.x * L)), 1.0, det);
   hp.x *= boost;
   hp.z = mix(1.25, hp.z, det);
   hp.w = mix(1.0, hp.w, det);
@@ -188,7 +192,10 @@ void main() {
   }
   lay(vec3(0.96, 0.985, 1.0), clamp(fo * smoothstep(0.25, 0.6, fn + 0.28) + bowArm * 0.9, 0.0, 1.0) * (0.5 + 0.5 * det));
   // Far away: a pale ring round the hull, since the dark sea would swallow its outline.
-  lay(vec3(0.92, 0.96, 1.0), (1.0 - smoothstep(0.0, 2.2 * aa, -d)) * step(d, 0.0) * 0.55 * (1.0 - det));
+  // Thick and bright round a warship, which must stand out; a thread round a trade ship.
+  float ringW = vKind > 1.5 ? 3.6 : (vKind > 0.5 ? 2.2 : 1.5);
+  float ringA = vKind > 1.5 ? 0.95 : (vKind > 0.5 ? 0.55 : 0.32);
+  lay(vec3(0.92, 0.96, 1.0), (1.0 - smoothstep(0.0, ringW * aa, -d)) * step(d, 0.0) * ringA * (1.0 - det));
 
   float inside = clamp(0.5 + d / aa, 0.0, 1.0);
   if (inside > 0.0) {
@@ -292,12 +299,26 @@ void main() {
     if (vKind > 1.5) mk = 1.0 - smoothstep(-aa, aa, length(vec2(u - 0.14, v)) - 0.07 * boost * 0.7);
     else if (vKind > 0.5) mk = 1.0 - smoothstep(-aa, aa, sdBox(vec2(u, v), vec2(-0.30, 0.0), vec2(0.10, 0.2 * W / 0.15)));
     else mk = max(1.0 - smoothstep(-aa, aa, sdBox(vec2(u, v), vec2(-0.2, 0.0), vec2(0.07, 0.19 * W / 0.15))), 1.0 - smoothstep(-aa, aa, sdBox(vec2(u, v), vec2(0.12, 0.0), vec2(0.07, 0.19 * W / 0.15))));
-    col = mix(mix(own * 0.92, vec3(0.97, 0.98, 1.0), mk * 0.85), col, det);
+    vec3 mkc = vKind > 1.5 ? vec3(0.05, 0.07, 0.11) : vec3(0.97, 0.98, 1.0);
+    col = mix(mix(own * 0.92, mkc, mk * 0.85), col, det);
     col *= mix(0.80 + 0.35 * lam, shade, det);
     // A dark edge, thinner as you come closer.
     float ow = mix(1.4, 0.9, det) * aa;
     col = mix(col, ink, (1.0 - smoothstep(ow, ow + aa, d)) * mix(0.85, 0.55, det));
     lay(col, inside);
+  }
+
+  // A warship that has just fired: its guns flash and a ring of light runs round the hull.
+  // With motion reduced the flash is left out and the ring only glows, softer and still.
+  if (vFlash > 0.001 && vKind > 1.5) {
+    float soft = reduced > 0.5 ? 0.5 : 1.0;
+    float gr = max(0.10, 7.0 * tilesPerPixel / L);
+    float muzzle = 0.0;
+    muzzle += exp(-dot(p - vec2(0.28, 0.0), p - vec2(0.28, 0.0)) / (gr * gr));
+    muzzle += exp(-dot(p - vec2(0.185, 0.0), p - vec2(0.185, 0.0)) / (gr * gr)) * 0.8;
+    float halo = (1.0 - smoothstep(0.0, 2.0 * aa + 0.006, abs(d - 0.01))) * smoothstep(-0.1, 0.1, p.x + 0.55);
+    lay(vec3(1.0, 0.86, 0.5), clamp(muzzle, 0.0, 1.0) * vFlash * (reduced > 0.5 ? 0.0 : 0.95));
+    lay(vec3(1.0, 0.95, 0.78), halo * vFlash * 0.75 * soft);
   }
 
   // Fade out at the border of the quad so that a wide wake never shows a seam.
@@ -415,7 +436,13 @@ export class ShipLayer {
       const hull = hulls[i] as Hull;
       this.position.setXY(i, hull.x, hull.y);
       this.angle.setX(i, hull.heading);
-      this.kind.setXYZW(i, KIND_ID[hull.kind], 0, Math.min(1, hull.speed / FULL_SPEED), hull.seed);
+      this.kind.setXYZW(
+        i,
+        KIND_ID[hull.kind],
+        hull.flash ?? 0,
+        Math.min(1, hull.speed / FULL_SPEED),
+        hull.seed,
+      );
       const [r, g, b] = srgb(hull.color);
       this.color.setXYZ(i, r, g, b);
     }

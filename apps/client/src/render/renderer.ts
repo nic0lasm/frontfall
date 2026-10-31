@@ -41,6 +41,16 @@ export interface UnitMark {
   /** A missile's blast radius in tiles, and the colour of whoever launched it. */
   readonly radius?: number;
   readonly owner?: string;
+  /**
+   * A warship that has just fired: where its shot lands, in tiles, which shot
+   * it is (to start its effect once) and how old it is, 0 to 1 over its short life.
+   */
+  readonly shot?: {
+    readonly x: number;
+    readonly y: number;
+    readonly id: number;
+    readonly age: number;
+  };
 }
 
 /** How a missile ended, on the map: where, with what, and for whom. Tiles, y counted from the north. */

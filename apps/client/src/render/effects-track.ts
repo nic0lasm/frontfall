@@ -43,6 +43,8 @@ const HEAVY_MISSILE_RADIUS = 30;
 /** The tiles the balance gives the blast radii on, 2^19, to scale them to this map. */
 const REFERENCE_TILES = 2 ** 19;
 
+/** The hot white-orange of a warship's shot, seen against any sea and any owner's colour. */
+const SHOT = "#FFD27A";
 const FOAM = "#CFE8F5";
 const FLASH = "#FFE2A8";
 /** The burst of a missile stopped in the air: cool, apart from the warm flash of a strike. */
@@ -77,6 +79,8 @@ interface Seen {
   y: number;
   color: string;
   pass: number;
+  /** The last shot of this ship that started an effect. */
+  shot?: number;
 }
 
 /** Tells the layer which particles to draw as ships, missiles and fronts move. */
@@ -140,6 +144,10 @@ export class EffectTracker {
       seen.x = mark.x;
       seen.y = mark.y;
       seen.pass = pass;
+      if (mark.shot && mark.shot.id !== seen.shot) {
+        seen.shot = mark.shot.id;
+        this.fired(mark.x, mark.y, mark.shot.x, mark.shot.y, mark.color, now);
+      }
     }
     for (const [id, seen] of this.known) {
       if (seen.pass === pass) continue;
@@ -309,6 +317,49 @@ export class EffectTracker {
       alpha: 0.55,
       life: 1.6,
     });
+  }
+
+  /**
+   * A warship fires at a ship: a flash at the muzzle, a streak of bright dots
+   * that crosses the water, a burst where it lands. Held still, only a soft
+   * ring on the target says that a shot was made.
+   */
+  private fired(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    color: string,
+    now: number,
+  ): void {
+    if ((!this.visible(fromX, fromY) && !this.visible(toX, toY)) || this.budget <= 0) return;
+    this.budget--;
+    if (!this.moving) {
+      this.emit({ ...disc(toX, toY, now, 1.2, 2.2, 3.2, SHOT, 0.5, 10), shape: "ring" });
+      return;
+    }
+    this.emit(disc(fromX, fromY, now, 0.22, 1.6, 3.4, SHOT, 0.95, 9));
+    const steps = 6;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / (steps + 1);
+      this.emit({
+        ...disc(
+          fromX + (toX - fromX) * t,
+          fromY + (toY - fromY) * t,
+          now,
+          0.16,
+          1,
+          0.6,
+          "#FFFFFF",
+          0.95,
+          4,
+        ),
+        birth: now + t * 0.22,
+      });
+    }
+    const land = now + 0.24;
+    this.emit({ ...disc(toX, toY, land, 0.45, 1.2, 3.6, SHOT, 0.95, 11), birth: land });
+    this.emit({ ...disc(toX, toY, land, 0.7, 1, 5, color, 0.9, 12), shape: "ring", birth: land });
   }
 
   private appeared(unit: Seen, now: number): void {

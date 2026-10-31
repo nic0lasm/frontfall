@@ -18,6 +18,11 @@ const SHIP_CAPACITY = 128;
 const TRADE_CAPACITY = 512;
 /** Warships at once: B-WARSHIP-MAX for each of up to 64 players. */
 const WARSHIP_CAPACITY = 256;
+/** Flashes of shots at once: a muzzle and a target for each of 32 shots. */
+const FLASH_CAPACITY = 64;
+/** The pale rim of a warship and the hot colour of a shot. */
+const HALO_COLOR = "#F4F8FC";
+const SHOT_COLOR = "#FFD27A";
 const STRUCTURE_CAPACITY = 1024;
 const MISSILE_CAPACITY = 256;
 const STRUCTURE_MIN_PIXELS = 9;
@@ -46,6 +51,10 @@ export class GlobeView implements Renderer {
   private readonly ships: GlobeMarkers;
   private readonly tradeShips: GlobeMarkers;
   private readonly warships: GlobeMarkers;
+  /** A pale triangle under each warship, so that it stands out from a trade ship of the same colour. */
+  private readonly warshipHalos: GlobeMarkers;
+  /** The flash of a shot, at the muzzle and on the target. */
+  private readonly flashes: GlobeMarkers;
   private readonly missiles: GlobeMarkers;
   private readonly heavyMissiles: GlobeMarkers;
   private readonly structures: Record<StructureMark["type"], StructureMarkers>;
@@ -94,7 +103,9 @@ export class GlobeView implements Renderer {
     };
     this.ships = markers(SHIP_SIZES.transport.tiles, 8, 1);
     this.tradeShips = markers(SHIP_SIZES.trade.tiles, 8, 1, TRADE_CAPACITY);
-    this.warships = markers(SHIP_SIZES.warship.tiles, 3, 1, WARSHIP_CAPACITY);
+    this.warshipHalos = markers(SHIP_SIZES.warship.tiles * 1.45, 3, 1.2, WARSHIP_CAPACITY);
+    this.warships = markers(SHIP_SIZES.warship.tiles, 3, 1.5, WARSHIP_CAPACITY);
+    this.flashes = markers(SHIP_SIZES.warship.tiles, 8, 1.7, FLASH_CAPACITY);
     this.missiles = markers(SHIP_SIZES.missile.tiles, 4, 4, MISSILE_CAPACITY);
     this.heavyMissiles = markers(SHIP_SIZES.heavyMissile.tiles, 4, 4, MISSILE_CAPACITY);
     this.structures = {
@@ -150,6 +161,7 @@ export class GlobeView implements Renderer {
     let transports = 0;
     let trade = 0;
     let warships = 0;
+    let flashes = 0;
     let missiles = 0;
     let heavy = 0;
     for (const ship of ships) {
@@ -162,7 +174,14 @@ export class GlobeView implements Renderer {
       } else if (ship.kind === "trade") {
         if (trade < TRADE_CAPACITY) this.tradeShips.set(trade++, ship.x, ship.y, ship.color);
       } else if (ship.kind === "warship") {
-        if (warships < WARSHIP_CAPACITY) this.warships.set(warships++, ship.x, ship.y, ship.color);
+        if (warships < WARSHIP_CAPACITY) {
+          this.warshipHalos.set(warships, ship.x, ship.y, HALO_COLOR);
+          this.warships.set(warships++, ship.x, ship.y, ship.color);
+        }
+        if (ship.shot && flashes + 2 <= FLASH_CAPACITY) {
+          this.flashes.set(flashes++, ship.x, ship.y, SHOT_COLOR);
+          this.flashes.set(flashes++, ship.shot.x, ship.shot.y, SHOT_COLOR);
+        }
       } else if (transports < SHIP_CAPACITY) {
         this.ships.set(transports++, ship.x, ship.y, ship.color);
       }
@@ -170,6 +189,8 @@ export class GlobeView implements Renderer {
     this.ships.count = transports;
     this.tradeShips.count = trade;
     this.warships.count = warships;
+    this.warshipHalos.count = warships;
+    this.flashes.count = flashes;
     this.missiles.count = missiles;
     this.heavyMissiles.count = heavy;
   }
@@ -242,6 +263,8 @@ export class GlobeView implements Renderer {
     this.ships.setScale(shipScale(SHIP_SIZES.transport, tilesPerPixel));
     this.tradeShips.setScale(shipScale(SHIP_SIZES.trade, tilesPerPixel));
     this.warships.setScale(shipScale(SHIP_SIZES.warship, tilesPerPixel));
+    this.warshipHalos.setScale(shipScale(SHIP_SIZES.warship, tilesPerPixel));
+    this.flashes.setScale(shipScale(SHIP_SIZES.warship, tilesPerPixel) * 0.7);
     this.missiles.setScale(shipScale(SHIP_SIZES.missile, tilesPerPixel));
     this.heavyMissiles.setScale(shipScale(SHIP_SIZES.heavyMissile, tilesPerPixel));
     for (const { outline, fill, size } of Object.values(this.structures)) {
@@ -289,6 +312,8 @@ export class GlobeView implements Renderer {
     this.ships.dispose();
     this.tradeShips.dispose();
     this.warships.dispose();
+    this.warshipHalos.dispose();
+    this.flashes.dispose();
     this.missiles.dispose();
     this.heavyMissiles.dispose();
     for (const { outline, fill } of Object.values(this.structures)) {

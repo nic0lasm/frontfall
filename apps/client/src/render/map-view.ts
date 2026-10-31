@@ -34,7 +34,7 @@ const WARSHIP_CAPACITY = 256;
 export const SHIP_SIZES = {
   transport: { tiles: 2.5, minPixels: 6 },
   trade: { tiles: 1.6, minPixels: 6 },
-  warship: { tiles: 3.5, minPixels: 10 },
+  warship: { tiles: 3.5, minPixels: 14 },
   missile: { tiles: 2.5, minPixels: 9 },
   heavyMissile: { tiles: 4, minPixels: 13 },
 } as const;
@@ -477,6 +477,7 @@ export class MapView implements Renderer {
           speed: ship.speed ?? 0,
           color: ship.color,
           seed: (ship.id ?? 0) % 10,
+          ...(ship.shot ? { flash: 1 - ship.shot.age } : {}),
         });
       } else if (ship.kind === "trade") {
         if (trade < TRADE_CAPACITY) this.tradeShips?.set(trade++, ship.x, ship.y, ship.color);

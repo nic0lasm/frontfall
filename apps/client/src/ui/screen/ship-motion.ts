@@ -25,6 +25,10 @@ type ShipKind = NonNullable<UnitMark["kind"]> | "transport";
 
 /** How long a ship that left the sea takes to dock, land its troops or go under, in ms. */
 const GHOST_MS = { docking: 1200, landing: 1400, sinking: 2400 } as const;
+/** How long the sign of a shot stays on a warship, in ms. */
+const SHOT_MS = 700;
+/** A shot older than this many ticks when first seen is not shown: a seek, not a fight. */
+const SHOT_TICKS = 3;
 /** Part of the way a ship's heading turns toward its latest course on each tick. */
 const TURN = 0.5;
 /** Part of the way a ship's speed moves toward the last tick's on each tick. */
@@ -47,6 +51,8 @@ interface Tracked {
   speed: number;
   /** It lands or docks on the next tick. */
   arriving: boolean;
+  /** A warship's last shot: its tick, the tile it aimed at and when it was first seen, in ms. */
+  shot?: { id: number; aim: number; since: number };
   /** A missile's route: its launch tile and aim, and the ticks it was launched and arrives at. */
   flight?: { from: number; to: number; launchedAt: number; arrivesAt: number; radius: number };
 }
@@ -144,8 +150,20 @@ export class ShipMotion {
     for (const ship of update.tradeShips) {
       see(-ship.id, "trade", ship.player, ship.tile, ship.arriving === true);
     }
-    for (const ship of update.warships)
+    for (const ship of update.warships) {
       see(WARSHIP_IDS + ship.id, "warship", ship.player, ship.tile, false);
+      const tracked = this.known.get(WARSHIP_IDS + ship.id);
+      if (
+        tracked &&
+        playing &&
+        ship.firedAt !== undefined &&
+        ship.aim !== undefined &&
+        ship.firedAt !== tracked.shot?.id &&
+        update.tick - ship.firedAt <= SHOT_TICKS
+      ) {
+        tracked.shot = { id: ship.firedAt, aim: ship.aim, since: now };
+      }
+    }
     for (const missile of update.missiles) {
       const kind = missile.heavy ? "heavyMissile" : "missile";
       see(MISSILE_IDS + missile.id, kind, missile.player, missile.tile, false);
@@ -180,7 +198,11 @@ export class ShipMotion {
   /** Whether a ship is still going down, docking or landing at `now`, which keeps frames coming. */
   busy(now: number): boolean {
     this.ghosts = this.ghosts.filter((g) => now - g.since < GHOST_MS[g.state]);
-    return this.ghosts.length > 0;
+    if (this.ghosts.length > 0) return true;
+    for (const ship of this.known.values()) {
+      if (ship.shot && now - ship.shot.since < SHOT_MS) return true;
+    }
+    return false;
   }
 
   /**
@@ -207,6 +229,16 @@ export class ShipMotion {
         speed: ship.speed,
         ...(ship.flight
           ? { ...this.flight(ship.flight, progress), owner: colorOf(ship.player) }
+          : {}),
+        ...(ship.shot && now - ship.shot.since < SHOT_MS
+          ? {
+              shot: {
+                x: ship.shot.aim % this.width,
+                y: Math.floor(ship.shot.aim / this.width),
+                id: ship.shot.id,
+                age: (now - ship.shot.since) / SHOT_MS,
+              },
+            }
           : {}),
       });
     }

@@ -36,6 +36,31 @@ const trade = (id: number, x: number): UnitMark => ({
 });
 
 describe("EffectTracker", () => {
+  it("draws a warship's shot as a flash, a streak and an impact, and only a ring when still", () => {
+    const shooter = (id: number, shot?: UnitMark["shot"]): UnitMark => ({
+      id,
+      x: 20,
+      y: 25,
+      color: "#3366CC",
+      kind: "warship",
+      ...(shot ? { shot } : {}),
+    });
+    const { tracker: t, particles } = tracker();
+    t.ships([shooter(7)], 0);
+    expect(particles).toEqual([]);
+    t.ships([shooter(7, { x: 30, y: 25, id: 4, age: 0 })], 0.1);
+    expect(particles.length).toBeGreaterThan(6);
+    expect(particles.some((p) => p.shape === "ring")).toBe(true);
+    // The same shot seen again on the next frame starts nothing more.
+    const count = particles.length;
+    t.ships([shooter(7, { x: 30, y: 25, id: 4, age: 0.1 })], 0.2);
+    expect(particles).toHaveLength(count);
+    const still = tracker(false);
+    still.tracker.ships([shooter(7)], 0);
+    still.tracker.ships([shooter(7, { x: 30, y: 25, id: 4, age: 0 })], 0.1);
+    expect(still.particles.map((p) => p.shape)).toEqual(["ring"]);
+  });
+
   it("starts nothing for units that are already there on the first frame", () => {
     const { tracker: t, particles } = tracker();
     t.ships([missile(1, 10), boat(2, 20)], 0);

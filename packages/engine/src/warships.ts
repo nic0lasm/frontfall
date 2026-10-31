@@ -22,6 +22,12 @@ export interface Warship {
   step: number;
   /** First tick it may fire again. */
   reloadAt: number;
+  /**
+   * The tick of its last shot at a ship and the water tile it aimed at. Only
+   * the screen reads them, to show the shot: not hashed, not saved.
+   */
+  firedAt?: number;
+  aim?: number;
 }
 
 /** Two players at war until `until` (R-UNIT-04): `a` is always the lower id. */
@@ -266,6 +272,8 @@ export function installWarships(game: Game): void {
     }
     if (best) {
       best.health -= balance.warshipDamage;
+      ship.firedAt = game.tick;
+      ship.aim = best.tile;
       return true;
     }
     let boat = -1;
@@ -282,6 +290,12 @@ export function installWarships(game: Game): void {
       }
     }
     if (boat < 0) return false;
+    const hit = game.boats[boat];
+    const at = hit?.path[Math.max(0, hit.step - 1)];
+    if (at !== undefined) {
+      ship.firedAt = game.tick;
+      ship.aim = at;
+    }
     game.boats.splice(boat, 1);
     return true;
   }

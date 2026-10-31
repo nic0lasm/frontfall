@@ -166,6 +166,37 @@ describe("ship motion", () => {
     });
   });
 
+  it("shows a warship's shot once, for a short while, and not one seen late", () => {
+    const motion = new ShipMotion();
+    const frame = { width: 10, wrapsX: false };
+    const ship = (tick: number, firedAt?: number) =>
+      ({
+        ...sea,
+        tick,
+        boats: [],
+        tradeShips: [],
+        missiles: [],
+        warships: [
+          { id: 1, player: 2, tile: 12, health: 3, ...(firedAt ? { firedAt, aim: 25 } : {}) },
+        ],
+      }) as never;
+    motion.tick(ship(10), frame, 10, 0);
+    motion.tick(ship(11, 11), frame, 10, 100);
+    const shot = motion.marks(1, 250, color)[0]?.shot;
+    expect(shot).toMatchObject({ id: 11, x: 5, y: 2 });
+    expect(shot?.age).toBeCloseTo(150 / 700);
+    expect(motion.busy(300)).toBe(true);
+    motion.tick(ship(12, 11), frame, 10, 200);
+    expect(motion.marks(1, 250, color)[0]?.shot?.id).toBe(11);
+    expect(motion.marks(1, 900, color)[0]?.shot).toBeUndefined();
+    expect(motion.busy(900)).toBe(false);
+    // A shot already old when the ship is first seen (a seek) is not shown.
+    const late = new ShipMotion();
+    late.tick(ship(50), frame, 10, 0);
+    late.tick(ship(51, 40), frame, 10, 100);
+    expect(late.marks(1, 150, color)[0]?.shot).toBeUndefined();
+  });
+
   it("points a ship along its course and turns it smoothly the short way", () => {
     const motion = new ShipMotion();
     motion.tick(at(1, 15), { width: 10, wrapsX: false }, 10, 0);

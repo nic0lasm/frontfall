@@ -369,6 +369,9 @@ export interface WarshipView {
   health: number;
   /** Its health when new, to read `health` against. */
   maxHealth?: number;
+  /** The tick of its last shot at a ship and the tile it aimed at, to show the shot. */
+  firedAt?: number;
+  aim?: number;
 }
 
 /** A missile in flight, where it is this tick (R-UNIT-05). */
