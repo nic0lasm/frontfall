@@ -5,6 +5,7 @@ import {
   installCityStates,
   installNations,
   CITY_STATES_PER_NATION,
+  Doctrine,
   loadMap,
   type BotDifficulty,
   type GameRules,
@@ -111,7 +112,8 @@ export function playCampaignGame(
     seed: setup.seed,
     players,
     balance,
-    ...(setup.rules ? { rules: setup.rules } : {}),
+    // Doctrines are on by default in 0.9.5, public games included.
+    rules: { doctrines: true, ...setup.rules },
   });
   if (cities.length > 0) installCityStates(game, cities);
   installNations(game, nations, setup.difficulty);
@@ -122,6 +124,7 @@ export function playCampaignGame(
       ? new StyledPlayer(game, 1, STYLES.beginner, setup.seed, avoid)
       : humanProfile(game, setup.profile, setup.seed, avoid);
 
+  const pick = doctrineOf(setup);
   const perMinute = 60 * balance.ticksPerSecond;
   const lastTick = balance.spawnPhaseTicks + setup.minutes * perMinute;
   const ownable = terrain.ownableCount;
@@ -146,6 +149,8 @@ export function playCampaignGame(
 
   while (game.tick < lastTick) {
     const orders = game.tick === 0 || game.phase === "play" ? me.orders() : [];
+    // A beginner never opens the doctrine card: no pick means Balanced.
+    if (game.tick === 0 && pick !== undefined) orders.unshift({ type: "doctrine", pick });
     const turn: Turn = { tick: game.tick, orders: orders.map((order) => ({ player: 1, order })) };
     const t0 = performance.now();
     try {
@@ -271,4 +276,11 @@ function humanProfile(
     refused: 0,
     sent: 0,
   };
+}
+
+/** The doctrine each profile picks: none for a beginner, the aggressive one for Nico, one per seed for a veteran. */
+function doctrineOf(setup: CampaignSetup): number | undefined {
+  if (setup.profile === "beginner") return undefined;
+  if (setup.profile === "nico") return Doctrine.Conqueror;
+  return [Doctrine.Conqueror, Doctrine.Merchant, Doctrine.Bastion][setup.seed % 3];
 }
