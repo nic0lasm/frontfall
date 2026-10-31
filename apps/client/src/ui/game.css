@@ -2767,12 +2767,13 @@ button.feed-entry:focus-visible {
 
 /* A phone keeps the map: the cards fold to a line each, and only the chosen one
    spells out its effects (the others stay in the reading order for a screen reader),
-   so that the start can still be placed above them. */
-@media (width < 640px) {
+   so that the start can still be placed above them. The picker rises over the bottom
+   bar rather than covering it, so the sliders and buttons stay in sight. */
+@media (width < 640px), (height < 560px) {
   .doctrine-picker {
-    inset: auto 8px 8px;
+    inset: auto 8px 84px;
     gap: 4px;
-    max-height: 50vh;
+    max-height: 34vh;
     padding: 8px 10px;
     overflow-y: auto;
   }
@@ -2803,6 +2804,31 @@ button.feed-entry:focus-visible {
   }
 
   .doctrine-card:not([aria-pressed="true"]) .doctrine-effects {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* A short phone: three names in a row, the chosen one marked, so that the map keeps most of the screen. */
+@media (height < 700px) and ((width < 640px) or (height < 560px)) {
+  .doctrine-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .doctrine-card .doctrine-idea {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .doctrine-card[aria-pressed="true"] .doctrine-effects {
     position: absolute;
     width: 1px;
     height: 1px;

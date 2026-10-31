@@ -216,3 +216,36 @@ test("the line about expanding goes away for good after the first attack", async
   await expect(page.locator(".stats .stat").nth(2).locator(".stat-value")).not.toHaveText("0%");
   await expect(banner).toBeHidden({ timeout: 30_000 });
 });
+
+for (const viewport of [
+  { width: 390, height: 780 },
+  { width: 360, height: 640 },
+]) {
+  test.describe(`on a ${String(viewport.width)} by ${String(viewport.height)} phone`, () => {
+    test.use({ viewport, hasTouch: true });
+
+    test("the tutorial's card and the doctrine cards leave the banner and the sliders in sight", async ({
+      page,
+    }) => {
+      await page.goto("./");
+      await page.locator("#tutorial").click();
+      await page.locator("#tutorial-intro").getByRole("button", { name: "Start" }).click();
+      const picker = page.locator(".doctrine-picker");
+      await expect(picker).toBeVisible();
+      await expect(page.locator("#guide")).toBeVisible();
+      const box = async (selector: string) => {
+        const found = await page.locator(selector).first().boundingBox();
+        if (!found) throw new Error(`${selector} has no size`);
+        return found;
+      };
+      const banner = await box(".banner");
+      const guide = await box("#guide");
+      const cards = await box(".doctrine-picker");
+      const slider = await box("#attack-ratio");
+      // The guide sits under the banner, and above the cards, which sit above the sliders.
+      expect(guide.y).toBeGreaterThanOrEqual(banner.y + banner.height);
+      expect(guide.y + guide.height).toBeLessThanOrEqual(cards.y);
+      expect(cards.y + cards.height).toBeLessThanOrEqual(slider.y);
+    });
+  });
+}
