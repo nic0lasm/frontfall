@@ -201,9 +201,9 @@ test("plays against the nations of the map, named and on the board (R-BOT-07)", 
   // Placed on their tiles when the spawn phase ends, then ranked with everyone.
   await expect(page.locator(".banner")).toContainText("to expand", { timeout: 30_000 });
   // The leaderboard lists three leaders at rest, and all of them once opened:
-  // the player, the bot, the six nations and their city-states (R-BOT-29), some of them already taken.
+  // the player, the bot and the six nations; their city-states (R-BOT-29) would crowd them out.
   await page.locator("#leaderboard-toggle").click();
-  await expect.poll(() => page.locator(".leaderboard-list .leader").count()).toBeGreaterThan(8);
+  await expect(page.locator(".leaderboard-list .leader")).toHaveCount(8);
   // City-states may hold the ten first places at first: the nation is found by its name on the map.
   await expect(page.locator(".labels .label-name").filter({ hasText: "Northmark" })).toHaveCount(1);
 

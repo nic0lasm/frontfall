@@ -41,7 +41,8 @@ export class LeaderList {
   ): void {
     const { players, you, diplomacy } = update;
     const ranked = players
-      .filter((player) => player.alive)
+      // City-states (R-BOT-29) are hundreds of small players: they would crowd out the real ones.
+      .filter((player) => player.alive && (player.cityState !== true || player.id === you))
       .sort((a, b) => b.tiles - a.tiles || a.id - b.id);
     const shown = ranked.slice(0, size);
     const humanRank = ranked.findIndex((player) => player.id === you);
