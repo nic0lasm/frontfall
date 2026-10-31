@@ -259,8 +259,8 @@ const HUMAN_STYLES: Record<"nico" | "veteran", HumanStyle> = {
     ratioPercent: 30,
     keepPercent: 40,
     warPercent: 60,
-    oddsPercent: 120,
-    allySeconds: 900,
+    oddsPercent: 160,
+    allySeconds: 300,
   },
 };
 
