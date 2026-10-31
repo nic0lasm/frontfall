@@ -77,6 +77,42 @@ test("the first steps follow the player, and stay hidden once put away", async (
   await expect(guide).toHaveAttribute("data-step", "start");
 });
 
+test("the shortcut for the share of troops moves the guide on, as the slider does", async ({
+  page,
+}) => {
+  await startSolo(page);
+  const guide = page.locator("#guide");
+  for (const step of ["doctrine", "expand", "troops"]) {
+    await page.locator("#guide-next").click();
+    await expect(guide).toHaveAttribute("data-step", step);
+  }
+  await page.keyboard.press("Shift+Digit5");
+  await expect(guide).toHaveAttribute("data-step", "build");
+});
+
+test("on a desktop screen the doctrine cards leave the sliders and the buildings in reach, and no income shows before the start", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("./?map=skirmish&bots=2&difficulty=easy&speed=1");
+  await page.locator("#play").click();
+  const picker = page.locator(".doctrine-picker");
+  await expect(picker).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#attack-ratio")).toBeVisible();
+  const box = async (selector: string) => {
+    const found = await page.locator(selector).first().boundingBox();
+    if (!found) throw new Error(`${selector} has no size`);
+    return found;
+  };
+  const cards = await box(".doctrine-picker");
+  const bar = await box("#attack-ratio");
+  const build = await box(".build");
+  expect(cards.y + cards.height).toBeLessThanOrEqual(bar.y);
+  expect(cards.y + cards.height).toBeLessThanOrEqual(build.y);
+  // Nothing comes in before the attacks open.
+  await expect(page.locator(".gold-rate")).not.toContainText("/s");
+});
+
 test("a refused build names what was refused", async ({ page }) => {
   // The line comes once the placement phase is over: at ×5 that is seconds, not the test's whole time.
   await startSolo(page, "&speed=5");

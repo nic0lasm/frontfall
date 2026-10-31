@@ -32,6 +32,17 @@ export class GuideHost {
     this.parent.querySelector("#work-share")?.addEventListener("input", () => {
       this.workMoved = true;
     });
+    // Shift + a digit sets the share of troops without an input event of the slider.
+    document.addEventListener("keydown", this.onKey);
+  }
+
+  private readonly onKey = (event: KeyboardEvent): void => {
+    if (event.shiftKey && /^(Digit|Numpad)[0-9]$/.test(event.code)) this.ratioMoved = true;
+  };
+
+  /** The guide's host is done with: the shortcut is no longer watched. */
+  dispose(): void {
+    document.removeEventListener("keydown", this.onKey);
   }
 
   /** Shows the guide from its first step, over the one showing if any; `full` for the tutorial. */

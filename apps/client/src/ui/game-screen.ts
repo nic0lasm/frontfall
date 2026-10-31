@@ -524,6 +524,9 @@ export class GameScreen {
     }
     this.cleanups.push(
       () => {
+        this.guide.dispose();
+      },
+      () => {
         window.removeEventListener("keydown", keydown);
       },
       () => {
