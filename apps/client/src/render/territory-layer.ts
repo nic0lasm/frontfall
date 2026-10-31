@@ -652,7 +652,7 @@ const fragmentShader = /* glsl */ `
       landColor *= 1.0 + 0.2 * (1.0 - smoothstep(0.0, max(0.3, 1.6 * pixel), coastIn));
     }
 
-    // Sea: four tones of depth, a slow swell, glints, surf and two waves creeping in.
+    // Sea: four tones of depth, a slow swell, surf and two waves creeping in.
     vec3 seaColor = vec3(0.0);
     if (landCover < 1.0) {
       seaColor = mix(srgb3(34.0, 112.0, 134.0), srgb3(18.0, 66.0, 92.0), smoothstep(0.0, max(1.4, 4.5 * pixel), depth));
@@ -662,18 +662,6 @@ const fragmentShader = /* glsl */ `
       seaColor *= 1.0 - 0.32 * exp(-depth / max(0.4, 1.4 * pixel));
       float swell = nz(at * 0.22 + t * vec2(0.05, 0.02)) + nz(at * 0.5 - t * vec2(0.03, 0.06)) - 1.0;
       seaColor *= 1.0 + 0.16 * swell * (1.0 - smoothstep(0.25, 1.1, pixel)) * smoothstep(0.6, 4.0, depth);
-      if (pixel < 1.2 && depth > 0.8) {
-        float cell = max(0.5, 9.0 * pixel);
-        vec2 gp = at / cell + vec2(t * 0.05, 0.0);
-        vec2 gid = floor(gp);
-        float gh = hs(gid + 11.0);
-        if (gh > 0.78) {
-          vec2 gpos = vec2(hs(gid + 2.3), hs(gid + 5.9)) * 0.7 + 0.15;
-          float gd = length((fract(gp) - gpos) * vec2(1.0, 2.2));
-          float twinkle = 0.5 + 0.5 * sin(t * (1.2 + 2.0 * gh) + gh * 60.0);
-          seaColor += vec3(0.7, 0.85, 1.0) * (1.0 - smoothstep(0.0, 0.12, gd)) * pow(twinkle, 3.0) * 0.55 * (1.0 - smoothstep(0.6, 1.2, pixel)) * smoothstep(0.8, 3.0, depth);
-        }
-      }
       float foamEdge = max(0.07, 1.25 * pixel);
       float foamBreak = 0.55 + 0.9 * nz(at * 1.3 + t * vec2(0.12, 0.05));
       float surf = (1.0 - smoothstep(0.35 * foamEdge, foamEdge, depth)) * min(1.0, foamBreak + 0.35);
