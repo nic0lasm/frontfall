@@ -58,7 +58,7 @@ const camera = {
 } as unknown as Camera;
 
 function player(id: number): PlayerView {
-  return { id, name: `P${String(id)}`, troops: id * 10 } as unknown as PlayerView;
+  return { id, name: `P${String(id)}`, troops: id * 10, cityState: true } as unknown as PlayerView;
 }
 
 describe("player labels", () => {

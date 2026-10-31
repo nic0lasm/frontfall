@@ -75,6 +75,8 @@ export class PlayerLabels {
         if (name) name.textContent = player.name;
       }
       label.count = formatCount(player.troops);
+      // Only city-states wait to be big enough: everyone else keeps an element, there are few.
+      if (!player.cityState) this.build(label);
       if (label.troops) setText(label.troops, label.count);
     }
   }
