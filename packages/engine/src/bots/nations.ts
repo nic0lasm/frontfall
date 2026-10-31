@@ -322,8 +322,8 @@ export function installNations(
 
   /**
    * R-BOT-27: whether the nation turns on `owner` when it chooses to: always
-   * a nation, a city-state or a traitor; a player never during B-NATION-GRACE,
-   * then only B-NATION-HUMAN of the time.
+   * a nation, a city-state or a traitor; a player never during B-NATION-GRACE
+   * nor while spared (B-NATION-SPARE), then only B-NATION-HUMAN of the time.
    */
   function goes(owner: number): boolean {
     const player = game.player(owner);
@@ -332,7 +332,13 @@ export function installNations(
     }
     // B-NATION-GRACE: no player is chosen early on.
     if (game.tick < balance.spawnPhaseTicks + graceTicks) return false;
+    if (player && spared(player)) return false;
     return game.random.nextInt(0, 100) < nationParams.humanPercent;
+  }
+
+  /** B-NATION-SPARE: a player whose army is down to a small share of their cap is left to rebuild. */
+  function spared(player: Player): boolean {
+    return player.troops * 100 < populationCap(game, player) * nationParams.sparePercent;
   }
 
   /** Troops in attacks on `id`'s land. */
@@ -390,6 +396,9 @@ export function installNations(
   /** R-BOT-27: an answer to the main attacker, a hard nation sending at least what comes at it. Whether it attacked. */
   function retaliate(nation: Player, attacker: number, armed: () => number): boolean {
     if (attacker === NEUTRAL || game.bots.has(attacker)) return false;
+    const player = game.player(attacker);
+    if (player && !nationSet.has(attacker) && !isTraitor(game, player) && spared(player))
+      return false;
     let troops = armed();
     if (nationParams.answer === "at once") {
       troops = Math.max(troops, Math.min(soldiers(nation), incomingOn(nation.id)));

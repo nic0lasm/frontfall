@@ -113,7 +113,8 @@ describe("nations", () => {
     const { game, grid, nation, ada, bea, ordersOf, run, adaAttacks } = strip({}, "easy");
     nation.troops = 4000;
     ada.troops = 5000;
-    bea.troops = 10;
+    // Above B-NATION-SPARE of her cap, under the nation's troops.
+    bea.troops = 2000;
     // Under a tenth of the nation's troops: it plays on, and turns on Bea rather than answer Ada.
     adaAttacks(300);
     run(1);
@@ -221,6 +222,42 @@ describe("nations", () => {
     nation.troops = cap;
     run(interval);
     expect(ordersOf(1).map((order) => order.type)).toEqual(["attack"]);
+  });
+
+  it("leave alone a player whose army is down, and do not answer them, at easy (B-NATION-SPARE)", () => {
+    const { game, ordersOf, run, nation, ada, bea, adaAttacks } = strip({}, "easy");
+    const spare = NATION_DIFFICULTIES.easy.sparePercent;
+    const low = (player: Player) => {
+      player.troops = Math.floor((populationCap(game, player) * spare) / 100) - 50;
+    };
+    for (let i = 0; i < 12; i++) {
+      nation.troops = populationCap(game, nation);
+      low(ada);
+      low(bea);
+      run(intervalOf("easy"));
+    }
+    const attacks = () => ordersOf(1).filter((order) => order.type === "attack");
+    expect(attacks()).toEqual([]);
+    // An attack from a player that leaves them low is not answered either.
+    nation.troops = populationCap(game, nation);
+    ada.troops = 3000;
+    adaAttacks(2900);
+    run(2);
+    expect(attacks()).toEqual([]);
+  });
+
+  it("turn again on a player back over B-NATION-SPARE, at easy", () => {
+    const { game, ordersOf, run, nation, ada, bea } = strip({}, "easy");
+    const spare = NATION_DIFFICULTIES.easy.sparePercent;
+    const attacks = () => ordersOf(1).filter((order) => order.type === "attack");
+    for (let i = 0; i < 24 && attacks().length === 0; i++) {
+      nation.troops = populationCap(game, nation);
+      // Over the share, and under the nation's troops: an easy nation holds half a player's cap.
+      ada.troops = Math.floor((populationCap(game, ada) * (spare + 10)) / 100);
+      bea.troops = ada.troops;
+      run(intervalOf("easy"));
+    }
+    expect(attacks().length).toBeGreaterThan(0);
   });
 
   it("sail before fighting a neighbour down to scraps (R-BOT-18)", () => {

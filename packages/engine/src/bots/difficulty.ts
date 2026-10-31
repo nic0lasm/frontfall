@@ -46,6 +46,8 @@ export interface NationParameters {
   intervalSeconds: number;
   /** B-NATION-HUMAN, in % of the times it chooses a player who is neither a nation nor a city-state that it goes on */
   humanPercent: number;
+  /** B-NATION-SPARE, in % of a player's cap: under it a player who is neither a nation, a city-state nor a traitor is left alone */
+  sparePercent: number;
   /** B-NATION-CAP, in % of a player's population cap that a nation holds */
   capPercent: number;
   /** B-NATION-START, in % of a player's starting troops that a nation starts with */
@@ -94,6 +96,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
   easy: {
     intervalSeconds: 8,
     humanPercent: 25,
+    sparePercent: 30,
     capPercent: 50,
     startPercent: 50,
     growthPercent: 90,
@@ -119,6 +122,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
   normal: {
     intervalSeconds: 6,
     humanPercent: 75,
+    sparePercent: 0,
     capPercent: 92,
     startPercent: 92,
     growthPercent: 100,
@@ -144,6 +148,7 @@ export const NATION_DIFFICULTIES: Readonly<Record<BotDifficulty, Readonly<Nation
   hard: {
     intervalSeconds: 4,
     humanPercent: 100,
+    sparePercent: 0,
     capPercent: 100,
     startPercent: 100,
     growthPercent: 100,
