@@ -85,7 +85,7 @@
 .leaderboard {
   top: 12px;
   right: 12px;
-  width: 220px;
+  width: 252px;
   /* A long player menu scrolls inside the panel rather than running off the screen. */
   max-height: calc(100% - 24px);
   overflow-y: auto;
