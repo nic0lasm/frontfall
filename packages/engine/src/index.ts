@@ -113,6 +113,7 @@ export {
   NATION_DIFFICULTIES,
   type BotDifficulty,
   type BotParameters,
+  type BotShelter,
   type NationParameters,
   nationMood,
   type Mood,

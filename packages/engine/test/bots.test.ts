@@ -381,7 +381,7 @@ describe("spared players", () => {
       installEconomy(game);
       installAttacks(game);
       installBoats(game);
-      installBots(game, [2, 3], "hard", spared);
+      installBots(game, [2, 3], "hard", { spared, landCapPercent: 100 });
       const hits = new Set<number>();
       for (let i = 0; i < 6000; i++) {
         game.step({
@@ -396,5 +396,22 @@ describe("spared players", () => {
     const spared = setup([1]);
     for (const hit of spared) expect(hit).not.toBe(12);
     expect([...spared].some((hit) => hit === 23 || hit === 32)).toBe(true);
+  });
+
+  it("stop taking land at their share of the map", () => {
+    const grid = new WorldGrid(96, 48);
+    const kinds = new Uint8Array(grid.size).fill(TileKind.Plains);
+    const players = [1, 2, 3].map((id) => ({ id, name: `P${String(id)}` }));
+    const game = new Game({ terrain: new Terrain(grid, kinds), seed: 3, players, balance });
+    installSpawn(game);
+    installEconomy(game);
+    installAttacks(game);
+    installBots(game, [1, 2, 3], "hard", { spared: [], landCapPercent: 20 });
+    for (let i = 0; i < 8000; i++) game.step({ tick: game.tick, orders: [] });
+    // One order may carry a bot a little past its share, never to a quarter more.
+    for (const id of [1, 2, 3]) {
+      expect(game.territory.tileCount(id) * 100).toBeLessThan(game.terrain.ownableCount * 30);
+    }
+    expect(game.territory.tileCount(1)).toBeGreaterThan(0);
   });
 });

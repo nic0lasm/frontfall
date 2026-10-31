@@ -6,7 +6,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ### Fixed
 
-- **The tutorial can no longer be lost.** On the Strait, the two computer players used to head straight for a beginner's capital and could wipe them out within two or three minutes. In the tutorial they now leave you alone, by land and by sea, and only the city-states, which are weak, still stir up trouble. Real games are unchanged.
+- **The tutorial can no longer be lost.** On the Strait, the two computer players used to head straight for a beginner's capital and could wipe them out within two or three minutes, or take three quarters of the map while the guide was still being read. In the tutorial they now leave you alone, by land and by sea, and each stops expanding at a quarter of the map. Only the city-states, which are weak, still stir up trouble. Real games are unchanged.
 
 ### Added
 
