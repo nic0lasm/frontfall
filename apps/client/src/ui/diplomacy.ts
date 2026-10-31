@@ -102,7 +102,7 @@ export class DiplomacyPanel {
   private menuKey = "";
   /** What had focus before the menu opened. */
   private opener: HTMLElement | undefined;
-  private requestsKey = "";
+  private requestsKey: string | undefined;
 
   constructor(private readonly actions: DiplomacyActions) {}
 
@@ -171,13 +171,18 @@ export class DiplomacyPanel {
   /** Redraws everything in the current language. */
   refresh(): void {
     this.menuKey = "";
-    this.requestsKey = "";
+    this.requestsKey = undefined;
     if (this.last) this.render(this.last);
   }
 
   private render(update: GameUpdate): void {
     this.renderMenu(update);
     this.renderRequests(update);
+  }
+
+  /** The share of a request's time still left, as the width of its bar. */
+  private timeLeft(ticks: number, total: number): string {
+    return `${String(Math.min(100, (ticks / Math.max(1, total)) * 100))}%`;
   }
 
   private seconds(ticks: number): number {
@@ -539,10 +544,23 @@ export class DiplomacyPanel {
     }
     const shown = incoming.filter((r) => !this.ignored.has(r.from));
     const total = this.rules.allianceRequestTicks;
-    const key = shown
-      .map((r) => `${String(r.from)}:${String(this.seconds(r.ticksLeft))}`)
-      .join(",");
-    if (key === this.requestsKey) return;
+    const nameOf = (from: number) => update.players.find((p) => p.id === from)?.name ?? "";
+    // Who asks, not the seconds left: the countdown is written in place below, or a click
+    // that starts on a button would end on its replacement and go nowhere.
+    const key = shown.map(({ from }) => `${String(from)}:${nameOf(from)}`).join(",");
+    if (key === this.requestsKey) {
+      const rows = this.requests.querySelectorAll<HTMLElement>(":scope > .request");
+      shown.forEach(({ from, ticksLeft }, i) => {
+        const row = rows[i];
+        if (!row) return;
+        const text = t("diplo.request", { name: nameOf(from), seconds: this.seconds(ticksLeft) });
+        const node = row.querySelector(".request-text");
+        if (node && node.textContent !== text) node.textContent = text;
+        const bar = row.querySelector<HTMLElement>(".request-time-left");
+        if (bar) bar.style.width = this.timeLeft(ticksLeft, total);
+      });
+      return;
+    }
     this.requestsKey = key;
     this.requests.hidden = shown.length === 0;
     const focused = this.requests.contains(document.activeElement)
@@ -550,7 +568,7 @@ export class DiplomacyPanel {
       : undefined;
     this.requests.replaceChildren(
       ...shown.map(({ from, ticksLeft }) => {
-        const name = update.players.find((p) => p.id === from)?.name ?? "";
+        const name = nameOf(from);
         const accept = h(
           "button",
           { type: "button", class: "request-accept", "data-kind": `accept-${String(from)}` },
@@ -560,7 +578,7 @@ export class DiplomacyPanel {
           // A request accepted during a pause stays in the stack, still waiting.
           if (!this.actions.onAlly(from)) return;
           this.ignored.add(from);
-          this.requestsKey = "";
+          this.requestsKey = undefined;
         });
         const ignore = h(
           "button",
@@ -569,11 +587,11 @@ export class DiplomacyPanel {
         );
         ignore.addEventListener("click", () => {
           this.ignored.add(from);
-          this.requestsKey = "";
+          this.requestsKey = undefined;
           if (this.last) this.renderRequests(this.last);
         });
         const left = h("span", { class: "request-time-left" });
-        left.style.width = `${String(Math.min(100, (ticksLeft / Math.max(1, total)) * 100))}%`;
+        left.style.width = this.timeLeft(ticksLeft, total);
         return h(
           "li",
           { class: "request" },

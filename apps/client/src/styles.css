@@ -1035,7 +1035,7 @@ main.join {
   left: 50%;
   display: grid;
   gap: 6px;
-  width: min(380px, calc(100vw - 24px));
+  width: min(440px, calc(100vw - 24px));
   box-sizing: border-box;
   margin: 0;
   padding: 8px;
