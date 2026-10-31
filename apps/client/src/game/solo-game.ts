@@ -98,6 +98,7 @@ export class SoloGame {
         nationIds,
         difficulty,
         cityStateIds,
+        options.tutorial ? [HUMAN_ID] : [],
       );
     const { snapshot } = options;
     const loaded =

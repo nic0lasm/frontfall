@@ -43,13 +43,23 @@ const ALLIANCE_SIZE_PERCENT = 100;
  *
  * Bots do not pick a start: the spawn phase places them at random when it
  * ends (R-SPAWN-03).
+ *
+ * `spared` names players the bots never attack, by land or by sea: the
+ * practice game keeps its learner out of reach. Real games spare nobody.
  */
-export function installBots(game: Game, ids: readonly number[], difficulty: BotDifficulty): void {
+export function installBots(
+  game: Game,
+  ids: readonly number[],
+  difficulty: BotDifficulty,
+  spared: readonly number[] = [],
+): void {
   const { territory, balance } = game;
   const params = BOT_DIFFICULTIES[difficulty];
   const interval = Math.max(1, params.intervalSeconds * balance.ticksPerSecond);
   const retryTicks = RETRY_DECISIONS * interval;
   const bots = [...new Set(ids)].sort((a, b) => a - b);
+  const spare = new Set(spared);
+  const accept = (owner: number): boolean => !spare.has(owner);
   for (const id of bots) {
     if (!game.player(id)) throw new RangeError(`unknown player ${String(id)}`);
     game.bots.add(id);
@@ -84,7 +94,7 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
     // Less than the price of one tile would come straight back.
     if (troops < cheapestTile(balance)) return;
 
-    const { neutral, enemy, enemyDensity } = scanBorder(game, bot);
+    const { neutral, enemy, enemyDensity } = scanBorder(game, bot, accept);
     const ownDensity = bot.troops;
     const weak = enemy >= 0 && enemyDensity * 100 <= ownDensity * params.boldnessPercent;
     // Free land is cheaper than a fight: while some is in reach, only a much weaker neighbour is worth attacking.
@@ -93,6 +103,6 @@ export function installBots(game: Game, ids: readonly number[], difficulty: BotD
     // R-BOT-17: an attack on a player heads for their capital.
     const aim = target >= 0 && target === enemy ? capitalAim(game, target) : target;
     if (target >= 0) game.apply(bot.id, { type: "attack", target: aim, troops });
-    else sail(game, bot, troops, params.boldnessPercent, seaCooldowns, retryTicks);
+    else sail(game, bot, troops, params.boldnessPercent, seaCooldowns, retryTicks, accept);
   }
 }

@@ -185,16 +185,20 @@ export function newSetup(
   return { players, botIds, nationIds, cityStateIds, balance };
 }
 
-/** A game with every rule installed, then the bots, the city-states and the nations, in that order. */
+/**
+ * A game with every rule installed, then the bots, the city-states and the nations, in that order.
+ * The bots leave `spared` players alone: the tutorial's learner, who is there to learn, not to lose.
+ */
 export function createSimulation(
   setup: GameSetup,
   botIds: readonly number[],
   nationIds: readonly number[],
   difficulty: Difficulty,
   cityStateIds: readonly number[] = [],
+  spared: readonly number[] = [],
 ): Game {
   const game = createGame(setup);
-  installBots(game, botIds, difficulty);
+  installBots(game, botIds, difficulty, spared);
   installCityStates(game, cityStateIds);
   installNations(game, nationIds, difficulty);
   return game;

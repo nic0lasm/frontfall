@@ -369,3 +369,32 @@ describe("bots", () => {
     expect(game.terrain.isOceanCoast(port)).toBe(true);
   });
 });
+
+describe("spared players", () => {
+  it("are never attacked by a bot, by land or by sea, while the bots still fight each other", () => {
+    const setup = (spared: number[]) => {
+      const grid = new WorldGrid(96, 48);
+      const kinds = new Uint8Array(grid.size).fill(TileKind.Plains);
+      const players = [1, 2, 3].map((id) => ({ id, name: `P${String(id)}` }));
+      const game = new Game({ terrain: new Terrain(grid, kinds), seed: 7, players, balance });
+      installSpawn(game);
+      installEconomy(game);
+      installAttacks(game);
+      installBoats(game);
+      installBots(game, [2, 3], "hard", spared);
+      const hits = new Set<number>();
+      for (let i = 0; i < 6000; i++) {
+        game.step({
+          tick: game.tick,
+          orders: i === 0 ? [{ player: 1, order: { type: "spawn", tile: 0 } }] : [],
+        });
+        for (const attack of game.attacks) hits.add(attack.target * 10 + attack.player);
+        for (const boat of game.boats) hits.add(boat.player);
+      }
+      return hits;
+    };
+    const spared = setup([1]);
+    for (const hit of spared) expect(hit).not.toBe(12);
+    expect([...spared].some((hit) => hit === 23 || hit === 32)).toBe(true);
+  });
+});

@@ -4,6 +4,10 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- **The tutorial can no longer be lost.** On the Strait, the two computer players used to head straight for a beginner's capital and could wipe them out within two or three minutes. In the tutorial they now leave you alone, by land and by sea, and only the city-states, which are weak, still stir up trouble. Real games are unchanged.
+
 ### Added
 
 - **The gold of a trade ship, at the dock.** When a trade ship reaches a port, the gold it brings you now rises as a "+N" over that port, for your own ships and for those that call at your ports. Two ships docking together add up in one figure, and with reduced motion the figure stays still and fades.
