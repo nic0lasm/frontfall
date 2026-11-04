@@ -896,6 +896,21 @@ const fragmentShader = /* glsl */ `
       // A tile taken a moment ago fades in, so fronts creep instead of jumping each tick.
       color = mix(color, owned, fadeIn * landCover);
     }
+  #ifdef PREMIUM
+    // Shadows of high clouds drifting from the west, soft and slow; they hold
+    // still with less motion and fade out up close and at world zoom, where
+    // they would only hide the countries.
+    float cloudFade = smoothstep(0.06, 0.2, pixel) * (1.0 - smoothstep(0.8, 1.6, pixel));
+    if (cloudFade > 0.0) {
+      vec2 drift = now * frontMotion * vec2(0.35, 0.08);
+      float cloud = nz((at - drift) * 0.018) * 0.65 + nz((at - drift * 1.3) * 0.047 + 7.0) * 0.35;
+      color *= 1.0 - 0.16 * smoothstep(0.55, 0.8, cloud) * cloudFade;
+    }
+    // A touch of grading: lifted shadows toward blue, warm highlights.
+    float lum = luma(color);
+    color = mix(color, color * vec3(0.94, 0.98, 1.08), (1.0 - smoothstep(0.02, 0.12, lum)) * 0.5);
+    color = mix(color, color * vec3(1.05, 1.01, 0.95), smoothstep(0.25, 0.6, lum) * 0.5);
+  #endif
   #ifndef SPHERE
     // Vignette, at world zoom only: the map is an object on a dark table.
     vec2 corner = gl_FragCoord.xy / max(viewport, vec2(1.0)) - 0.5;
