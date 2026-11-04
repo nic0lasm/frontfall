@@ -7,6 +7,7 @@
  */
 import { bakeTerrainColors } from "../../../apps/client/src/render/terrain-colors.ts";
 import { bilinear, gaussianBlur, nearestInside, valueNoise, type Grid } from "./raster.ts";
+import { drainage } from "./rivers.ts";
 
 export interface PremiumMap {
   readonly width: number;
@@ -51,6 +52,10 @@ const SHELF = rgb(30, 92, 110);
 const SLOPE = rgb(18, 62, 90);
 const OPEN = rgb(11, 38, 66);
 const ABYSS = rgb(6, 20, 38);
+const RIVER = rgb(40, 104, 124);
+/** Land drained, in square kilometres, where a river starts to show, and where it is at its widest. */
+const RIVER_START = 6000;
+const RIVER_FULL = 400_000;
 const COOL = [0.75, 0.825, 1.0] as const;
 const WARM = [1.0, 0.957, 0.871] as const;
 
@@ -119,6 +124,31 @@ export function bakePremiumGround(
   }
   gaussianBlur(ice, grid, k * 0.6);
 
+  log("rivers");
+  // Wet climates feed rivers, dry ones hardly: a desert's colour is redder than green.
+  const wetness = new Float32Array(size);
+  for (let y = 0; y < H; y++) {
+    const lat = lats[y] as number;
+    const area = degX * 111.32 * Math.max(0.05, Math.cos((lat * Math.PI) / 180)) * degY * 110.54;
+    const ty = (y + 0.5) / k;
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (land[i] === 0) continue;
+      const tx = (x + 0.5) / k;
+      const dry = (bilinear(red, tiles, tx, ty) - bilinear(green, tiles, tx, ty)) / 255;
+      wetness[i] =
+        area * Math.max(0.08, Math.min(1, 1 - dry * 10)) * (1 - clamp01(ice[i] as number));
+    }
+  }
+  const drained = drainage(h, land, wetness, grid);
+  const river = new Float32Array(size);
+  const span = Math.log(RIVER_FULL / RIVER_START);
+  for (let i = 0; i < size; i++) {
+    const a = drained[i] as number;
+    if (a > RIVER_START) river[i] = 0.4 + 0.6 * clamp01(Math.log(a / RIVER_START) / span);
+  }
+  gaussianBlur(river, grid, 0.55);
+
   log("lighting");
   const smooth = Float32Array.from(h);
   gaussianBlur(smooth, grid, 0.7);
@@ -181,6 +211,7 @@ export function bakePremiumGround(
         const s = Math.max(0.25, Math.min(1.5, hs ** 1.35 * (1 + 0.35 * ao)));
         const warm = clamp01((s - 0.6) / 0.8);
         const iceMix = clamp01(((ice[i] as number) - 0.5) * 2 + 0.5);
+        const riverMix = clamp01((river[i] as number) * 1.7);
         for (let c = 0; c < 3; c++) {
           let col =
             (base[c] as number) +
@@ -194,7 +225,9 @@ export function bakePremiumGround(
           col += ((ICE[c] as number) - col) * (iceMix > 0.5 ? 1 : 0);
           col *= 1 + 0.1 * noise;
           const tint = (COOL[c] as number) + ((WARM[c] as number) - (COOL[c] as number)) * warm;
-          landBytes[i * 4 + c] = encode(col * s * (0.75 + 0.25 * tint) * 0.82);
+          const shaded = col * s * (0.75 + 0.25 * tint) * 0.82;
+          const water = (RIVER[c] as number) * (0.85 + 0.15 * Math.min(1.2, s));
+          landBytes[i * 4 + c] = encode(shaded + (water - shaded) * riverMix);
         }
         landBytes[i * 4 + 3] = Math.round(clamp01(s / 2) * 255);
       } else {
@@ -215,12 +248,26 @@ export function bakePremiumGround(
   // Each texture is filled past the coast with its nearest colour, so that the
   // game's own coast curve, drawn over both, cuts clean whatever the filter.
   log("filling past the coast");
+  // Further out than a few tiles nothing reads the colour: one flat tone there keeps the file small.
+  const reach = 4 * k;
   const fill = (bytes: Uint8Array, inside: Uint8Array): void => {
     const nearest = nearestInside(inside, grid);
+    const far = [0, 0, 0, 0];
+    let count = 0;
+    for (let i = 0; i < size; i += 97) {
+      if (inside[i] !== 1) continue;
+      for (let c = 0; c < 4; c++) far[c] = (far[c] as number) + (bytes[i * 4 + c] as number);
+      count++;
+    }
+    const tone = far.map((v) => Math.round(v / Math.max(1, count)));
     for (let i = 0; i < size; i++) {
       const from = nearest[i] as number;
-      if (from === i || from < 0) continue;
-      bytes.copyWithin(i * 4, from * 4, from * 4 + 4);
+      if (from === i) continue;
+      let dx = Math.abs((i % W) - (from % W));
+      if (map.wrapsX) dx = Math.min(dx, W - dx);
+      const dy = Math.abs(Math.floor(i / W) - Math.floor(from / W));
+      if (from < 0 || Math.max(dx, dy) > reach) bytes.set(tone, i * 4);
+      else bytes.copyWithin(i * 4, from * 4, from * 4 + 4);
     }
   };
   fill(landBytes, land);

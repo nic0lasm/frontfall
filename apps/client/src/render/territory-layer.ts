@@ -700,6 +700,16 @@ const fragmentShader = /* glsl */ `
     if (landCover > 0.0) {
       // Lit ahead from real elevation: colour, light and shade come from the texture.
       vec4 hd = texture(premiumLand, at / worldSize);
+      // Zoomed in past a texel, the picture is sharpened against its own blur, and rough
+      // ground (where the light changes fast) gains crags and stones the texture is too coarse for.
+      float zoomIn = 1.0 - smoothstep(0.1, 0.3, pixel);
+      if (zoomIn > 0.0) {
+        vec4 soft = textureLod(premiumLand, at / worldSize, 2.0);
+        hd.rgb = max(hd.rgb + (hd.rgb - soft.rgb) * 0.55 * zoomIn, 0.0);
+        float rough = clamp(abs(hd.a - soft.a) * 7.0, 0.0, 1.0);
+        float crag = nz(at * 5.3) * 0.65 + nz(at * 12.1) * 0.35 - 0.5;
+        hd.rgb *= 1.0 + crag * (0.12 + 0.6 * rough) * zoomIn;
+      }
       shade = hd.a * 2.0;
       albedo = hd.rgb * 0.88 / max(shade, 0.3);
       hm = smoothstep(0.92, 1.25, shade) * 0.0;
