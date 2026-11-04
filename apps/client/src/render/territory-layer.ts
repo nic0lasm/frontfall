@@ -38,6 +38,23 @@ export interface TerritoryLayerOptions {
    * that fills the screen, with the camera given by setGlobePose.
    */
   readonly surface?: "plane" | "sphere" | undefined;
+  /**
+   * The high-definition ground of the premium look (premium-ground.ts): land
+   * and sea lit ahead from real elevation, several texels a tile. The relief
+   * worked out in the shader is left out when it is given.
+   */
+  readonly premium?: PremiumGround | undefined;
+}
+
+/** Ground baked ahead at several texels a tile: lit land (shade in alpha) and lit sea. */
+export interface PremiumGround {
+  readonly land: TexImageSource;
+  readonly sea: TexImageSource;
+  /**
+   * Brightness of the land left unclaimed, and of the sea, against the lit
+   * ground baked: unclaimed land stays dark so that every country stands out.
+   */
+  readonly gain?: { readonly land: number; readonly sea: number } | undefined;
 }
 
 /** The globe camera, as the territory layer needs it (globe-projection.ts). */
@@ -145,6 +162,11 @@ const fragmentShader = /* glsl */ `
   uniform uint hovered;
   uniform sampler2D heightMap;
   uniform vec2 viewport;
+#ifdef PREMIUM
+  uniform sampler2D premiumLand;
+  uniform sampler2D premiumSea;
+  uniform vec2 premiumGain;
+#endif
 
   /** The column on the map, across the seam of a map that wraps; a float division, as % is undefined below 0. */
   int wrapColumn(int x) {
@@ -674,7 +696,27 @@ const fragmentShader = /* glsl */ `
     float canopy = 0.5;
     vec3 albedo = groundSample.rgb;
     vec3 landColor = albedo;
+  #ifdef PREMIUM
     if (landCover > 0.0) {
+      // Lit ahead from real elevation: colour, light and shade come from the texture.
+      vec4 hd = texture(premiumLand, at / worldSize);
+      shade = hd.a * 2.0;
+      albedo = hd.rgb * 0.88 / max(shade, 0.3);
+      hm = smoothstep(0.92, 1.25, shade) * 0.0;
+      float baseLight = luma(albedo);
+      forest = (1.0 - smoothstep(0.06, 0.12, baseLight)) * smoothstep(1.0, 1.3, albedo.g / max(albedo.r, 0.01));
+      float close = 1.0 - smoothstep(0.08, 0.18, pixel);
+      float ice = smoothstep(0.5, 0.7, baseLight);
+      vec3 grain = fineFade > 0.0 ? vec3(0.94 + 0.12 * nz(at * 2.3)) : vec3(1.0);
+      grain = mix(vec3(1.0), grain, fineFade);
+      if (close > 0.0) grain *= mix(vec3(1.0), closeGround(at, forest, 0.0, ice, pixel), close * 0.8);
+      landColor = hd.rgb * grain * premiumGain.x;
+      landColor *= 1.0 + 0.16 * (1.0 - smoothstep(0.0, max(0.3, 1.6 * pixel), coastIn));
+    }
+    if (false) {
+  #else
+    if (landCover > 0.0) {
+  #endif
       float eN = clamp(pixel, 0.12, 0.5);
       vec2 warp = reliefWarp(at);
       // The same two noises, rescaled, bend the ridges and raise or lower the ground.
@@ -735,10 +777,15 @@ const fragmentShader = /* glsl */ `
     // Sea: four tones of depth, a slow swell, surf and two waves creeping in.
     vec3 seaColor = vec3(0.0);
     if (landCover < 1.0) {
+  #ifdef PREMIUM
+      // Real depths: shelves, basins and trenches, lit ahead like the land.
+      seaColor = texture(premiumSea, at / worldSize).rgb * premiumGain.y;
+  #else
       seaColor = mix(srgb3(34.0, 112.0, 134.0), srgb3(18.0, 66.0, 92.0), smoothstep(0.0, max(1.4, 4.5 * pixel), depth));
       float shelfWidth = max(1.4, 4.5 * pixel);
       seaColor = mix(seaColor, srgb3(12.0, 40.0, 62.0), smoothstep(0.5 * shelfWidth, 2.2 * shelfWidth + 3.0, depth));
       seaColor = mix(seaColor, srgb3(7.0, 22.0, 38.0), smoothstep(8.0, 40.0, depth));
+  #endif
       seaColor *= 1.0 - 0.32 * exp(-depth / max(0.4, 1.4 * pixel));
       float swell = nz(at * 0.22 + t * vec2(0.05, 0.02)) + nz(at * 0.5 - t * vec2(0.03, 0.06)) - 1.0;
       seaColor *= 1.0 + 0.16 * swell * (1.0 - smoothstep(0.25, 1.1, pixel)) * smoothstep(0.6, 4.0, depth);
@@ -905,6 +952,8 @@ export class TerritoryLayer {
   /** The rectangle of the ground that changed since it was last sent: first and last column and row. */
   private groundDirty: { x0: number; y0: number; x1: number; y1: number } | undefined;
   private fullRefresh = false;
+  /** The premium look's land and sea, when the layer was given them. */
+  private readonly premiumTextures: THREE.Texture[];
 
   constructor(readonly options: TerritoryLayerOptions) {
     const { width, height, owners, terrain, maxOwner } = options;
@@ -991,15 +1040,40 @@ export class TerritoryLayer {
     }
 
     const sphere = options.surface === "sphere";
+    const premium = options.flat ? undefined : options.premium;
+    this.premiumTextures = premium
+      ? [premium.land, premium.sea].map((image) => {
+          const texture = new THREE.Texture(image);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.flipY = false;
+          texture.premultiplyAlpha = false;
+          texture.magFilter = THREE.LinearFilter;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.generateMipmaps = true;
+          texture.anisotropy = 8;
+          texture.wrapS = wrapsX ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+          texture.needsUpdate = true;
+          return texture;
+        })
+      : [];
     const material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
-      defines: { ...(sphere ? { SPHERE: 1 } : {}), ...(options.flat ? { FLAT: 1 } : {}) },
+      defines: {
+        ...(sphere ? { SPHERE: 1 } : {}),
+        ...(options.flat ? { FLAT: 1 } : {}),
+        ...(premium ? { PREMIUM: 1 } : {}),
+      },
       vertexShader,
       fragmentShader,
       uniforms: {
         owners: { value: this.ownerTexture },
         ground: { value: this.groundTexture },
         heightMap: { value: this.heightTexture },
+        premiumLand: { value: this.premiumTextures[0] ?? null },
+        premiumSea: { value: this.premiumTextures[1] ?? null },
+        premiumGain: {
+          value: new THREE.Vector2(premium?.gain?.land ?? 0.62, premium?.gain?.sea ?? 0.8),
+        },
         viewport: { value: new THREE.Vector2(1, 1) },
         takenAt: { value: this.takenAtTexture },
         palette: { value: this.paletteTexture },
@@ -1394,6 +1468,7 @@ export class TerritoryLayer {
     this.heightTexture.dispose();
     this.takenAtTexture.dispose();
     this.paletteTexture.dispose();
+    for (const texture of this.premiumTextures) texture.dispose();
   }
 }
 

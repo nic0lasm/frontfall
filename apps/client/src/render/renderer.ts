@@ -106,6 +106,8 @@ export interface RendererOptions {
   readonly groundSource?: { readonly id: string; readonly sha256: string } | undefined;
   /** The flat map: square tiles, without smooth coasts and borders, for older devices. */
   readonly flat?: boolean | undefined;
+  /** The premium look's ground, baked ahead at several texels a tile (premium-ground.ts). */
+  readonly premium?: import("./territory-layer.ts").PremiumGround | undefined;
   /** A phone, which asks for larger ships. */
   readonly phone?: boolean | undefined;
   /** Owner of every tile, kept up to date by the caller and read in place. */
