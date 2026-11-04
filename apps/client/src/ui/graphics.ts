@@ -12,16 +12,29 @@ export interface GraphicsProfile {
   readonly maxPixelRatio: number;
   /** The map in square tiles, without smooth coasts and borders. */
   readonly flat: boolean;
+  /** The ground baked from real elevation, where the build holds it (docs/premium-graphics.md). */
+  readonly premium: boolean;
 }
 
 export const QUALITY: GraphicsProfile = {
   saver: false,
   maxPixelRatio: MAX_PIXEL_RATIO,
   flat: false,
+  premium: true,
 };
 /** The full picture on a phone, at 1.5 times its screen's pixels instead of twice. */
-export const BALANCED: GraphicsProfile = { saver: false, maxPixelRatio: 1.5, flat: false };
-export const SAVER: GraphicsProfile = { saver: true, maxPixelRatio: 1, flat: true };
+export const BALANCED: GraphicsProfile = {
+  saver: false,
+  maxPixelRatio: 1.5,
+  flat: false,
+  premium: true,
+};
+export const SAVER: GraphicsProfile = {
+  saver: true,
+  maxPixelRatio: 1,
+  flat: true,
+  premium: false,
+};
 
 /** What the browser tells about the device, all of it optional but the screen. */
 export interface DeviceSignals {

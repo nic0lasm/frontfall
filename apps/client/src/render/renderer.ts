@@ -1,8 +1,10 @@
 import { FlatCamera, type CameraView, type ViewCamera } from "./camera.ts";
 import type * as Lazy from "./lazy.ts";
+import type { PremiumGround } from "./territory-layer.ts";
 import { MapView } from "./map-view.ts";
 
 export { FRONT_SECONDS } from "./fronts.ts";
+export type { PremiumGround } from "./territory-layer.ts";
 
 /** How the map is shown: flat, or on a globe for a map of the whole planet (a prototype, ADR 0005). */
 export type ViewKind = "flat" | "globe";
@@ -107,7 +109,7 @@ export interface RendererOptions {
   /** The flat map: square tiles, without smooth coasts and borders, for older devices. */
   readonly flat?: boolean | undefined;
   /** The premium look's ground, baked ahead at several texels a tile (premium-ground.ts). */
-  readonly premium?: import("./territory-layer.ts").PremiumGround | undefined;
+  readonly premium?: PremiumGround | undefined;
   /** A phone, which asks for larger ships. */
   readonly phone?: boolean | undefined;
   /** Owner of every tile, kept up to date by the caller and read in place. */

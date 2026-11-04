@@ -35,7 +35,8 @@
     "campaign": "pnpm --filter @frontfall/bench campaign",
     "determinism": "pnpm --filter @frontfall/bench determinism",
     "golden": "pnpm --filter @frontfall/bench golden",
-    "load": "pnpm --filter @frontfall/bench load"
+    "load": "pnpm --filter @frontfall/bench load",
+    "premium": "pnpm --filter @frontfall/tools premium"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

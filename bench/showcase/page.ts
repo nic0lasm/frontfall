@@ -106,15 +106,17 @@ async function run(): Promise<void> {
   }
 
   await loadPieces();
-  // ?premium=<style>: the ground baked ahead, read from the folder given in ?bake.
-  const style = params.get("premium");
+  // ?premium: the ground baked ahead by `pnpm premium`, from the published maps' folder.
   let premium:
     { land: ImageBitmap; sea: ImageBitmap; gain: { land: number; sea: number } } | undefined;
-  if (style) {
-    const folder = "/@fs" + decodeURIComponent(params.get("bake") ?? "");
+  if (params.has("premium")) {
     const load = async (part: string): Promise<ImageBitmap> => {
-      const blob = await (await fetch(`${folder}/${mapId}-${style}-${part}.png`)).blob();
-      return createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+      const response = await fetch(new URL(`maps/premium/${mapId}-${part}.webp`, base));
+      if (!response.ok) throw new Error(`no premium ground for ${mapId}: run pnpm premium`);
+      return createImageBitmap(await response.blob(), {
+        premultiplyAlpha: "none",
+        colorSpaceConversion: "none",
+      });
     };
     premium = {
       land: await load("land"),

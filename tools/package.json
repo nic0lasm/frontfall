@@ -8,7 +8,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "maps": "tsx src/mapgen/cli.ts",
-    "announce": "tsx src/announce-cli.ts"
+    "announce": "tsx src/announce-cli.ts",
+    "premium": "tsx src/premium/cli.ts"
   },
   "dependencies": {
     "@frontfall/engine": "workspace:*",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "geotiff": "3.0.5",
+    "sharp": "0.34.5",
     "tsx": "^4.23.15"
   }
 }

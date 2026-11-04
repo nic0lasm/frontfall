@@ -34,6 +34,8 @@ Attributions the city maps carry:
 
 The names of the city maps' nations are those of the arrondissements, quarters and neighbouring towns they start in; their starting points were placed by hand at each town hall.
 
+The premium look of the Earth maps (a build option, see [docs/premium-graphics.md](docs/premium-graphics.md)) is baked from the [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) of the AWS Open Data registry: SRTM, GMTED2010, ETOPO1 and 3DEP in the public domain, and EU-DEM, ArcticDEM, CDEM, Kartverket, data.gov.uk, INEGI, Geoscience Australia and LINZ under the credits listed on that page.
+
 The files and their checksums are listed in [`tools/mapgen/sources.json`](tools/mapgen/sources.json). See [docs/maps.md](docs/maps.md) for how they are used.
 
 ## Artwork

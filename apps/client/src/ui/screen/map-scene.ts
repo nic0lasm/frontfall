@@ -12,11 +12,13 @@ import {
   FRONT_SECONDS,
   globeLoaded,
   type MissileEnd,
+  type PremiumGround,
   type Renderer,
   type StructureMark,
   type ViewKind,
 } from "../../render/renderer.ts";
 import type { Minimap } from "../../render/minimap.ts";
+import { loadPremiumGround } from "../../render/premium-ground.ts";
 import { RenderScale } from "../../render/render-scale.ts";
 import {
   type GraphicsProfile,
@@ -113,6 +115,8 @@ export class MapScene {
   private readonly mapSize: { readonly width: number; readonly height: number };
   /** What the renderer is made from, kept to make another one when the view switches. */
   private shown: SceneStart | undefined;
+  /** The ground baked from real elevation, once loaded for this map (render/premium-ground.ts). */
+  private premium: PremiumGround | undefined;
 
   constructor(
     /** The layer the canvas goes in. */
@@ -159,16 +163,10 @@ export class MapScene {
     if (accessibility().graphics !== "auto" || this.profile.saver || !this.view) return;
     rememberSaver(safeStorage());
     this.profile = SAVER;
+    this.premium = undefined;
     this.scale = new RenderScale(window.devicePixelRatio, SAVER.maxPixelRatio);
-    const kept = this.view;
-    this.unwatchContext?.();
-    this.unwatchContext = undefined;
-    kept.dispose();
-    this.view = undefined;
     // The owners are already there to draw.
-    this.mount()?.markAllChanged();
-    this.drawnStructures = [];
-    if (this.latest) this.placeStructures(this.latest);
+    this.remount();
   }
 
   /** The camera of the current view; another one after a switch. */
@@ -239,6 +237,34 @@ export class MapScene {
     this.shown = start;
     const view = this.mount();
     if (view) this.addMinimap(start, view);
+    this.loadPremium(start);
+  }
+
+  /**
+   * The premium ground, where the build holds one for this map: the game
+   * starts on the usual ground and the renderer is made again over the same
+   * owners once the images are decoded.
+   */
+  private loadPremium(start: SceneStart): void {
+    const { map } = start;
+    if (!this.profile.premium || this.flat || !map.source) return;
+    void loadPremiumGround(map.id, map.source.sha256).then((ground) => {
+      if (!ground || this.shown !== start || !this.view || this.profile.saver) return;
+      this.premium = ground;
+      this.remount();
+    });
+  }
+
+  /** A new renderer of the current kind over the owners already there. */
+  private remount(): void {
+    if (!this.view) return;
+    this.unwatchContext?.();
+    this.unwatchContext = undefined;
+    this.view.dispose();
+    this.view = undefined;
+    this.mount()?.markAllChanged();
+    this.drawnStructures = [];
+    if (this.latest) this.placeStructures(this.latest);
   }
 
   /** The minimap of a game: over the ground the renderer baked, in the players' colours. */
@@ -285,6 +311,7 @@ export class MapScene {
           latitudes: map.latitudes,
           groundSource: map.source && { id: map.id, sha256: map.source.sha256 },
           flat: this.flat,
+          premium: this.viewKind === "flat" ? this.premium : undefined,
           phone: isPhone(readDevice()),
           owners: this.owners,
           maxOwner: maxPlayer,
