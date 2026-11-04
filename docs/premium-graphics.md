@@ -21,9 +21,21 @@ pnpm premium -- --maps europe,world,americas,africa,asia --texels 4
 
 The tool (`tools/src/premium/`) downloads the elevation tiles that cover each map, at the zoom whose pixels are at least as fine as the texels, keeps them in `node_modules/.cache/mapgen/terrarium/`, and writes `apps/client/public/maps/premium/<map>-land.webp`, `<map>-sea.webp` (half the texels: the sea is smooth) and `index.json`. These files are left out of git: the premium builds bake them. A bake takes a few minutes a map.
 
-| Map    | Texture     | Elevation zoom | Land (WebP) |
-| ------ | ----------- | -------------- | ----------- |
-| Europe | 5120 × 4320 | 8              | 6.1 MB      |
+| Map      | Land texture | Elevation zoom | Land + sea (WebP) |
+| -------- | ------------ | -------------- | ----------------- |
+| World    | 8192 × 4096  | 5              | 5.8 MB            |
+| Europe   | 5120 × 4320  | 8              | 6.0 MB            |
+| Americas | 3840 × 4096  | 7              | 2.5 MB            |
+| Africa   | 4096 × 4096  | 7              | 4.1 MB            |
+| Asia     | 5120 × 4352  | 7              | 8.1 MB            |
+
+Rivers are drawn from the elevation alone: every texel of land drains to the sea along a priority flood, and a river shows where more than 6,000 km² of wet land drains through it (a desert counts for little), widest past 400,000 km².
+
+Up close, the shader sharpens the ground against its own blur and adds crags where the light changes fast; at middle zooms the shadows of high clouds drift over the map (still with less motion), and a light grading leans the shadows blue and the highlights warm.
+
+## Cost
+
+Measured on the fixed scene (`bench/showcase`, Europe) in the software renderer, median of 12 frames: 12 to 22 % less time a frame than 0.9.9 at every zoom, on a laptop and a phone, as the relief is no longer worked out a pixel at a time. On a GPU, texture reads weigh more than in software: the cost is to be measured again on an iPhone with `?perf` on a premium build, against the 0.9.9 measure in [performance.md](performance.md). The textures take about 120 MB of graphics memory on Europe with their mipmaps, which is why the light picture leaves them out.
 
 The light the land got is kept in the alpha channel, so the images must be decoded without premultiplying it (`createImageBitmap` with `premultiplyAlpha: "none"`).
 
