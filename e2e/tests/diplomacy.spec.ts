@@ -242,10 +242,6 @@ test("closes the player menu with Esc before pausing", async ({ page }) => {
 });
 
 test.describe("on a touch screen", () => {
-  // The bot's land is found on a screenshot of a software-rendered map: on a loaded runner the
-  // camera has not always reached it, or has moved on, so the press misses. The test is run again
-  // a few times, and still has to pass once with every check.
-  test.describe.configure({ retries: 3 });
   // Synthetic pointer events need no touch support from the browser.
   test.use({ viewport: { width: 400, height: 760 } });
 
@@ -253,9 +249,9 @@ test.describe("on a touch screen", () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    // At ×5 a bot may take the whole map while the camera looks for the other one; at ×1 the
-    // bots' land is still too small to find.
-    await startGame(page, 2, "", 2);
+    // At ×1 a bot needs minutes to win, which leaves a loaded runner time to look for the land;
+    // the search starts once a bot holds enough of the map to be found (below).
+    await startGame(page, 2, "", 1);
     // On a phone the guide covers a good part of the map: put away, as a player would.
     const hide = page.locator("#guide-hide");
     if (await hide.isVisible()) await hide.click();
@@ -265,6 +261,19 @@ test.describe("on a touch screen", () => {
     if (!box) throw new Error("the map has no size");
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 400);
+    // A bot's land is big enough to find on a zoomed-out screen once the leaderboard shows 3 % of
+    // the map for it (a state, not a colour).
+    await expect
+      .poll(
+        () =>
+          page.evaluate<number>(
+            `[...document.querySelectorAll(".leader-button .leader-land")].filter(
+              (land) => (Number.parseFloat(land.textContent.replace(",", ".")) || 0) >= 3,
+            ).length`,
+          ),
+        { timeout: 60_000 },
+      )
+      .toBeGreaterThan(0);
     // A bot's land, either bot's, found on screen by its colour in the leaderboard.
     const bots = await page.evaluate<{ name: string; color: string }[]>(
       `[...document.querySelectorAll(".leader-button")].map((button) => ({
@@ -279,19 +288,29 @@ test.describe("on a touch screen", () => {
       }
       return undefined;
     };
-    // A tall screen shows the map's whole height but not its width: pan east, then west.
-    // Keys move the camera while held.
-    let at = await search();
-    for (let i = 0; i < 24 && !at; i++) {
-      const key = i < 8 ? "ArrowRight" : "ArrowLeft";
-      await page.keyboard.down(key);
-      await frames(page, 24);
-      await page.keyboard.up(key);
-      // Searched once the camera stands still, so that the press lands on what was found.
-      at = await search();
-    }
+    // A tall screen shows the map's whole height but not its width: the camera is moved east, then
+    // west, while it looks, and the search goes on until a bot's land is on screen. Keys move the
+    // camera while held.
+    let at: { x: number; y: number; name: string } | undefined;
+    let sweep = 0;
+    await expect
+      .poll(
+        async () => {
+          at = await search();
+          if (at) return true;
+          const key = sweep++ % 16 < 8 ? "ArrowRight" : "ArrowLeft";
+          await page.keyboard.down(key);
+          await frames(page, 24);
+          await page.keyboard.up(key);
+          // Searched again once the camera stands still, so that the press lands on what was found.
+          await frames(page, 4);
+          at = await search();
+          return at !== undefined;
+        },
+        { timeout: 60_000, intervals: [0] },
+      )
+      .toBe(true);
     if (!at) throw new Error("no bot's land on screen");
-    const { name } = at;
     const { x, y } = at;
     // Synthetic pointer events carry their own time; a string, as the tests are not compiled for the DOM.
     await page.evaluate(`(async () => {
@@ -301,7 +320,11 @@ test.describe("on a touch screen", () => {
       await new Promise((resolve) => setTimeout(resolve, 600));
       map.dispatchEvent(new PointerEvent("pointerup", init));
     })()`);
-    await expect(menu.locator("h2")).toHaveText(name);
+    // The colour found may sit on the other bot's land (two palette colours can be close, or the
+    // land has changed hands since): the menu is of whichever bot is there.
+    await expect(menu.locator("h2")).toHaveText(
+      new RegExp(`^(${bots.map((bot) => bot.name).join("|")})$`),
+    );
     // An attack would show up with the next updates: the clock says they came.
     // (Troops are no sign of one: they stand still once at their cap.)
     const clock = page.locator(".goal-clock");
