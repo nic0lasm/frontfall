@@ -23,11 +23,11 @@
     "@frontfall/engine": "workspace:*",
     "@frontfall/protocol": "workspace:*",
     "@frontfall/server": "workspace:*",
-    "three": "^0.186.1",
-    "ws": "^8.22.0"
+    "three": "^0.187.0",
+    "ws": "^8.22.1"
   },
   "devDependencies": {
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.187.0",
     "@types/ws": "^8.18.2",
     "playwright-core": "^1.64.1",
     "tsx": "^4.23.15",
