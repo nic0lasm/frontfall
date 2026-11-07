@@ -10,7 +10,7 @@ import {
   NATION_WORK_PERCENT,
 } from "../src/bots/index.ts";
 import { installDiplomacy } from "../src/diplomacy.ts";
-import { installEconomy, populationCap } from "../src/economy.ts";
+import { installEconomy, populationCap, workShareOf } from "../src/economy.ts";
 import { Game, type GameRules, type Order, type Player } from "../src/game.ts";
 import { installSpawn, spawnSettings } from "../src/spawn.ts";
 import { StructureKind, installStructures } from "../src/structures.ts";
@@ -218,13 +218,13 @@ describe("nations", () => {
     nation.troops = cap;
     run(interval);
     expect(workOf(1)).toEqual([NATION_WORK_PERCENT]);
-    expect(nation.workShare).toBe(NATION_WORK_PERCENT);
+    expect(workShareOf(game, nation.id)).toBe(NATION_WORK_PERCENT);
     ada.troops = 10 * cap;
     run(1, [{ player: 2, order: { type: "betray", target: 1 } }]);
     adaAttacks(nation.troops);
     run(interval);
     expect(workOf(1)).toEqual([NATION_WORK_PERCENT, 0]);
-    expect(nation.workShare).toBe(0);
+    expect(workShareOf(game, nation.id)).toBe(0);
   });
 
   it("keep their troops under arms where a neighbour could break their front (R-BOT-16)", () => {

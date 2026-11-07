@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchMaps, fetchManifest, generatedThumbnail, GENERATED_MAPS } from "../src/game/maps.ts";
+import { fetchMaps, fetchManifest, generatedThumbnail, GENERATED_MAPS } from "../src/maps.ts";
 import { prebakeGround, takeBakedGround } from "../src/render/prebaked-ground.ts";
 
 const PAGE = "https://example.test/frontfall/";

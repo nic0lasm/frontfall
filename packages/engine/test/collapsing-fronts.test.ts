@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collapseDepth, installAttacks } from "../src/attacks.ts";
+import { collapseDepth, installAttacks, pressureOf } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { Game, type Order, type Player } from "../src/game.ts";
 import { loadSnapshot, saveSnapshot } from "../src/snapshot.ts";
@@ -7,6 +7,7 @@ import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { WorldGrid } from "../src/world-grid.ts";
 import { WHOLE_PRICES } from "./whole-prices.ts";
+import { writable } from "../src/state/lists.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
@@ -64,6 +65,12 @@ function blankGame(collapsingFronts: boolean, overrides: Partial<Balance>) {
   return { grid, game };
 }
 
+/** The pressure of the first attack under way, if there is one. */
+function firstPressure(game: Game): number | undefined {
+  const attack = game.attacks[0];
+  return attack === undefined ? undefined : pressureOf(game, attack);
+}
+
 describe("collapsing fronts (R-ATTACK-10)", () => {
   it("is off unless the setup turns it on (R-MODE-08)", () => {
     const { game, ada, run, attack } = newGame(false);
@@ -72,7 +79,7 @@ describe("collapsing fronts (R-ATTACK-10)", () => {
     for (let i = 0; i < 9; i++) run();
     // One tile per tick, nothing more.
     expect(game.territory.tileCount(1)).toBe(HEIGHT + 10);
-    expect(game.attacks[0]?.pressure).toBe(0);
+    expect(firstPressure(game)).toBe(0);
     expect(game.diplomacyEvents).toEqual([]);
   });
 
@@ -81,12 +88,12 @@ describe("collapsing fronts (R-ATTACK-10)", () => {
     ada.troops = 10_000;
     run([attack(10_000)]);
     run();
-    expect(game.attacks[0]?.pressure).toBe(2);
+    expect(firstPressure(game)).toBe(2);
     expect(game.territory.tileCount(1)).toBe(HEIGHT + 2);
     run();
     // The third tile, then the stretch behind it, within 3 tiles of it.
     expect(game.territory.tileCount(1)).toBeGreaterThan(HEIGHT + 3 + 10);
-    expect(game.attacks[0]?.pressure).toBe(0);
+    expect(firstPressure(game)).toBe(0);
     const event = game.diplomacyEvents.at(-1);
     expect(event).toMatchObject({ type: "collapsed", a: 1, b: 2 });
     const tip = event?.tile as number;
@@ -119,13 +126,13 @@ describe("collapsing fronts (R-ATTACK-10)", () => {
     ada.troops = 260;
     run([attack(260)]);
     for (let i = 0; i < 5; i++) run();
-    expect(game.attacks[0]?.pressure ?? 0).toBe(0);
+    expect(firstPressure(game) ?? 0).toBe(0);
     expect(game.diplomacyEvents).toEqual([]);
   });
 
   it("does not give way within reach of a ready fort (R-BUILD-03)", () => {
     const { grid, game, ada, run, attack } = newGame(true, { fortRadius: 4 });
-    game.structures.push({
+    writable(game, "structures").push({
       id: 1,
       player: 2,
       kind: StructureKind.Fort,
@@ -172,11 +179,11 @@ describe("collapsing fronts (R-ATTACK-10)", () => {
     ada.troops = 10_000;
     run([attack(10_000)]);
     for (let i = 0; i < 4; i++) run();
-    expect(game.attacks[0]?.pressure).toBe(5);
+    expect(firstPressure(game)).toBe(5);
     const loaded = loadSnapshot(saveSnapshot(game, "test"), "test", create);
     expect(loaded.ok ? "" : loaded.reason).toBe("");
     if (!loaded.ok) return;
-    expect(loaded.game.attacks.map((a) => a.pressure)).toEqual([5]);
+    expect(loaded.game.attacks.map((a) => pressureOf(loaded.game, a))).toEqual([5]);
     expect(loaded.game.hash()).toBe(game.hash());
   });
 });

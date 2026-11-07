@@ -1,5 +1,5 @@
 import type { GameSession } from "../../game/session.ts";
-import type { ClickMode, ClickPreview, GameUpdate } from "../../game/solo-game.ts";
+import type { ClickMode, ClickPreview, GameUpdate } from "../../game/game-runner.ts";
 import { aimReach } from "../../input/aim.ts";
 import { t, type MessageKey } from "../../i18n/index.ts";
 import type { ViewCamera } from "../../render/camera.ts";

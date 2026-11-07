@@ -1,3 +1,5 @@
+import { safeStorage } from "../storage.ts";
+
 /**
  * Achievements of this device, as the account keeps them. Loaded with the
  * sign-in box only, so it reads the browser's storage itself rather than
@@ -17,16 +19,8 @@ export interface SavedAchievements {
   counts: Record<string, number>;
 }
 
-function storage(): Storage | undefined {
-  try {
-    return localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 /** What this device has earned; nothing when its storage cannot be read. */
-export function deviceAchievements(store = storage()): SavedAchievements {
+export function deviceAchievements(store = safeStorage()): SavedAchievements {
   const found: SavedAchievements = { earned: {}, counts: {} };
   let data: unknown;
   try {
@@ -54,7 +48,7 @@ export function deviceAchievements(store = storage()): SavedAchievements {
  * Adds achievements kept with the account to those of this device: the
  * higher level and the earlier day of each, the larger of each count.
  */
-export function absorbAchievements(kept: SavedAchievements, store = storage()): void {
+export function absorbAchievements(kept: SavedAchievements, store = safeStorage()): void {
   const mine = deviceAchievements(store);
   for (const [id, entry] of Object.entries(kept.earned)) {
     if (!isObject(entry) || typeof entry.at !== "number" || !isLevel(entry.level)) continue;

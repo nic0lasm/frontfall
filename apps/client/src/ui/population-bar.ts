@@ -1,6 +1,6 @@
 import { DEFAULT_BALANCE, troopGrowth } from "@frontfall/engine";
 import { t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { formatCount } from "./format.ts";
 
 /** The band is where troops grow at least this share of their fastest. */

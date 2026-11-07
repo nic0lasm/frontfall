@@ -1,8 +1,8 @@
 import type { LabelAnchor } from "../game/label-anchors.ts";
 import type { GameUpdate } from "../game/game-view.ts";
-import type { PlayerView } from "../game/solo-game.ts";
+import type { PlayerView } from "../game/game-runner.ts";
 import type { Camera } from "../render/camera.ts";
-import { h, setText } from "./dom.ts";
+import { h, setText } from "../dom.ts";
 import { formatCount } from "./format.ts";
 
 /**
@@ -22,7 +22,7 @@ const LINES_EM = 2.1;
 /** Narrowest land, in CSS pixels, that carries a name at the smallest size. */
 const MIN_ACROSS = FONT_SIZES[0] * LINES_EM;
 
-/** Marks beside the troops of a player (setRelations). */
+/** Marks beside the troops of a player (relationMarks). */
 const MARK_LEADER = "\u265B";
 const MARK_ALLY = "\u2713";
 const MARK_TRAITOR = "\u26A0";
@@ -64,6 +64,7 @@ export class PlayerLabels {
   private readonly labels = new Map<number, Label>();
   private anchors: readonly LabelAnchor[] = [];
   private obstacles: readonly Box[] = [];
+  private marks: ReadonlyMap<number, string> = new Map();
 
   update(players: readonly PlayerView[], anchors: readonly LabelAnchor[] | undefined): void {
     // Largest lands first: where two names would overlap, the smaller one gives way.
@@ -75,7 +76,7 @@ export class PlayerLabels {
           name: player.name,
           count: "",
           raw: "",
-          badges: "",
+          badges: this.badgesOf(player.id),
           transform: "",
           size: 0,
           shown: false,
@@ -97,41 +98,24 @@ export class PlayerLabels {
   }
 
   /**
-   * Marks beside the troops of each player, from one update: the leader, an
-   * ally, a traitor, an embargo and an alliance request. Texts are written
-   * only for a player whose marks changed, on updates and not on frames.
+   * Marks beside the troops of each player (relationMarks). Texts are
+   * written only for a player whose marks changed; a label made later takes
+   * its marks when it is made.
    */
-  setRelations(update: GameUpdate): void {
-    const marks = new Map<number, string>();
-    const add = (id: number, mark: string): void => {
-      marks.set(id, (marks.get(id) ?? "") + mark);
-    };
-    if (update.phase === "play") {
-      let top = 0;
-      let leader = 0;
-      for (const player of update.players) {
-        if (!player.alive || player.cityState === true || player.tiles <= top) continue;
-        top = player.tiles;
-        leader = player.id;
-      }
-      if (leader !== 0) add(leader, MARK_LEADER);
-    }
-    const { diplomacy } = update;
-    for (const ally of diplomacy.allies) add(ally.id, MARK_ALLY);
-    for (const traitor of diplomacy.traitors) add(traitor.id, MARK_TRAITOR);
-    for (const id of new Set([...diplomacy.embargoes, ...diplomacy.embargoedBy])) {
-      add(id, MARK_EMBARGO);
-    }
-    for (const request of diplomacy.incoming) add(request.from, MARK_ASK);
-    for (const id of diplomacy.outgoing) add(id, MARK_ASK);
+  setMarks(marks: ReadonlyMap<number, string>): void {
+    this.marks = marks;
     for (const [id, label] of this.labels) {
-      const found = marks.get(id);
-      const badges = found === undefined ? "" : `${found} `;
+      const badges = this.badgesOf(id);
       if (badges === label.badges) continue;
       label.badges = badges;
       label.count = badges + label.raw;
       if (label.troops) setText(label.troops, label.count);
     }
+  }
+
+  private badgesOf(id: number): string {
+    const found = this.marks.get(id);
+    return found === undefined ? "" : `${found} `;
   }
 
   private build(label: Label): HTMLElement {
@@ -224,4 +208,35 @@ export class PlayerLabels {
 
 function overlaps(a: Box, b: Box): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
+
+/**
+ * Marks beside the troops of each player, from one update: the leader, an
+ * ally, a traitor, an embargo and an alliance request. They change far less
+ * often than the troops, so the labels take them on their own (setMarks).
+ */
+export function relationMarks(update: GameUpdate): ReadonlyMap<number, string> {
+  const marks = new Map<number, string>();
+  const add = (id: number, mark: string): void => {
+    marks.set(id, (marks.get(id) ?? "") + mark);
+  };
+  if (update.phase === "play") {
+    let top = 0;
+    let leader = 0;
+    for (const player of update.players) {
+      if (!player.alive || player.cityState === true || player.tiles <= top) continue;
+      top = player.tiles;
+      leader = player.id;
+    }
+    if (leader !== 0) add(leader, MARK_LEADER);
+  }
+  const { diplomacy } = update;
+  for (const ally of diplomacy.allies) add(ally.id, MARK_ALLY);
+  for (const traitor of diplomacy.traitors) add(traitor.id, MARK_TRAITOR);
+  for (const id of new Set([...diplomacy.embargoes, ...diplomacy.embargoedBy])) {
+    add(id, MARK_EMBARGO);
+  }
+  for (const request of diplomacy.incoming) add(request.from, MARK_ASK);
+  for (const id of diplomacy.outgoing) add(id, MARK_ASK);
+  return marks;
 }

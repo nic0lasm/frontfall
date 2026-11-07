@@ -1,7 +1,8 @@
+import { youOf } from "../game/selectors.ts";
 import "./guide.css";
 import { getLanguage, type Language } from "../i18n/index.ts";
-import type { GameUpdate } from "../game/solo-game.ts";
-import { h, setText } from "./dom.ts";
+import type { GameUpdate } from "../game/game-runner.ts";
+import { h, setText } from "../dom.ts";
 
 /**
  * Short explanations that show once, the first time something happens that a
@@ -56,7 +57,7 @@ const SHOWN_TICKS = 200;
 /** The first hint whose moment has come, that was not shown yet. */
 export function due(update: GameUpdate, seen: readonly string[]): HintId | undefined {
   if (update.phase !== "play") return undefined;
-  const you = update.players.find((player) => player.id === update.you);
+  const you = youOf(update);
   if (!you?.alive) return undefined;
   const moments: [HintId, boolean][] = [
     ["attacked", (update.incoming?.length ?? 0) > 0],

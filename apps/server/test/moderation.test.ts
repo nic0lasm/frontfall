@@ -1,20 +1,21 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Moderation, validTarget } from "../src/moderation.ts";
+import { Moderation, validTarget, writeBans } from "../src/moderation.ts";
+import type { SqlDriver } from "../src/sql/driver.ts";
+import { tempDatabase, type TempDatabase } from "./support/database.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 const T0 = Date.parse("2026-11-01T12:00:00Z");
 const report = { game: "abcdefgh", reason: "abuse" as const, player: 2, name: "Troll" };
 
 describe("Moderation (R-MODE-06)", () => {
-  let dir: string;
+  let data: TempDatabase;
+  let dir: SqlDriver;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "frontfall-moderation-"));
+    data = tempDatabase("frontfall-moderation-");
+    dir = data.db;
   });
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
+    data.remove();
   });
 
   it("names addresses by a reference that never shows the address", () => {
@@ -32,8 +33,10 @@ describe("Moderation (R-MODE-06)", () => {
 
   it("keeps the same references across restarts with a data directory", () => {
     const first = new Moderation(dir, T0).ref("203.0.113.7");
-    expect(new Moderation(dir, T0).ref("203.0.113.7")).toBe(first);
-    expect(statSync(join(dir, "moderation", "key")).mode & 0o777).toBe(0o600);
+    expect(new Moderation(data.reopen(), T0).ref("203.0.113.7")).toBe(first);
+    expect(
+      dir.get<{ value: string }>("SELECT value FROM meta WHERE key = ?", ["moderation.key"])?.value,
+    ).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("records a report once per reporter, game and player, within a rate", () => {
@@ -60,7 +63,8 @@ describe("Moderation (R-MODE-06)", () => {
       },
     ]);
     moderation.flush();
-    const file = readFileSync(join(dir, "moderation", "reports.json"), "utf8");
+    const file = JSON.stringify(dir.all("SELECT * FROM reports"));
+    expect(file).toContain("Troll");
     expect(file).not.toContain("198.51.100");
     expect(file).not.toContain("203.0.113");
     // Kept across a restart, and forgotten after 30 days.
@@ -110,25 +114,35 @@ describe("Moderation (R-MODE-06)", () => {
     expect(moderation.unban("2001:DB8:0:1:ffff::1", T0)).toBe(true);
   });
 
-  it("reads a ban list written by hand, and refuses one that does not read", () => {
+  it("reads a ban list another process changed, and refuses one that does not read", () => {
     const moderation = new Moderation(dir, T0);
-    const file = join(dir, "moderation", "bans.json");
-    writeFileSync(
-      file,
-      JSON.stringify({
-        bans: [{ target: "203.0.113.7", until: "2026-12-01" }, { target: "2001:db8::1" }],
-      }),
-    );
+    // As the admin command writes it, through its own connection.
+    const other = data.reopen();
+    writeBans(other, [
+      { target: "203.0.113.7", until: "2026-12-01T00:00:00.000Z" },
+      { target: "2001:db8::1", until: null },
+    ]);
     moderation.reload(T0);
     expect(moderation.list(T0).map((ban) => [ban.target, ban.until])).toEqual([
       ["203.0.113.7", "2026-12-01T00:00:00.000Z"],
       ["2001:db8:0:0::/64", null],
     ]);
-    writeFileSync(file, JSON.stringify({ bans: [{ target: "nobody" }] }));
+    other.run("INSERT INTO bans (target, until, note) VALUES (?, ?, ?)", ["nobody", null, null]);
     expect(() => {
       moderation.reload(T0);
-    }).toThrow("entry 1");
+    }).toThrow("entry 3");
     // The list stays as it was.
     expect(moderation.list(T0)).toHaveLength(2);
+  });
+
+  it("keeps a ban the admin command added when it bans another", () => {
+    const moderation = new Moderation(dir, T0);
+    writeBans(data.reopen(), [{ target: "203.0.113.7", until: null }]);
+    moderation.ban("198.51.100.1", 1, undefined, T0);
+    expect(moderation.list(T0).map((ban) => ban.target)).toEqual(["203.0.113.7", "198.51.100.1"]);
+    expect(dir.all("SELECT target FROM bans ORDER BY rowid")).toEqual([
+      { target: "203.0.113.7" },
+      { target: "198.51.100.1" },
+    ]);
   });
 });

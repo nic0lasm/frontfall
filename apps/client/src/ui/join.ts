@@ -1,5 +1,5 @@
 import { applyTranslations } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { cleanName, MAX_NAME_LENGTH } from "./setup.ts";
 
 export interface JoinActions {

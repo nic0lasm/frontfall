@@ -1,4 +1,7 @@
-export type BotDifficulty = "easy" | "normal" | "hard";
+import type { Difficulty } from "@frontfall/contracts";
+
+/** How hard a computer player plays: one of the contracts' `DIFFICULTIES`. */
+export type BotDifficulty = Difficulty;
 
 /**
  * How often and how boldly a bot acts (R-BOT-04). Values come from the Bots

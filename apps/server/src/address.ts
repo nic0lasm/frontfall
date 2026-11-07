@@ -1,5 +1,8 @@
 import { isIP } from "node:net";
-import type { IncomingMessage } from "node:http";
+import type { HttpRequest } from "./transport.ts";
+
+/** What the checks of an address read of a request: who sent it, and what it says. */
+type Sender = Pick<HttpRequest, "peer" | "header">;
 
 /**
  * Loopback and private ranges: the host itself, or a reverse proxy on the same
@@ -47,10 +50,9 @@ export function network(address: string): string {
  * `trustProxy` false never believes it, for a server reached without a proxy
  * from its own network, such as a LAN party. IPv6 players count by /64.
  */
-export function clientAddress(request: IncomingMessage, trustProxy = true): string {
-  const peer = request.socket.remoteAddress;
-  const header = request.headers["x-client-ip"];
-  const forwarded = (Array.isArray(header) ? header[0] : header)?.trim();
+export function clientAddress(request: Sender, trustProxy = true): string {
+  const peer = request.peer;
+  const forwarded = request.header("x-client-ip")?.trim();
   // Anything but an address would let one client invent new names for itself.
   const valid = forwarded && isIP(forwarded) !== 0 ? forwarded : undefined;
   return network((trustProxy && isPrivateAddress(peer) && valid) || (peer ?? "unknown"));
@@ -66,10 +68,10 @@ const PROXY_HEADERS = [
 ];
 
 /** A request from the host or its private network, not forwarded by a proxy. */
-export function isLocalRequest(request: IncomingMessage): boolean {
+export function isLocalRequest(request: Sender): boolean {
   return (
-    isPrivateAddress(request.socket.remoteAddress) &&
-    !PROXY_HEADERS.some((name) => name in request.headers)
+    isPrivateAddress(request.peer) &&
+    !PROXY_HEADERS.some((name) => request.header(name) !== undefined)
   );
 }
 
@@ -82,14 +84,14 @@ const LOOPBACK_HOST = /^(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d{1,5})?$/
  * sent it (Origin, Sec-Fetch-Site), and a host name that was rebound to
  * 127.0.0.1 still shows in Host, so no web page can reach these routes.
  */
-export function isLoopbackRequest(request: IncomingMessage): boolean {
-  const address = request.socket.remoteAddress ?? "";
+export function isLoopbackRequest(request: Sender): boolean {
+  const address = request.peer ?? "";
   const ip = address.startsWith("::ffff:") ? address.slice(7) : address;
   return (
     (ip === "::1" || ip.startsWith("127.")) &&
-    !PROXY_HEADERS.some((name) => name in request.headers) &&
-    !("origin" in request.headers) &&
-    !("sec-fetch-site" in request.headers) &&
-    LOOPBACK_HOST.test(request.headers.host ?? "")
+    !PROXY_HEADERS.some((name) => request.header(name) !== undefined) &&
+    request.header("origin") === undefined &&
+    request.header("sec-fetch-site") === undefined &&
+    LOOPBACK_HOST.test(request.header("host") ?? "")
   );
 }

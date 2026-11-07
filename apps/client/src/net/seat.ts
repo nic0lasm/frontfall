@@ -4,6 +4,8 @@
  * A copy in local storage outlives the tab, so that the menu of a page
  * opened again offers to go back to the game while the server keeps the seat.
  */
+import { safeSession, safeStorage } from "../storage.ts";
+
 const KEY = "frontfall.seat";
 
 /** How long the server keeps the seat of a player gone (docs/server.md). */
@@ -24,26 +26,10 @@ export interface AwaySeat extends Seat {
   seenAt: number;
 }
 
-function storage(): Storage | undefined {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return undefined;
-  }
-}
-
-function lasting(): Storage | undefined {
-  try {
-    return window.localStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 export function saveSeat(game: string, token: string, now = Date.now()): void {
   try {
-    storage()?.setItem(KEY, JSON.stringify({ game, token } satisfies Seat));
-    lasting()?.setItem(KEY, JSON.stringify({ game, token, seenAt: now } satisfies AwaySeat));
+    safeSession()?.setItem(KEY, JSON.stringify({ game, token } satisfies Seat));
+    safeStorage()?.setItem(KEY, JSON.stringify({ game, token, seenAt: now } satisfies AwaySeat));
   } catch {
     // Storage full or blocked: a reload will join from the link instead.
   }
@@ -53,7 +39,7 @@ export function saveSeat(game: string, token: string, now = Date.now()): void {
 export function touchSeat(game: string, now = Date.now()): void {
   try {
     const seat = readAway();
-    if (seat?.game === game) lasting()?.setItem(KEY, JSON.stringify({ ...seat, seenAt: now }));
+    if (seat?.game === game) safeStorage()?.setItem(KEY, JSON.stringify({ ...seat, seenAt: now }));
   } catch {
     // Nothing to touch.
   }
@@ -62,7 +48,7 @@ export function touchSeat(game: string, now = Date.now()): void {
 /** The token of this tab's seat in `game`, if it holds one. */
 export function seatIn(game: string): string | undefined {
   try {
-    const seat = JSON.parse(storage()?.getItem(KEY) ?? "null") as Partial<Seat> | null;
+    const seat = JSON.parse(safeSession()?.getItem(KEY) ?? "null") as Partial<Seat> | null;
     return seat?.game === game && typeof seat.token === "string" ? seat.token : undefined;
   } catch {
     return undefined;
@@ -71,7 +57,7 @@ export function seatIn(game: string): string | undefined {
 
 function readAway(): AwaySeat | undefined {
   try {
-    const seat = JSON.parse(lasting()?.getItem(KEY) ?? "null") as Partial<AwaySeat> | null;
+    const seat = JSON.parse(safeStorage()?.getItem(KEY) ?? "null") as Partial<AwaySeat> | null;
     return typeof seat?.game === "string" &&
       typeof seat.token === "string" &&
       typeof seat.seenAt === "number"
@@ -109,8 +95,8 @@ export function seatHeldFor(now = Date.now()): number | undefined {
 
 export function forgetSeat(): void {
   try {
-    storage()?.removeItem(KEY);
-    lasting()?.removeItem(KEY);
+    safeSession()?.removeItem(KEY);
+    safeStorage()?.removeItem(KEY);
   } catch {
     // Nothing to forget.
   }

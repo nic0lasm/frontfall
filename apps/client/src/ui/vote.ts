@@ -1,7 +1,7 @@
 import type { FeedbackReason } from "@frontfall/protocol";
 import { applyTranslations, type MessageKey } from "../i18n/index.ts";
 import type { GameTracker } from "../usage.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { feedbackLinks } from "./feedback.ts";
 
 const REASONS: readonly FeedbackReason[] = ["too_hard", "too_long", "unclear", "slow_or_buggy"];

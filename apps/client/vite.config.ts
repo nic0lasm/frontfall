@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import { minifyShader } from "../../tools/shader-minify.mjs";
 import { simulationBuild } from "../../tools/simulation-build.mjs";
-import { GENERATED_MAPS, generatedThumbnail } from "./src/game/maps.ts";
+import { GENERATED_MAPS, generatedThumbnail } from "./src/maps.ts";
 
 // The release is the version of the repository's root package.json, for the client and the server alike.
 const { version } = JSON.parse(
@@ -102,7 +102,7 @@ export default defineConfig({
   // Relative URLs: the same build works at / and behind a path prefix such as /frontfall/.
   base: "./",
   define: {
-    // Simulation build of the sources, not the commit; see src/net/build.ts.
+    // Simulation build of the sources, not the commit; see src/build.ts.
     __FRONTFALL_SIMULATION__: JSON.stringify(simulationBuild()),
     // Release of the game, from the root package.json; see src/release.ts.
     __FRONTFALL_THUMBNAILS__: JSON.stringify(generatedThumbnails()),

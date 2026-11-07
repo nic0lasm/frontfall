@@ -1,7 +1,8 @@
-import { DEFAULT_RULES, type GameRules } from "@frontfall/protocol";
+import type { GameRules } from "@frontfall/protocol";
+import { defaultRules } from "../game/defaults.ts";
 import type { MessageKey } from "../i18n/index.ts";
 import { t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 
 /**
  * The special rules a game can be played with (R-MODE-08), in the order the
@@ -21,11 +22,6 @@ export const SPECIAL_RULES: readonly {
   { name: "capitals", label: "setup.rules.capitals", hint: "setup.rules.capitalsHint" },
   { name: "doctrines", label: "setup.rules.doctrines", hint: "setup.rules.doctrinesHint" },
 ];
-
-/** The rules at their defaults, as a copy to change. */
-export function defaultRules(): GameRules {
-  return { ...DEFAULT_RULES };
-}
 
 /** The names of the rules switched on, in the current language, for a summary line. */
 export function activeRuleNames(rules: Partial<GameRules> | undefined): string[] {

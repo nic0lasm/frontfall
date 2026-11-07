@@ -1,8 +1,8 @@
+import { safeStorage, safeSession } from "../../storage.ts";
 import type { GameRules } from "../../game/messages.ts";
 import type { Difficulty, GameUpdate } from "../../game/game-view.ts";
 import { AchievementStore, type Gain } from "../../achievements/store.ts";
 import { AchievementTracker, type Credited } from "../../achievements/tracker.ts";
-import { safeStorage } from "../setup.ts";
 
 /**
  * The achievements of one game: what it earns is kept at once, so a closed
@@ -44,7 +44,7 @@ export class GameAchievements {
 
   private load(): Credited | undefined {
     try {
-      const raw = window.sessionStorage.getItem(this.key);
+      const raw = safeSession()?.getItem(this.key);
       return raw ? (JSON.parse(raw) as Credited) : undefined;
     } catch {
       return undefined;
@@ -54,7 +54,7 @@ export class GameAchievements {
   private save(): void {
     try {
       if (this.tracker) {
-        window.sessionStorage.setItem(this.key, JSON.stringify(this.tracker.credited()));
+        safeSession()?.setItem(this.key, JSON.stringify(this.tracker.credited()));
       }
     } catch {
       // Without it a reload may count a city twice.

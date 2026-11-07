@@ -71,7 +71,7 @@ export class AchievementTracker {
       this.earned.add(id);
       fresh.push(id);
     };
-    const you = update.players.find((player) => player.id === update.you);
+    const you = update.players.find((p) => p.id === update.you);
     const decided = update.winner !== undefined && update.players.length >= MIN_PLAYERS;
     const won =
       decided &&

@@ -1,9 +1,9 @@
 import type { GameRules } from "../game/messages.ts";
 import type { GameUpdate } from "../game/game-view.ts";
-import type { MapLandmarkData } from "../game/maps.ts";
+import type { MapLandmarkData } from "../maps.ts";
 import { getLanguage, t, type MessageKey } from "../i18n/index.ts";
 import { colorOf } from "../palette.ts";
-import { h, swatch } from "./dom.ts";
+import { h, swatch } from "../dom.ts";
 import { formatCount, formatPercent } from "./format.ts";
 
 type TipRules = Pick<GameRules, "ticksPerSecond" | "firstNation" | "teams" | "ownableTiles">;

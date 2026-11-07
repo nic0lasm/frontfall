@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { scrubMessage, type ErrorReport } from "@frontfall/protocol";
+import { readDocument, writeDocument } from "./database.ts";
+import { transaction, type SqlDriver } from "./sql/driver.ts";
 
 /**
  * The errors players' pages report (docs/privacy.md), grouped so that the
@@ -171,39 +172,31 @@ export class ClientErrors {
   }
 }
 
-/** Where the groups are kept between restarts, beside the usage counts. */
+/** The file the groups were kept in before data.db, which the first start imports. */
 export function clientErrorsFile(dataDir: string): string {
   return join(dataDir, "usage", "errors.json");
 }
 
-/** Reads the groups kept by an earlier run; an error says why they could not be read. */
-export function loadClientErrors(errors: ClientErrors, file: string): Error | undefined {
-  let text: string;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    return error as Error;
-  }
-  if (errors.restore(text)) return undefined;
-  try {
-    renameSync(file, `${file}.broken`);
-  } catch {
-    // Left in place: the next save replaces it.
-  }
-  return new Error(`unreadable error groups, kept as ${file}.broken`);
+/** Where the groups are kept in data.db, as one document. */
+const ERRORS = "errors";
+
+/** Takes back the groups kept by an earlier run; groups that do not read are kept aside as `errors.broken-<time>`. */
+export function loadClientErrors(
+  errors: ClientErrors,
+  db: SqlDriver,
+  now: number,
+): Error | undefined {
+  const text = readDocument(db, ERRORS);
+  if (text === undefined || errors.restore(text)) return undefined;
+  const aside = `${ERRORS}.broken-${String(now)}`;
+  transaction(db, () => {
+    writeDocument(db, aside, text);
+    db.run("DELETE FROM documents WHERE name = ?", [ERRORS]);
+  });
+  return new Error(`unreadable error groups, kept as ${aside}`);
 }
 
-/** Writes the groups readable by the server's user only, replacing the old file at once. */
-export function saveClientErrors(errors: ClientErrors, file: string, now: number): void {
-  mkdirSync(join(file, ".."), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.tmp`;
-  try {
-    writeFileSync(temporary, errors.serialize(now), { mode: 0o600 });
-    chmodSync(temporary, 0o600);
-    renameSync(temporary, file);
-  } catch (error) {
-    rmSync(temporary, { force: true });
-    throw error;
-  }
+/** Writes the groups, replacing the last ones at once. */
+export function saveClientErrors(errors: ClientErrors, db: SqlDriver, now: number): void {
+  writeDocument(db, ERRORS, errors.serialize(now));
 }

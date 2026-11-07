@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameUpdate } from "../src/game/solo-game.ts";
+import type { GameUpdate } from "../src/game/game-runner.ts";
 import { withHidden } from "../src/ui/hidden-players.ts";
 
 const update = {

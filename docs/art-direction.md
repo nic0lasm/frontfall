@@ -177,7 +177,7 @@ Every visual change is judged against these, on a capture or a measurement, so t
 
 ## Performance
 
-The ground, its height and the coast distance are baked once per tile when the map loads and again only where the terrain changes; the rest is computed per pixel in the territory shader (`render/territory-layer.ts`, shipped minified, about 3 kB gzip, in the lazy chunk). It costs about 40 % more than the former look in software rendering, measured with `pnpm bench:render`; the cost on real GPUs is still to measure on the reference laptop and a mid-range phone. Octaves, grain and glints fade out as a pixel grows, so world zoom pays little. The Saver profile keeps the flat map. The look must keep to the budgets in [`performance.md`](performance.md) on the reference laptop and phone; a flatter setting exists for devices that cannot.
+The ground, its height and the coast distance are baked once per tile when the map loads and again only where the terrain changes; the rest is computed per pixel in the territory shader (`render/territory-layer.ts`, shipped minified, about 3 kB gzip, in the lazy chunk). It costs about 40 % more than the former look in software rendering, measured with `bun run bench:render`; the cost on real GPUs is still to measure on the reference laptop and a mid-range phone. Octaves, grain and glints fade out as a pixel grows, so world zoom pays little. The Saver profile keeps the flat map. The look must keep to the budgets in [`performance.md`](performance.md) on the reference laptop and phone; a flatter setting exists for devices that cannot.
 
 ## Not covered here
 

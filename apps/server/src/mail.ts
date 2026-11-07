@@ -80,15 +80,28 @@ export function mailbox(email: string): string {
   return `${local}@${domain}`;
 }
 
+/**
+ * Where a test reaches its own SMTP server instead: the port it listens on,
+ * and the certificate it signs with, trusted on top of the system's.
+ */
+export interface SmtpTestServer {
+  port: number;
+  ca: string;
+}
+
 /** Sends over SMTP, encrypted with a checked certificate, as plain text only. */
-export function smtpMailer(settings: SmtpSettings): Mailer {
+export function smtpMailer(settings: SmtpSettings, testServer?: SmtpTestServer): Mailer {
   const transport = createTransport({
     host: settings.host,
-    port: settings.port,
+    port: testServer?.port ?? settings.port,
     secure: settings.port === 465,
     requireTLS: true,
     auth: { user: settings.user, pass: settings.password },
-    tls: { minVersion: "TLSv1.2", servername: settings.host },
+    tls: {
+      minVersion: "TLSv1.2",
+      servername: settings.host,
+      ...(testServer && { ca: testServer.ca }),
+    },
     connectionTimeout: SMTP_TIMEOUT_MS,
     greetingTimeout: SMTP_TIMEOUT_MS,
     socketTimeout: SMTP_TIMEOUT_MS * 2,

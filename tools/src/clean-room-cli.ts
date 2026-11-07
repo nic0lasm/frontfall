@@ -4,7 +4,7 @@ import { relative } from "node:path";
 import { parseArgs } from "node:util";
 import { DEFAULT_OPTIONS, indexReference, scan, type Finding } from "./clean-room.ts";
 
-const usage = "usage: pnpm clean-room --reference <dir> [--base <git ref>] [--min-tokens <n>]";
+const usage = "usage: bun run clean-room --reference <dir> [--base <git ref>] [--min-tokens <n>]";
 
 const { values } = parseArgs({
   options: {

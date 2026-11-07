@@ -9,12 +9,12 @@ import type { ProfileName } from "./profiles.ts";
 import { FUN, PERF, SKILL_GAP_POINTS, SURVIVAL_EASY_MIN, WIN_TARGETS } from "./targets.ts";
 
 /**
- * `pnpm campaign`: every profile at every difficulty on the same seeds, then a
+ * `bun run campaign`: every profile at every difficulty on the same seeds, then a
  * verdict against targets.ts. Exit code 1 when a target is missed or a rule broken.
  *
- *   pnpm campaign -- --map world --seeds 1-12 --minutes 30
- *   pnpm campaign -- --profiles nico --difficulties easy,normal --rule capitals
- *   pnpm campaign -- --map world,europe,lyon --balance cityLand=6000
+ *   bun run campaign -- --map world --seeds 1-12 --minutes 30
+ *   bun run campaign -- --profiles nico --difficulties easy,normal --rule capitals
+ *   bun run campaign -- --map world,europe,lyon --balance cityLand=6000
  */
 const { values } = parseArgs({
   args: process.argv.slice(2).filter((a) => a !== "--"),

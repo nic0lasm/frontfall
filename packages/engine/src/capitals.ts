@@ -2,7 +2,39 @@ import { isAllied, logEvent } from "./diplomacy.ts";
 import type { Game, Player } from "./game.ts";
 import { mulDiv, percentOf } from "./integer-math.ts";
 import { spawnSettings } from "./spawn.ts";
+import { tileOrNone } from "./state/codec.ts";
+import { PlayerValues, RecordList, partKey } from "./state/parts.ts";
+import { CAPITAL_FALL_RECORD } from "./state/records.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
+
+/** A capital that fell (R-CAP-03) or was razed (R-CAP-04). */
+export interface CapitalFall {
+  readonly tick: number;
+  /** Player whose capital it was. */
+  readonly player: number;
+  /** Player who took it; 0 when it was razed and moved. */
+  readonly by: number;
+  /** Tile the capital stood on. */
+  readonly tile: number;
+}
+
+/** The tile of each player's capital, -1 for none; only in capital mode. */
+const CAPITALS = partKey<PlayerValues>("capitals");
+/** Capitals taken or razed, oldest first; only in capital mode. */
+const CAPITAL_FALLS = partKey<RecordList<CapitalFall>>("capital falls");
+
+const NO_FALLS: readonly Readonly<CapitalFall>[] = Object.freeze([]);
+
+/** The tile of a player's capital (R-CAP-01): undefined before play, after it fell, and in a game without capitals. */
+export function capitalOf(game: Game, player: number): number | undefined {
+  const tile = game.part(CAPITALS)?.get(player) ?? -1;
+  return tile < 0 ? undefined : tile;
+}
+
+/** Capitals taken or razed, oldest first (R-CAP-03, R-CAP-04); none in a game without capitals. */
+export function capitalFalls(game: Game): readonly Readonly<CapitalFall>[] {
+  return game.part(CAPITAL_FALLS)?.entries ?? NO_FALLS;
+}
 
 /**
  * Radius around a capital, in tiles, within which attackers pay
@@ -29,7 +61,7 @@ export function capitalsStand(game: Game): boolean {
 /** R-CAP-02: whether the tile lies within the radius of its owner's capital. */
 export function guardedByCapital(game: Game, tile: number, owner: number): boolean {
   if (!game.rules.capitals || owner === NEUTRAL) return false;
-  const capital = game.player(owner)?.capital;
+  const capital = capitalOf(game, owner);
   return (
     capital !== undefined && game.terrain.topology.distance(capital, tile) <= capitalRadius(game)
   );
@@ -43,7 +75,7 @@ export function guardedByCapital(game: Game, tile: number, owner: number): boole
  * and nations defend by it (R-BOT-17).
  */
 export function capitalThreat(game: Game, id: number): number {
-  const capital = capitalsStand(game) ? game.player(id)?.capital : undefined;
+  const capital = capitalsStand(game) ? capitalOf(game, id) : undefined;
   if (capital === undefined) return NEUTRAL;
   const byPlayer = new Map<number, number>();
   for (const attack of game.attacks) {
@@ -81,8 +113,26 @@ export function capitalThreat(game: Game, id: number): number {
 export function capitalAim(game: Game, tile: number): number {
   if (!game.rules.capitals) return tile;
   const owner = game.territory.ownerOf(tile);
-  const capital = owner === NEUTRAL ? undefined : game.player(owner)?.capital;
+  const capital = owner === NEUTRAL ? undefined : capitalOf(game, owner);
   return capital !== undefined && game.territory.ownerOf(capital) === owner ? capital : tile;
+}
+
+/**
+ * R-CAP-03: the player who took `player`'s capital takes all of their land,
+ * in tile order, and B-CAPITAL-SPOILS of their troops; `player` keeps none.
+ * The economy carries out the elimination in this tick's growth, the land
+ * being gone, and hands the captor, who took the last tile, the gold
+ * (R-ECO-05, R-ECO-08). The land and the two ledgers are shared state
+ * (ADR 0010): this function is the one place capitals change them.
+ */
+export function handOverCapital(game: Game, player: Player, captor: Player): void {
+  const { territory } = game;
+  const owners = territory.owners;
+  for (let t = 0; t < owners.length; t++) {
+    if (owners[t] === player.id) territory.setOwner(t, captor.id);
+  }
+  captor.troops += percentOf(player.troops, game.balance.capitalSpoilsPercent);
+  player.troops = 0;
 }
 
 /**
@@ -100,24 +150,11 @@ export function installCapitals(game: Game): void {
   if (!game.rules.capitals) return;
   const { territory, balance } = game;
   const topology = game.terrain.topology;
-  const falls = game.capitalFalls;
-
-  game.persist("capitals", {
-    save(out) {
-      for (const player of game.players()) out.int(player.capital ?? -1);
-      out.uint(falls.length);
-      for (const f of falls) for (const value of [f.tick, f.player, f.by, f.tile]) out.uint(value);
-    },
-    load(from) {
-      for (const player of game.players()) {
-        const tile = from.int();
-        player.capital = tile < 0 ? undefined : tile;
-      }
-      for (let n = from.count(); n > 0; n--) {
-        falls.push({ tick: from.uint(), player: from.uint(), by: from.uint(), tile: from.uint() });
-      }
-    },
-  });
+  const capitals = game.addPart(CAPITALS, new PlayerValues(game, tileOrNone("capital"), -1));
+  const falls = game.addPart(CAPITAL_FALLS, new RecordList(game, CAPITAL_FALL_RECORD)).entries;
+  const setCapital = (player: Player, tile: number | undefined): void => {
+    capitals.set(player.id, tile ?? -1);
+  };
 
   game.onTick(() => {
     if (game.phase !== "play") return;
@@ -125,21 +162,23 @@ export function installCapitals(game: Game): void {
     if (game.tick === balance.spawnPhaseTicks) {
       for (const player of game.players()) {
         if (player.alive && player.start !== undefined) {
-          player.capital =
+          setCapital(
+            player,
             territory.ownerOf(player.start) === player.id
               ? player.start
-              : closestOwned(player, player.start);
+              : closestOwned(player, player.start),
+          );
         }
       }
     }
     // By player id: a conquest earlier in the tick can hand a capital back to its owner.
     for (const player of game.players()) {
-      const capital = player.capital;
+      const capital = capitalOf(game, player.id);
       if (!player.alive || capital === undefined) continue;
       const holder = territory.ownerOf(capital);
       if (holder === player.id) continue;
       // R-CAP-06: during the grace, a capital taken moves to the land its owner has left.
-      if (!capitalsStand(game)) player.capital = closestOwned(player, capital);
+      if (!capitalsStand(game)) setCapital(player, closestOwned(player, capital));
       // An ally's ship can land on a capital a missile razed: the capital still only moves.
       else if (holder === NEUTRAL || isAllied(game, holder, player.id)) raze(player, capital);
       else conquer(player, game.player(holder) as Player, capital);
@@ -148,15 +187,8 @@ export function installCapitals(game: Game): void {
 
   /** R-CAP-03: the holder of the capital's tile takes everything; its owner falls. */
   function conquer(player: Player, captor: Player, tile: number): void {
-    const owners = territory.owners;
-    for (let t = 0; t < owners.length; t++) {
-      if (owners[t] === player.id) territory.setOwner(t, captor.id);
-    }
-    captor.troops += percentOf(player.troops, balance.capitalSpoilsPercent);
-    // R-ECO-05 carries out the elimination in this tick's growth, the land being
-    // gone, and hands the captor, who took the last tile, the gold (R-ECO-08).
-    player.troops = 0;
-    player.capital = undefined;
+    handOverCapital(game, player, captor);
+    setCapital(player, undefined);
     falls.push({ tick: game.tick, player: player.id, by: captor.id, tile });
     logEvent(game, { tick: game.tick, type: "capital", a: captor.id, b: player.id });
   }
@@ -164,7 +196,7 @@ export function installCapitals(game: Game): void {
   /** R-CAP-04: a capital on land gone back to nobody moves, at a price. */
   function raze(player: Player, tile: number): void {
     player.troops -= percentOf(player.troops, balance.capitalRazePercent);
-    player.capital = closestOwned(player, tile);
+    setCapital(player, closestOwned(player, tile));
     falls.push({ tick: game.tick, player: player.id, by: NEUTRAL, tile });
     logEvent(game, { tick: game.tick, type: "razed", a: player.id, b: player.id });
   }

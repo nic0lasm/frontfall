@@ -1,6 +1,6 @@
 import "./guide.css";
 import { DEFAULT_BALANCE } from "@frontfall/engine";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { CHAPTER_IDS, type ChapterId } from "./guide.ts";
 import { tutorialText, type TutorialKey } from "./tutorial-text.ts";
 

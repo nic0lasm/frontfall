@@ -69,7 +69,7 @@ export class CueWatcher {
       if (!this.started) return;
       events.push(tile === undefined ? { cue, own } : { cue, own, tile });
     };
-    const you = update.players.find((player) => player.id === update.you);
+    const you = update.players.find((p) => p.id === update.you);
     const tiles = you?.tiles ?? 0;
     const play = update.phase === "play";
 

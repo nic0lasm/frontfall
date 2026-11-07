@@ -1,12 +1,17 @@
-import { DiplomacyError, logEvent } from "./diplomacy.ts";
+import { QUICK_MESSAGES } from "@frontfall/contracts";
+import { DiplomacyError, logEvent, playerError } from "./diplomacy.ts";
 import type { Game, Player } from "./game.ts";
+import { ANY_PHASE, defineOrder } from "./order-rules.ts";
+import { writable } from "./state/lists.ts";
 
-/**
- * Preset quick messages and emoji a player can send (R-DIPLO-07), by number
- * from 0. Their words belong to the interfaces; the engine only relays the
- * number, so no free text ever enters a game.
- */
-export const QUICK_MESSAGES = 12;
+export { QUICK_MESSAGES };
+
+/** A player waiting to send another quick message (R-DIPLO-07). */
+export interface QuickCooldown {
+  readonly player: number;
+  /** First tick they may send one again. */
+  readonly until: number;
+}
 
 /** Ticks a player waits between two quick messages, to anyone: 2 seconds. */
 export const QUICK_MESSAGE_TICKS = 20;
@@ -47,10 +52,12 @@ export function quickError(
  * but the sender's wait of QUICK_MESSAGE_TICKS before the next one: it goes
  * into the event log for the two players' interfaces to show.
  */
-export function installQuickMessages(game: Game): void {
-  game.onOrder((_, player, order) => {
-    if (order.type !== "quick") return false;
-    const cooldowns = game.quickCooldowns;
+export const QUICK_ORDER = defineOrder("quick", {
+  phases: ANY_PHASE,
+  validate: (game, player, order) =>
+    playerError(order.target) ?? quickError(game, player, order.target, order.phrase) ?? order,
+  execute(game, player, order) {
+    const cooldowns = writable(game, "quickCooldowns");
     const until = game.tick + QUICK_MESSAGE_TICKS;
     const kept = cooldowns.filter((c) => c.player !== player.id && game.tick < c.until);
     kept.push({ player: player.id, until });
@@ -63,6 +70,9 @@ export function installQuickMessages(game: Game): void {
       b: order.target,
       phrase: order.phrase,
     });
-    return true;
-  });
+  },
+});
+
+export function installQuickMessages(game: Game): void {
+  game.onOrder(QUICK_ORDER);
 }

@@ -1,6 +1,15 @@
 import { parseServerMessage, type Frame, type ServerMessage } from "@frontfall/protocol";
 import { describe, expect, it } from "vitest";
-import { Room, type Peer, type RoomObserver, type RoomSettings, type Seat } from "../src/room.ts";
+import {
+  canEnter,
+  Room,
+  ROOM_STATES,
+  type Peer,
+  type RoomObserver,
+  type RoomSettings,
+  type RoomState,
+  type Seat,
+} from "../src/room.ts";
 
 const PUBLIC: RoomSettings = {
   visibility: "public",
@@ -1171,5 +1180,101 @@ describe("orders faster than a person plays", () => {
     expect(room.submit(bob.seat, order, 0)).toBe(true);
     expect(dropped).toEqual([alice.seat.id * 1000 + 1, alice.seat.id * 1000 + 2]);
     expect(bob.seat.throttled).toBe(0);
+  });
+});
+
+describe("room states", () => {
+  const STATES: RoomState[] = ["open", "starting", "running", "finished"];
+
+  it.each([
+    ["open", ["open", "starting", "running", "finished"]],
+    ["starting", ["open", "starting", "running", "finished"]],
+    ["running", ["finished"]],
+    ["finished", []],
+  ] as const)("lets %s go to %j and nowhere else", (from, allowed) => {
+    for (const to of STATES) {
+      expect(canEnter(from, to)).toBe((allowed as readonly string[]).includes(to));
+    }
+  });
+
+  it("allows a lobby before the start and play after it, and nothing once finished", () => {
+    expect(
+      STATES.map((state) => [state, ROOM_STATES[state].lobby, ROOM_STATES[state].playing]),
+    ).toEqual([
+      ["open", true, false],
+      ["starting", true, false],
+      ["running", false, true],
+      ["finished", false, false],
+    ]);
+  });
+
+  it("goes through every change of the table", () => {
+    const seen: string[] = [];
+    const trace = (room: Room, from: RoomState): RoomState => {
+      if (room.state !== from) seen.push(`${from}>${room.state}`);
+      return room.state;
+    };
+    // open > starting > open > starting > running > finished
+    const room = new Room("game0000", PUBLIC, 1);
+    let state = room.state;
+    seated(room, "Alice");
+    const bob = seated(room, "Bob");
+    state = trace(room, state);
+    room.leave(bob.seat, 1_000);
+    state = trace(room, state);
+    seated(room, "Carol", 2_000);
+    state = trace(room, state);
+    room.update(12_000);
+    state = trace(room, state);
+    room.stop();
+    trace(room, state);
+    // open > running, open > finished, starting > finished
+    const hosted = new Room("game0001", PRIVATE, 1);
+    hosted.requestStart(seated(hosted, "Host").seat, 0);
+    trace(hosted, "open");
+    const empty = new Room("game0002", PRIVATE, 1);
+    empty.leave(seated(empty, "Gone").seat, 0);
+    trace(empty, "open");
+    const counting = new Room("game0003", PUBLIC, 1);
+    seated(counting, "A");
+    seated(counting, "B");
+    counting.stop();
+    trace(counting, "starting");
+    expect(seen).toEqual([
+      "open>starting",
+      "starting>open",
+      "open>starting",
+      "starting>running",
+      "running>finished",
+      "open>running",
+      "open>finished",
+      "starting>finished",
+    ]);
+  });
+
+  it("enters running on a restore and finished on a suspend, once", () => {
+    const { room } = running();
+    room.update(100);
+    const saved = room.save(100);
+    if (!saved) throw new Error("not saved");
+    room.suspend();
+    expect(room.state).toBe("finished");
+    expect(() => {
+      room.suspend();
+    }).toThrow("cannot go from finished to finished");
+    expect(Room.restore(saved, {}, 0)?.state).toBe("running");
+  });
+
+  it("refuses what a finished room no longer does", () => {
+    const { room, alice } = running();
+    room.stop();
+    expect(room.state).toBe("finished");
+    expect(room.join("Late", new FakePeer(), 0)).toBe("game_started");
+    expect(room.submit(alice.seat, { type: "spawn", tile: 1 }, 0)).toBe(false);
+    expect(room.requestStart(alice.seat, 0)).toBe("not_in_game");
+    expect(room.save(0)).toBeUndefined();
+    room.stop();
+    room.update(1_000);
+    expect(room.state).toBe("finished");
   });
 });

@@ -9,21 +9,20 @@
     ".": "./src/server.ts"
   },
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "start": "node dist/server.mjs",
-    "build": "tsc -p tsconfig.json && node build.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "dev": "bun --watch src/main.ts",
+    "start": "bun dist/server.mjs",
+    "build": "tsc -p tsconfig.json && bun build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test:bun": "bun test ./test-bun",
+    "admin": "bun src/admin-main.ts"
   },
   "dependencies": {
     "@frontfall/protocol": "workspace:*",
     "nodemailer": "^10.2.1",
-    "ws": "^8.22.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/nodemailer": "^8.0.2",
-    "@types/ws": "^8.18.2",
-    "esbuild": "^0.28.2",
-    "tsx": "^4.23.15"
+    "@types/bun": "^1.4.4",
+    "@types/nodemailer": "^8.0.2"
   }
 }

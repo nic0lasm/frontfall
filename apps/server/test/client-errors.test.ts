@@ -1,15 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { ErrorReport } from "@frontfall/protocol";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { readDocument, writeDocument } from "../src/database.ts";
 import {
   ClientErrors,
-  clientErrorsFile,
   loadClientErrors,
   MAX_GROUPS,
   saveClientErrors,
 } from "../src/client-errors.ts";
+import { tempDatabase } from "./support/database.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 9, 29, 12);
@@ -24,12 +22,6 @@ const ERROR: ErrorReport = {
   device: "desktop",
   screen: "online",
 };
-
-let dir: string | undefined;
-afterEach(() => {
-  if (dir) rmSync(dir, { recursive: true, force: true });
-  dir = undefined;
-});
 
 describe("ClientErrors", () => {
   it("groups errors by kind, message and place, and counts what goes with them", () => {
@@ -112,19 +104,21 @@ describe("ClientErrors", () => {
     expect(releases.other).toBe(8);
   });
 
-  it("keeps the groups in a private file, and sets a damaged one aside", () => {
-    dir = mkdtempSync(join(tmpdir(), "frontfall-errors-"));
-    const file = clientErrorsFile(dir);
-    const errors = new ClientErrors();
-    errors.record(ERROR, NOW);
-    saveClientErrors(errors, file, NOW);
-    expect(statSync(file).mode & 0o777).toBe(0o600);
-    const back = new ClientErrors();
-    expect(loadClientErrors(back, file)).toBeUndefined();
-    expect(back.read(NOW, 1).groups).toHaveLength(1);
-    writeFileSync(file, "{");
-    expect(loadClientErrors(new ClientErrors(), file)?.message).toContain("broken");
-    expect(readFileSync(`${file}.broken`, "utf8")).toBe("{");
-    expect(loadClientErrors(new ClientErrors(), join(dir, "none.json"))).toBeUndefined();
+  it("keeps the groups in data.db, and sets aside groups that do not read", () => {
+    const data = tempDatabase("frontfall-errors-");
+    try {
+      const errors = new ClientErrors();
+      errors.record(ERROR, NOW);
+      saveClientErrors(errors, data.db, NOW);
+      const back = new ClientErrors();
+      expect(loadClientErrors(back, data.reopen(), NOW)).toBeUndefined();
+      expect(back.read(NOW, 1).groups).toHaveLength(1);
+      writeDocument(data.db, "errors", "{");
+      expect(loadClientErrors(new ClientErrors(), data.db, NOW)?.message).toContain("broken");
+      expect(readDocument(data.db, `errors.broken-${String(NOW)}`)).toBe("{");
+      expect(loadClientErrors(new ClientErrors(), data.db, NOW)).toBeUndefined();
+    } finally {
+      data.remove();
+    }
   });
 });

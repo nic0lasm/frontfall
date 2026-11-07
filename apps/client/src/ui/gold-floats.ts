@@ -1,6 +1,7 @@
 import { t } from "../i18n/index.ts";
+import type { GameUpdate } from "../game/game-view.ts";
 import type { Camera } from "../render/camera.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { formatCount } from "./format.ts";
 
 /** How long a figure stays on the map, in milliseconds; the CSS animation matches it. */
@@ -18,6 +19,25 @@ interface Float {
   readonly text: HTMLElement;
   gold: number;
   until: number;
+}
+
+/** Gold brought by a trade ship, on the dock it came in at. */
+export interface TradeGain {
+  readonly tile: number;
+  readonly gold: number;
+}
+
+const NO_GAINS: readonly TradeGain[] = [];
+
+/** The trade ships that docked for the player in `update`; the same empty list when none did. */
+export function tradeGains(update: GameUpdate | undefined): readonly TradeGain[] {
+  if (!update) return NO_GAINS;
+  const gains = update.events.flatMap((event) =>
+    event.type === "trade" && event.a === update.you && event.tile !== undefined
+      ? [{ tile: event.tile, gold: event.gold ?? 0 }]
+      : [],
+  );
+  return gains.length === 0 ? NO_GAINS : gains;
 }
 
 /**

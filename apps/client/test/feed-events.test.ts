@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameUpdate } from "../src/game/solo-game.ts";
+import type { GameUpdate } from "../src/game/game-runner.ts";
 import { FeedWatcher, landLost } from "../src/ui/feed-events.ts";
 import { facts, falloutLines, landmarkLines, relation, shipLines } from "../src/ui/player-tip.ts";
 

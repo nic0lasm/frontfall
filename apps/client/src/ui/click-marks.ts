@@ -1,9 +1,9 @@
 import type { ClickOutcome } from "../game/messages.ts";
-import type { ClickNote } from "../game/solo-game.ts";
+import type { ClickNote } from "../game/game-runner.ts";
 import type { MessageKey } from "../i18n/index.ts";
 import { t } from "../i18n/index.ts";
 import type { Camera } from "../render/camera.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 
 /** How long a mark stays on the map, in milliseconds; the CSS animation matches it. */
 const MARK_MS = 700;
@@ -40,6 +40,8 @@ export const REFUSALS: Partial<Record<ClickOutcome, MessageKey>> = {
   shore: "click.shore",
   allyNear: "click.allyNear",
   disabled: "click.disabled",
+  startTaken: "click.startTaken",
+  startNear: "click.startNear",
 };
 
 const NOTES: Record<ClickNote, MessageKey> = {

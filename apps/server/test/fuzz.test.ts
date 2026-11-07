@@ -1,5 +1,4 @@
 import { mkdtempSync, rmSync } from "node:fs";
-import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -13,8 +12,8 @@ import {
   type ServerMessage,
 } from "@frontfall/protocol";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import WebSocket from "ws";
 import { createGameServer, type GameServer } from "../src/server.ts";
+import { FakeSocket, FakeTransport } from "./support/fake-transport.ts";
 
 /** Fixed by default so CI is reproducible; set FUZZ_SEED to explore other inputs. */
 const SEED = Number(process.env.FUZZ_SEED ?? 0x5eed_2026) >>> 0;
@@ -256,19 +255,21 @@ describe("message parsing under fuzzing", () => {
 describe("server under fuzzed connections", () => {
   let staticRoot: string;
   let server: GameServer;
-  let host: string;
+  /** The connections reach the server without a network, each frame on a later turn of the event loop. */
+  let transport: FakeTransport;
 
   beforeAll(async () => {
     staticRoot = mkdtempSync(join(tmpdir(), "frontfall-fuzz-"));
+    transport = new FakeTransport();
     server = createGameServer({
+      transport,
       staticRoot,
       version: "fuzz",
       maxConnectionsPerAddress: 10_000,
       upgradeRate: { perSecond: 10_000, burst: 10_000 },
       drainMs: 0,
     });
-    await new Promise<void>((resolve) => server.http.listen(0, "127.0.0.1", resolve));
-    host = `127.0.0.1:${String((server.http.address() as AddressInfo).port)}`;
+    await server.listen(0);
   });
 
   afterAll(async () => {
@@ -276,9 +277,9 @@ describe("server under fuzzed connections", () => {
     rmSync(staticRoot, { recursive: true, force: true });
   });
 
-  function connect(): Promise<WebSocket> {
+  function connect(): Promise<FakeSocket> {
     return new Promise((resolve, reject) => {
-      const socket = new WebSocket(`ws://${host}/ws`);
+      const socket = transport.connect("/ws");
       socket.once("open", () => {
         resolve(socket);
       });
@@ -290,7 +291,7 @@ describe("server under fuzzed connections", () => {
   async function honestGame() {
     const [alice, bob] = await Promise.all([connect(), connect()]);
     const arrivals: { tick: number; at: number }[] = [];
-    const inbox = new Map<WebSocket, string[]>([
+    const inbox = new Map<FakeSocket, string[]>([
       [alice, []],
       [bob, []],
     ]);
@@ -308,7 +309,7 @@ describe("server under fuzzed connections", () => {
         }
       });
     }
-    const until = async (socket: WebSocket, type: string): Promise<Record<string, unknown>> => {
+    const until = async (socket: FakeSocket, type: string): Promise<Record<string, unknown>> => {
       const texts = inbox.get(socket) ?? [];
       for (;;) {
         const index = texts.findIndex((text) => text.includes(`"type":"${type}"`));
@@ -317,7 +318,7 @@ describe("server under fuzzed connections", () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
       }
     };
-    const send = (socket: WebSocket, message: ClientMessage) => {
+    const send = (socket: FakeSocket, message: ClientMessage) => {
       socket.send(encodeClientMessage(message));
     };
     send(alice, { type: "hello", version: PROTOCOL_VERSION, name: "Alice" });
@@ -357,7 +358,7 @@ describe("server under fuzzed connections", () => {
       socket.send(encodeClientMessage({ type: "hello", version: PROTOCOL_VERSION, name: "Fuzz" }));
     let sent = 0;
     for (const frame of frames) {
-      if (socket.readyState !== WebSocket.OPEN) break;
+      if (socket.readyState !== FakeSocket.OPEN) break;
       socket.send(frame);
       sent++;
     }
@@ -393,7 +394,7 @@ describe("server under fuzzed connections", () => {
     const elapsed = performance.now() - fuzzStart;
     game.close();
 
-    const health = await fetch(`http://${host}/healthz`);
+    const health = await transport.fetch("/healthz");
     expect(health.status).toBe(200);
 
     const during = game.arrivals.slice(firstTick);

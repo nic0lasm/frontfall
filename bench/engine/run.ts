@@ -9,7 +9,7 @@ import { ExpansionWorkload } from "./workload.ts";
 const TICK_BUDGET_MS = 30;
 
 const { values } = parseArgs({
-  // `pnpm bench -- --quick` forwards the separator too.
+  // `bun run bench -- --quick` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     scenario: { type: "string", multiple: true },

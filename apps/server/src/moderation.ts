@@ -1,10 +1,13 @@
-import { createHmac, randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
 import { isIP } from "node:net";
 import { join } from "node:path";
 import type { ReportReason } from "@frontfall/protocol";
 import { network } from "./address.ts";
 import { AddressRate } from "./rate-limit.ts";
+import { systemClock, type Clock, type Timer } from "./clock.ts";
+import { readMeta, writeMeta } from "./database.ts";
+import { systemIds, type Ids } from "./ids.ts";
+import { transaction, type SqlDriver } from "./sql/driver.ts";
 
 /** Reports older than this are forgotten (R-MODE-06). */
 export const REPORT_DAYS = 30;
@@ -71,20 +74,89 @@ function plain(address: string): string {
   return address.startsWith("::ffff:") ? address.slice(7) : address;
 }
 
-function writePrivate(file: string, text: string): void {
-  mkdirSync(join(file, ".."), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.tmp`;
-  writeFileSync(temporary, text, { mode: 0o600 });
-  chmodSync(temporary, 0o600);
-  renameSync(temporary, file);
+/** The files moderation was kept in before data.db, which the first start imports. */
+export function moderationFiles(dataDir: string): { key: string; bans: string; reports: string } {
+  const directory = join(dataDir, "moderation");
+  return {
+    key: join(directory, "key"),
+    bans: join(directory, "bans.json"),
+    reports: join(directory, "reports.json"),
+  };
 }
 
-function readIfAny(file: string): string | undefined {
-  try {
-    return readFileSync(file, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
+/** Where the key of the references is kept, in the `meta` table. */
+const KEY = "moderation.key";
+
+/** The key as the file kept it: 64 hex digits. */
+export function parseKey(text: string): string | undefined {
+  return /^[0-9a-f]{64}\s*$/.test(text) ? text.trim() : undefined;
+}
+
+export function writeKey(db: SqlDriver, hex: string): void {
+  writeMeta(db, KEY, hex);
+}
+
+interface BanRow {
+  target: string;
+  until: string | null;
+  note: string | null;
+}
+
+/** The ban list as data.db holds it, checked as the file was. */
+export function readBans(db: SqlDriver): Ban[] {
+  const rows = db.all<BanRow>("SELECT target, until, note FROM bans ORDER BY rowid");
+  return checkBans(
+    rows.map(({ target, until, note }) => ({ target, until, ...(note === null ? {} : { note }) })),
+    "bans",
+  );
+}
+
+/** Replaces the ban list, in the transaction of the caller. */
+export function writeBans(db: SqlDriver, bans: readonly Ban[]): void {
+  db.run("DELETE FROM bans");
+  for (const ban of bans) {
+    db.run("INSERT INTO bans (target, until, note) VALUES (?, ?, ?)", [
+      ban.target,
+      ban.until,
+      ban.note ?? null,
+    ]);
+  }
+}
+
+interface ReportRow {
+  at: string;
+  game: string;
+  reason: ReportReason;
+  reporter: string;
+  player: number;
+  name: string;
+  target: string | null;
+}
+
+export function readReports(db: SqlDriver): Report[] {
+  return db
+    .all<ReportRow>(
+      "SELECT at, game, reason, reporter, player, name, target FROM reports ORDER BY seq",
+    )
+    .map(({ at, game, reason, reporter, player, name, target }) => ({
+      at,
+      game,
+      reason,
+      from: reporter,
+      player,
+      name,
+      target,
+    }));
+}
+
+/** Replaces the reports, in the transaction of the caller. */
+export function writeReports(db: SqlDriver, reports: readonly Report[]): void {
+  db.run("DELETE FROM reports");
+  for (const r of reports) {
+    db.run(
+      "INSERT INTO reports (at, game, reason, reporter, player, name, target) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [r.at, r.game, r.reason, r.from, r.player, r.name, r.target],
+    );
   }
 }
 
@@ -99,24 +171,25 @@ export class Moderation {
   private reports: Report[] = [];
   private bans: Ban[] = [];
   private readonly rate: AddressRate;
-  private saveTimer: ReturnType<typeof setTimeout> | undefined;
+  private saveTimer: Timer | undefined;
 
   /**
-   * @param directory where the key, the reports and the ban list are kept;
-   * undefined keeps them in memory, with references that change at each start.
-   * The ban list is read by `reload`, which says when the file does not read.
+   * @param db where the key, the reports and the ban list are kept; undefined
+   * keeps them in memory, with references that change at each start. The ban
+   * list is read by `reload`, which says when it does not read.
+   * @param clock the time, and the timer of the next write of the reports.
+   * @param ids where a new key is drawn.
    */
   constructor(
-    private readonly directory: string | undefined,
+    private readonly db: SqlDriver | undefined,
     now: number,
     rate = { perSecond: 1 / 120, burst: 5 },
+    private readonly clock: Clock = systemClock,
+    private readonly ids: Ids = systemIds,
   ) {
     this.rate = new AddressRate(rate.perSecond, rate.burst, now);
     this.key = this.loadKey();
-    if (directory !== undefined) {
-      const text = readIfAny(this.file("reports.json"));
-      if (text !== undefined) this.reports = parseReports(text);
-    }
+    if (db !== undefined) this.reports = readReports(db);
   }
 
   /** The reference of an address, as reports give it and the ban list takes it. */
@@ -217,7 +290,11 @@ export class Moderation {
     return this.bans.filter((ban) => ban.until === null || Date.parse(ban.until) > now);
   }
 
-  /** Bans `target` for `days`, or for good when `days` is undefined; replaces an earlier ban of it. */
+  /**
+   * Bans `target` for `days`, or for good when `days` is undefined; replaces
+   * an earlier ban of it. The list is read again first, in the same
+   * transaction, so that a ban the admin command added meanwhile stays.
+   */
   ban(given: string, days: number | undefined, note: string | undefined, now: number): Ban {
     const target = banTarget(given);
     const ban: Ban = {
@@ -225,49 +302,72 @@ export class Moderation {
       until: days === undefined ? null : new Date(now + days * DAY_MS).toISOString(),
       ...(note ? { note } : {}),
     };
-    this.bans = [...this.list(now).filter((other) => other.target !== target), ban];
-    this.save("bans.json", { bans: this.bans });
+    this.changeBans(now, (bans) => [...bans.filter((other) => other.target !== target), ban]);
     return ban;
   }
 
   /** Lifts the ban of `target`; false when there was none. */
   unban(given: string, now: number): boolean {
     const target = banTarget(given);
-    const before = this.bans.length;
-    this.bans = this.list(now).filter((ban) => ban.target !== target);
-    if (this.bans.length === before) return false;
-    this.save("bans.json", { bans: this.bans });
-    return true;
+    let found = false;
+    this.changeBans(now, (bans) => {
+      const kept = bans.filter((ban) => ban.target !== target);
+      found = kept.length !== bans.length;
+      return kept;
+    });
+    return found;
   }
 
   /**
-   * Reads the ban list again, after the operator edited the file by hand.
-   * A file that does not read leaves the list as it was, and throws.
+   * Reads the ban list again, after the admin command changed it. A list
+   * that does not read leaves the one in memory as it was, and throws.
    */
-  reload(now = Date.now()): void {
-    if (this.directory === undefined) return;
-    const text = readIfAny(this.file("bans.json"));
-    // Bans that ran out are dropped, and leave the file at its next write.
-    this.bans =
-      text === undefined
-        ? []
-        : parseBans(text).filter((ban) => ban.until === null || Date.parse(ban.until) > now);
+  reload(now = this.clock.now()): void {
+    if (this.db === undefined) return;
+    // Bans that ran out are dropped, and leave data.db at its next write.
+    this.bans = readBans(this.db).filter(
+      (ban) => ban.until === null || Date.parse(ban.until) > now,
+    );
   }
 
   /** Writes the reports not yet written, as the server stops. */
   flush(): void {
     if (this.saveTimer === undefined) return;
-    clearTimeout(this.saveTimer);
+    this.saveTimer.clear();
     this.saveTimer = undefined;
-    this.save("reports.json", { reports: this.reports });
+    this.saveReports();
+  }
+
+  /** Applies `change` to the ban list, as data.db holds it when there is one, and keeps the result. */
+  private changeBans(now: number, change: (bans: Ban[]) => Ban[]): void {
+    const db = this.db;
+    const live = (bans: Ban[]): Ban[] =>
+      bans.filter((ban) => ban.until === null || Date.parse(ban.until) > now);
+    if (db === undefined) {
+      this.bans = change(live(this.bans));
+      return;
+    }
+    this.bans = transaction(db, () => {
+      const bans = change(live(readBans(db)));
+      writeBans(db, bans);
+      return bans;
+    });
+  }
+
+  private saveReports(): void {
+    const db = this.db;
+    if (db === undefined) return;
+    transaction(db, () => {
+      writeReports(db, this.reports);
+    });
   }
 
   private saveReportsSoon(): void {
-    if (this.directory === undefined || this.saveTimer !== undefined) return;
-    this.saveTimer = setTimeout(() => {
+    if (this.db === undefined || this.saveTimer !== undefined) return;
+    this.saveTimer = this.clock.setTimeout(() => {
       this.saveTimer = undefined;
       try {
-        this.save("reports.json", { reports: this.reports });
+        this.saveReports();
       } catch {
         // Tried again with the next report, or at the stop.
       }
@@ -280,33 +380,49 @@ export class Moderation {
     this.reports = this.reports.filter((r) => Date.parse(r.at) >= since).slice(-MAX_REPORTS);
   }
 
-  private file(name: string): string {
-    return join(this.directory ?? "", "moderation", name);
-  }
-
-  private save(name: string, content: unknown): void {
-    if (this.directory === undefined) return;
-    writePrivate(this.file(name), `${JSON.stringify(content, null, 2)}\n`);
-  }
-
   private loadKey(): Buffer {
-    if (this.directory === undefined) return randomBytes(32);
-    const file = this.file("key");
-    const text = readIfAny(file);
-    if (text !== undefined && /^[0-9a-f]{64}\s*$/.test(text))
-      return Buffer.from(text.trim(), "hex");
-    const key = randomBytes(32);
-    writePrivate(file, `${key.toString("hex")}\n`);
+    if (this.db === undefined) return this.ids.bytes(32);
+    const kept = parseKey(readMeta(this.db, KEY) ?? "");
+    if (kept !== undefined) return Buffer.from(kept, "hex");
+    const key = this.ids.bytes(32);
+    writeKey(this.db, key.toString("hex"));
     return key;
   }
 }
 
-function parseBans(text: string): Ban[] {
+/** Reads a bans.json of the earlier releases; throws, naming the entry, when it does not read. */
+export function parseBans(text: string): Ban[] {
   const json = JSON.parse(text) as { bans?: unknown };
   if (!Array.isArray(json.bans)) throw new Error('bans.json: expected { "bans": [...] }');
-  return json.bans.map((entry: unknown, index) => {
+  return oneEach(checkBans(json.bans, "bans.json"));
+}
+
+/** Whether a ban ends after another, or at the same time: one with no end lasts longest. */
+function lastsAsLong(ban: Ban, other: Ban): boolean {
+  if (ban.until === null) return true;
+  return other.until !== null && Date.parse(ban.until) >= Date.parse(other.until);
+}
+
+/**
+ * One ban a target. A file edited by hand can give one target twice, as an
+ * IPv4 address and its `::ffff:` form, or two addresses of one IPv6 /64.
+ * The earlier releases banned it while any of them ran, so the one that
+ * lasts longest is kept, the later one when they end together.
+ */
+function oneEach(bans: readonly Ban[]): Ban[] {
+  const kept = new Map<string, Ban>();
+  for (const ban of bans) {
+    const other = kept.get(ban.target);
+    if (other === undefined || lastsAsLong(ban, other)) kept.set(ban.target, ban);
+  }
+  return [...kept.values()];
+}
+
+/** Bans as given, each checked; throws, naming the entry, at the first that is wrong. */
+function checkBans(entries: readonly unknown[], source: string): Ban[] {
+  return entries.map((entry: unknown, index) => {
     const { target, until, note } = (entry ?? {}) as Record<string, unknown>;
-    const at = `bans.json, entry ${String(index + 1)}`;
+    const at = `${source}, entry ${String(index + 1)}`;
     if (typeof target !== "string" || !validTarget(target))
       throw new Error(`${at}: target must be an IP address or a 16-character reference`);
     if (
@@ -324,12 +440,29 @@ function parseBans(text: string): Ban[] {
   });
 }
 
-function parseReports(text: string): Report[] {
+/** Reads a reports.json of the earlier releases; undefined when it is not one. */
+export function parseReports(text: string): Report[] | undefined {
+  let json: unknown;
   try {
-    const json = JSON.parse(text) as { reports?: unknown };
-    return Array.isArray(json.reports) ? (json.reports as Report[]) : [];
+    json = JSON.parse(text);
   } catch {
-    // Reports are a help to the operator, not a record to defend: an unreadable file starts afresh.
-    return [];
+    return undefined;
   }
+  const reports = (json as { reports?: unknown } | null)?.reports;
+  if (!Array.isArray(reports) || !reports.every(isReport)) return undefined;
+  return reports;
+}
+
+function isReport(value: unknown): value is Report {
+  if (typeof value !== "object" || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.at === "string" &&
+    typeof r.game === "string" &&
+    typeof r.reason === "string" &&
+    typeof r.from === "string" &&
+    typeof r.player === "number" &&
+    typeof r.name === "string" &&
+    (typeof r.target === "string" || r.target === null)
+  );
 }

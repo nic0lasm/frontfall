@@ -1,5 +1,5 @@
 import { onLanguageChange, t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { icon } from "./icons.ts";
 
 /** The part of the document the full-screen button reads and drives. */

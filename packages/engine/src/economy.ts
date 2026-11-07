@@ -1,9 +1,14 @@
 import type { Balance } from "./balance.ts";
 import { withDoctrine } from "./doctrines.ts";
-import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
+import { OperatorBonus } from "@frontfall/contracts";
+import type { Game, Player } from "./game.ts";
+import { OPERATOR_FACTOR } from "./modes.ts";
 import { logEvent } from "./diplomacy.ts";
 import { detPow, mulDiv, percentOf } from "./integer-math.ts";
 import { LandmarkEffect, withLandmarks } from "./landmarks.ts";
+import { ANY_PHASE, defineOrder } from "./order-rules.ts";
+import { below } from "./state/codec.ts";
+import { PlayerValues, partKey } from "./state/parts.ts";
 import { workingCities } from "./structures.ts";
 
 /**
@@ -44,14 +49,22 @@ export function populationCap(game: Game, player: Player): number {
   return game.hasBonus(player.id, OperatorBonus.Troops) ? cap * OPERATOR_FACTOR : cap;
 }
 
+/** Each player's work share, by player id (R-ECO-07). */
+const WORK = partKey<PlayerValues>("work");
+
+/** Share of `player`'s troops at home, in %, who work rather than fight (R-ECO-07); 0 until they set one. */
+export function workShareOf(game: Game, player: number): number {
+  return game.part(WORK)?.get(player) ?? 0;
+}
+
 /** R-ECO-07: troops at home who work, earning gold, and neither attack nor defend. */
-export function workers(player: Player): number {
-  return percentOf(player.troops, player.workShare);
+export function workers(game: Game, player: Player): number {
+  return percentOf(player.troops, workShareOf(game, player.id));
 }
 
 /** R-ECO-07: troops at home who fight: the most an attack or a ship can take, and what holds the land. */
-export function soldiers(player: Player): number {
-  return player.troops - workers(player);
+export function soldiers(game: Game, player: Player): number {
+  return player.troops - workers(game, player);
 }
 
 /** Why a work share cannot be set, or undefined when it can (R-ECO-07). */
@@ -62,6 +75,15 @@ export function workError(game: Game, share: number): string | undefined {
   return undefined;
 }
 
+/** R-ECO-07: a player sets the share of their troops at home who work, in either phase. */
+export const WORK_ORDER = defineOrder("work", {
+  phases: ANY_PHASE,
+  validate: (game, _player, order) => workError(game, order.share) ?? order,
+  execute(game, player, order) {
+    game.part(WORK)?.set(player.id, order.share);
+  },
+});
+
 /**
  * Growth of troops and gold every tick of play (R-ECO-01 to R-ECO-05), and
  * elimination of players left without land.
@@ -71,12 +93,14 @@ export function installEconomy(game: Game): void {
   // units of 1 / goldDivisor, so small players are not rounded down to nothing.
   const goldDivisor = 1000 * game.balance.ticksPerSecond;
 
-  // R-ECO-07: a player sets the share of their troops at home who work.
-  game.onOrder((_, player, order) => {
-    if (order.type !== "work") return false;
-    player.workShare = order.share;
-    return true;
-  });
+  game.onOrder(WORK_ORDER);
+  game.addPart(
+    WORK,
+    new PlayerValues(
+      game,
+      below((g) => g.balance.workMaxPercent + 1, "work share"),
+    ),
+  );
 
   game.onTick(() => {
     if (game.phase !== "play") return;
@@ -116,8 +140,8 @@ export function goldIncome(game: Game, player: Player): number {
   // R-DOCTRINE: and the fixed income.
   const fixed = withDoctrine(game, player.id, "gold", shared);
   const working =
-    cap > 0 ? mulDiv(fixed * workGoldPercent, Math.min(workers(player), cap), 100 * cap) : 0;
-  const idle = soldiers(player) * goldPerThousandTroops;
+    cap > 0 ? mulDiv(fixed * workGoldPercent, Math.min(workers(game, player), cap), 100 * cap) : 0;
+  const idle = soldiers(game, player) * goldPerThousandTroops;
   return withLandmarks(
     game,
     player.id,
@@ -186,22 +210,31 @@ export function conquestGold(game: Game, player: Player): number {
 }
 
 /**
+ * R-ECO-08: the player who took the last tile of `player`, if still alive,
+ * takes `conquestGold` of theirs, and every player is told. The ledger of a
+ * player is shared (ADR 0010): this function is the one place a fallen
+ * player's gold goes to another.
+ */
+export function passOnGold(game: Game, player: Player): void {
+  const taker = game.player(game.territory.lastTakerOf(player.id));
+  if (taker?.alive !== true) return;
+  const gold = conquestGold(game, player);
+  taker.gold += gold;
+  logEvent(game, {
+    tick: game.tick,
+    type: "eliminated",
+    a: taker.id,
+    b: player.id,
+    gold,
+  });
+}
+
+/**
  * R-ECO-05: an eliminated player keeps nothing. R-ECO-08: the player who took
  * their last tile takes their gold, half of it from a human.
  */
 function eliminate(game: Game, player: Player): void {
-  const taker = game.player(game.territory.lastTakerOf(player.id));
-  if (taker?.alive === true) {
-    const gold = conquestGold(game, player);
-    taker.gold += gold;
-    logEvent(game, {
-      tick: game.tick,
-      type: "eliminated",
-      a: taker.id,
-      b: player.id,
-      gold,
-    });
-  }
+  passOnGold(game, player);
   player.alive = false;
   player.troops = 0;
   player.gold = 0;

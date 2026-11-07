@@ -1,5 +1,5 @@
 import { getLanguage } from "../i18n/index.ts";
-import { h, swatch } from "./dom.ts";
+import { h, swatch } from "../dom.ts";
 import { formatCount, formatDuration, formatPercent } from "./format.ts";
 import type { StatsHistory, StatsMark } from "./screen/stats-history.ts";
 

@@ -1,7 +1,7 @@
 import { PLAYER_COLORS } from "../palette.ts";
 import { getLanguage, onLanguageChange, t, type Language } from "../i18n/index.ts";
 import { text } from "./profile-text.ts";
-import { h, swatch } from "./dom.ts";
+import { h, swatch } from "../dom.ts";
 import { COLOR_CHOICES, type Profile } from "./profile.ts";
 
 /** Names of the colours, read aloud by screen readers; here, not in the catalogues, to stay out of the first download. */

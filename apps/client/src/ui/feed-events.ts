@@ -1,5 +1,6 @@
+import { youOf } from "../game/selectors.ts";
 import type { DiplomacyEvent, GameUpdate, StructureType } from "../game/game-view.ts";
-import type { MapLandmarkData } from "../game/maps.ts";
+import type { MapLandmarkData } from "../maps.ts";
 import { getLanguage, t, type MessageKey } from "../i18n/index.ts";
 import { formatCount } from "./format.ts";
 
@@ -136,7 +137,7 @@ export class FeedWatcher {
     }
     const threat = update.capitals?.threat ?? 0;
     if (this.started && this.personal && threat !== 0 && threat !== this.threat) {
-      const capital = update.players.find((p) => p.id === update.you)?.capital;
+      const capital = youOf(update)?.capital;
       entries.push({
         key: `siege:${String(threat)}`,
         tone: "bad",

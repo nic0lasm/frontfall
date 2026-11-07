@@ -91,7 +91,7 @@ flowchart LR
     UI -- "orders" --> Engine
     Engine -- "state to draw" --> UI
   end
-  subgraph Host["Server (Node.js, one container)"]
+  subgraph Host["Server (Bun, one container)"]
     Relay["apps/server<br/>lobbies, turn relay, static files"]
   end
   UI -- "orders (WebSocket)" --> Relay
@@ -109,27 +109,26 @@ flowchart LR
 | zod schemas            | Every message is validated on arrival, on both sides                                |
 | Single small container | Read-only filesystem, non-root user, multi-arch image scanned before every release  |
 
-Each choice is argued in an architecture decision record under [docs/adr](docs/adr/), and the tick, frame and memory budgets the engine and renderer are held to are in [docs/performance.md](docs/performance.md). The messages exchanged over the WebSocket are described in [docs/protocol.md](docs/protocol.md). Maps are generated from public-domain [Natural Earth](https://www.naturalearthdata.com/) data by `pnpm maps` ([docs/maps.md](docs/maps.md)), in the format of [docs/map-format.md](docs/map-format.md).
+For a map of the repository and how to extend it, see the [architecture guide](docs/architecture.md). Each choice is argued in an architecture decision record under [docs/adr](docs/adr/), and the tick, frame and memory budgets the engine and renderer are held to are in [docs/performance.md](docs/performance.md). The messages exchanged over the WebSocket are described in [docs/protocol.md](docs/protocol.md). Maps are generated from public-domain [Natural Earth](https://www.naturalearthdata.com/) data by `bun run maps` ([docs/maps.md](docs/maps.md)), in the format of [docs/map-format.md](docs/map-format.md).
 
 ## Run it locally
 
-Requirements: Node.js 24 LTS and pnpm 10, which `corepack enable` provides.
+Requirements: Node.js 24 LTS and Bun 1.4.
 
 ```sh
 git clone https://github.com/nic0lasm/frontfall.git
 cd frontfall
-corepack enable
-pnpm install
-pnpm dev        # client on http://localhost:5173, server on :8080
+bun install
+bun run dev        # client on http://localhost:5173, server on :8080
 ```
 
-| Command              | What it does                                      |
-| -------------------- | ------------------------------------------------- |
-| `pnpm test`          | Unit tests (Vitest)                               |
-| `pnpm test:coverage` | Tests with coverage; CI fails below 90 % of lines |
-| `pnpm lint`          | ESLint with type-aware rules                      |
-| `pnpm typecheck`     | TypeScript in strict mode, every package          |
-| `pnpm build`         | Production client and bundled server              |
+| Command                 | What it does                                      |
+| ----------------------- | ------------------------------------------------- |
+| `bun run test`          | Unit tests (Vitest)                               |
+| `bun run test:coverage` | Tests with coverage; CI fails below 90 % of lines |
+| `bun run lint`          | ESLint with type-aware rules                      |
+| `bun run typecheck`     | TypeScript in strict mode, every package          |
+| `bun run build`         | Production client and bundled server              |
 
 ### Host your own server
 
@@ -148,7 +147,7 @@ Frontfall is built in the open and contributions of every size are welcome: code
 1. **Play the current build** and [report what breaks](https://github.com/nic0lasm/frontfall/issues/new/choose).
 2. **Pick a starter task** among the issues labelled [`good first issue`](https://github.com/nic0lasm/frontfall/labels/good%20first%20issue) and leave a comment so nobody duplicates the work.
 3. **Discuss before building** anything large in [Discussions](https://github.com/nic0lasm/frontfall/discussions), under Ideas.
-4. **Open a pull request** following [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same checks as `pnpm test:coverage`, `pnpm lint` and `pnpm build`.
+4. **Open a pull request** following [CONTRIBUTING.md](CONTRIBUTING.md). CI runs the same checks as `bun run test:coverage`, `bun run lint` and `bun run build`.
 
 Security issues are reported privately, as described in [SECURITY.md](SECURITY.md). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 

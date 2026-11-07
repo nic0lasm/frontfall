@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadStaticFile } from "./static-files.ts";
+import type { HttpRequest, HttpResponse } from "./transport.ts";
 
 /**
  * Headers of every page and file the server sends. The policy is the one the
@@ -21,12 +21,12 @@ export const SECURITY_HEADERS = {
 export function serveStatic(
   root: string,
   path: string,
-  request: IncomingMessage,
-  response: ServerResponse,
+  request: HttpRequest,
+  response: HttpResponse,
 ): void {
   void loadStaticFile(root, path).then((file) => {
     if (!file) {
-      response.writeHead(404, { "content-type": "text/plain" }).end("not found");
+      response.send(404, { "content-type": "text/plain" }, "not found");
       return;
     }
     const gzip = file.gzip && acceptsGzip(request) ? file.gzip : undefined;
@@ -37,20 +37,22 @@ export function serveStatic(
         ? "public, max-age=31536000, immutable"
         : "no-cache",
     };
-    if (matchesEtag(request.headers["if-none-match"], file.etag)) {
-      response.writeHead(304, caching).end();
+    if (matchesEtag(request.header("if-none-match"), file.etag)) {
+      response.send(304, caching);
       return;
     }
-    response.writeHead(200, {
-      ...caching,
-      "content-type": file.contentType,
-      ...SECURITY_HEADERS,
-      "content-length": (gzip ?? file.body).length,
-      ...(file.gzip && { vary: "Accept-Encoding" }),
-      ...(gzip && { "content-encoding": "gzip" }),
-    });
-    if (request.method === "HEAD") response.end();
-    else response.end(gzip ?? file.body);
+    response.send(
+      200,
+      {
+        ...caching,
+        "content-type": file.contentType,
+        ...SECURITY_HEADERS,
+        "content-length": (gzip ?? file.body).length,
+        ...(file.gzip && { vary: "Accept-Encoding" }),
+        ...(gzip && { "content-encoding": "gzip" }),
+      },
+      request.method === "HEAD" ? undefined : (gzip ?? file.body),
+    );
   });
 }
 
@@ -61,19 +63,21 @@ function matchesEtag(header: string | undefined, etag: string): boolean {
   return header.split(",").some((tag) => bare(tag) === bare(etag) || tag.trim() === "*");
 }
 
-function acceptsGzip(request: IncomingMessage): boolean {
-  const header = request.headers["accept-encoding"];
+function acceptsGzip(request: HttpRequest): boolean {
+  const header = request.header("accept-encoding");
   return typeof header === "string" && /(^|[\s,])gzip(?!;\s*q=0(\.0*)?(\s*,|$))/i.test(header);
 }
 
-export function sendJson(response: ServerResponse, body: unknown, caching = "no-store"): void {
-  response
-    .writeHead(200, {
+export function sendJson(response: HttpResponse, body: unknown, caching = "no-store"): void {
+  response.send(
+    200,
+    {
       "content-type": "application/json",
       "cache-control": caching,
       "x-content-type-options": "nosniff",
-    })
-    .end(JSON.stringify(body));
+    },
+    JSON.stringify(body),
+  );
 }
 
 /** A JSON body and its ETag, worked out once for every request that gets it. */
@@ -92,15 +96,15 @@ export function cachedJson(body: unknown): CachedJson {
  * an empty 304 while nothing changed.
  */
 export function sendCachedJson(
-  request: IncomingMessage,
-  response: ServerResponse,
+  request: HttpRequest,
+  response: HttpResponse,
   body: CachedJson,
 ): void {
   const { text, etag } = body;
   const headers = { etag, "cache-control": "no-cache" };
-  if (matchesEtag(request.headers["if-none-match"], etag)) {
-    response.writeHead(304, headers).end();
+  if (matchesEtag(request.header("if-none-match"), etag)) {
+    response.send(304, headers);
     return;
   }
-  response.writeHead(200, { ...headers, "content-type": "application/json" }).end(text);
+  response.send(200, { ...headers, "content-type": "application/json" }, text);
 }

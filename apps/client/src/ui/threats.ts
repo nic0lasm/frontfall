@@ -1,6 +1,6 @@
 import type { BoatView, GameUpdate } from "../game/game-view.ts";
 import { t } from "../i18n/index.ts";
-import { h, setText } from "./dom.ts";
+import { h, setText } from "../dom.ts";
 import { formatCount, formatDuration } from "./format.ts";
 
 /** Where a click on a line sends the map: a tile, else the land of a player. */

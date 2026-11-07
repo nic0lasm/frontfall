@@ -1,5 +1,5 @@
 import type { MessageKey } from "./i18n/index.ts";
-import { hasWebGL2 } from "./render/webgl-support.ts";
+import { hasWebGL2 } from "./webgl-support.ts";
 
 /** What the browser must provide for a game to start, with the text that names it. */
 export type Feature = "webgl2" | "worker";

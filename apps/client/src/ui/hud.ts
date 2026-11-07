@@ -1,10 +1,12 @@
+import { youOf } from "../game/selectors.ts";
+import { safeStorage } from "../storage.ts";
 import { DEFAULT_BALANCE, NO_OPERATOR, PALACE_CITIES } from "@frontfall/engine";
 import { attackPreview, goldPerSecond, soldiersOf } from "../game/attack-preview.ts";
 import type { GameRules } from "../game/messages.ts";
-import type { ClickMode, GameUpdate, PlayerView } from "../game/solo-game.ts";
+import type { ClickMode, GameUpdate, PlayerView } from "../game/game-runner.ts";
 import { applyTranslations, plural, t, type MessageKey } from "../i18n/index.ts";
 import { colorOf } from "../palette.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { hintSeen, setHintSeen } from "./hint-state.ts";
 import { formatCount, formatDuration, formatPercent } from "./format.ts";
 import { icon } from "./icons.ts";
@@ -14,7 +16,6 @@ import { fullscreenButton } from "./fullscreen.ts";
 import { ThreatList, type ThreatTarget } from "./threats.ts";
 import { PopulationBar } from "./population-bar.ts";
 import { BUILD_MODES, costOf, numberOf, offers } from "./build-modes.ts";
-import { safeStorage } from "./setup.ts";
 import { paintFill, pressToSet } from "./range-click.ts";
 import { workText } from "./work-text.ts";
 
@@ -566,7 +567,7 @@ export class Hud {
     paintFill(this.workInput);
     this.renderShares();
     if (this.last) {
-      const human = this.you(this.last);
+      const human = this.youOf(this.last);
       if (human) this.renderGold(human);
       this.renderPreview(this.last);
     }
@@ -595,7 +596,7 @@ export class Hud {
   setMode(mode: ClickMode): void {
     this.mode = mode;
     if (this.last) this.renderPreview(this.last);
-    if (this.last) this.banner.textContent = this.bannerText(this.last, this.you(this.last));
+    if (this.last) this.banner.textContent = this.bannerText(this.last, this.youOf(this.last));
     for (const [button, element] of this.buildButtons) {
       element.setAttribute("aria-pressed", String(button === mode));
     }
@@ -626,12 +627,12 @@ export class Hud {
     if (this.last) this.render(this.last);
   }
 
-  private you(update: GameUpdate): PlayerView | undefined {
-    return update.players.find((player) => player.id === update.you);
+  private youOf(update: GameUpdate): PlayerView | undefined {
+    return youOf(update);
   }
 
   private render(update: GameUpdate): void {
-    const human = this.you(update);
+    const human = this.youOf(update);
     if (human) {
       // The owner's paint on the painted miniatures (styles.css: --own).
       this.element.style.setProperty(
@@ -670,7 +671,7 @@ export class Hud {
   /** What a figure of the bar is made of, with the player's own numbers. */
   private statHelp(kind: StatKind): string | undefined {
     const update = this.last;
-    const human = update ? this.you(update) : undefined;
+    const human = update ? this.youOf(update) : undefined;
     if (!update || !human) return undefined;
     const soldiers = soldiersOf({ troops: human.troops, workShare: this.work });
     switch (kind) {
@@ -732,7 +733,7 @@ export class Hud {
    * sends, and the gold a second the workers add.
    */
   private renderShares(): void {
-    const human = this.last ? this.you(this.last) : undefined;
+    const human = this.last ? this.youOf(this.last) : undefined;
     const ratio = formatPercent(this.ratio / 100);
     const work = formatPercent(this.work / 100);
     let sent = "";
@@ -789,7 +790,7 @@ export class Hud {
       this.mode === "attack" && this.hovered !== undefined
         ? attackPreview(update, this.hovered, this.ratio)
         : undefined;
-    const human = this.you(update);
+    const human = this.youOf(update);
     // The slider's share, which the game may not have yet.
     const preview =
       found && human && this.work !== human.workShare

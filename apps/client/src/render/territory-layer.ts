@@ -7,7 +7,7 @@ import {
   bakeTerrainColors,
   type Latitudes,
 } from "./terrain-colors.ts";
-import { takeBakedGround } from "./prebaked-ground.ts";
+import { takeBakedGround, type BakedGround } from "./prebaked-ground.ts";
 
 export interface TerritoryLayerOptions {
   readonly width: number;
@@ -24,6 +24,8 @@ export interface TerritoryLayerOptions {
   readonly latitudes?: Latitudes | undefined;
   /** Which published map this is, and its terrain's checksum: its ground may have been baked ahead. */
   readonly groundSource?: { readonly id: string; readonly sha256: string } | undefined;
+  /** The ground another layer of the same map baked already (bakedGround), taken as it is. */
+  readonly baked?: BakedGround | undefined;
   /** Highest owner id the palette must hold. */
   readonly maxOwner: number;
   /**
@@ -923,7 +925,7 @@ export class TerritoryLayer {
     this.ownerTexture.internalFormat = "R16UI";
 
     const source = options.groundSource;
-    const ahead = source && takeBakedGround(source.id, source.sha256);
+    const ahead = options.baked ?? (source && takeBakedGround(source.id, source.sha256));
     const heights = ahead?.heights ?? new Uint8Array(width * height);
     this.groundTexture = new THREE.DataTexture(
       ahead?.colors ??
@@ -1193,6 +1195,18 @@ export class TerritoryLayer {
       if (mask === 0) this.dirtyRows[this.dirtyRowCount++] = y;
       dirtyChunks[y] = mask | (1 << Math.floor(x / chunkWidth));
     }
+  }
+
+  /**
+   * A copy of the ground as baked, without the fallout drawn on it, and its
+   * heights: another layer of the same map takes them rather than bake them again.
+   */
+  bakedGround(): BakedGround {
+    const colors = this.pristineGround ?? (this.groundTexture.image.data as Uint8Array);
+    return {
+      colors: colors.slice(),
+      heights: (this.heightTexture.image.data as Uint8Array).slice(),
+    };
   }
 
   /** Too many changes to track: upload the whole texture on the next frame. */

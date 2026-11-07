@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { type ContextSource, hasWebGL2 } from "../src/render/webgl-support.ts";
+import { type ContextSource, hasWebGL2 } from "../src/webgl-support.ts";
 
 describe("hasWebGL2", () => {
   it("accepts a browser that creates a context, and releases it", () => {

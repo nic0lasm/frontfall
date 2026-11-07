@@ -1,18 +1,23 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import type { AddressInfo } from "node:net";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GameReport } from "@frontfall/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createServer } from "node:http";
 import { silentLogger, type LogFields } from "../src/log.ts";
 import { usageInbox } from "../src/usage-http.ts";
 import { UsageStats } from "../src/usage.ts";
+import { exchange, FakeTransport } from "./support/fake-transport.ts";
 import { createGameServer, type GameServer, type ServerOptions } from "../src/server.ts";
+import { readDocument } from "../src/database.ts";
+import { dataOf } from "./support/database.ts";
 
 let staticRoot: string;
 let dataDir: string;
 let server: GameServer | undefined;
+/** The server's transport: requests and sockets reach it without the network. */
+let transport: FakeTransport;
+/** Where the fake transport's requests go; only its host, the loopback, is read. */
+const BASE = "http://127.0.0.1";
 let logged: { event: string; fields: LogFields | undefined }[];
 
 beforeEach(() => {
@@ -30,19 +35,21 @@ afterEach(async () => {
 });
 
 async function start(options: Partial<ServerOptions> = {}): Promise<string> {
+  transport = new FakeTransport();
   server = createGameServer({
+    transport,
     staticRoot,
     version: "abc123",
     release: "0.5.0",
     logger: {
       info: () => undefined,
       warn: (event, fields) => logged.push({ event, fields }),
+      error: () => undefined,
     },
     ...options,
   });
-  const http = server.http;
-  await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
-  return `http://127.0.0.1:${String((http.address() as AddressInfo).port)}`;
+  await server.listen(0);
+  return BASE;
 }
 
 const GAME: GameReport = {
@@ -70,18 +77,28 @@ function post(
   body: unknown,
   headers: Record<string, string> = { "content-type": "text/plain;charset=UTF-8" },
 ) {
-  return fetch(`${base}/api/usage`, {
+  return transport.fetch(`${base}/api/usage`, {
     method: "POST",
     headers,
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
+/** A document data.db keeps in the data directory, as text. */
+function documentOf(name: string): string | undefined {
+  const db = dataOf(dataDir);
+  try {
+    return readDocument(db, name);
+  } finally {
+    db.close();
+  }
+}
+
 describe("/api/usage", () => {
   it("counts a report sent as a beacon and exports it in /api/stats", async () => {
     const base = await start();
     expect((await post(base, GAME)).status).toBe(204);
-    const stats = (await (await fetch(`${base}/api/stats`)).json()) as {
+    const stats = (await (await transport.fetch(`${base}/api/stats`)).json()) as {
       release: string;
       total: Record<string, Record<string, number>>;
     };
@@ -93,7 +110,7 @@ describe("/api/usage", () => {
   it("shows the counts in /metrics", async () => {
     const base = await start();
     await post(base, GAME);
-    const text = await (await fetch(`${base}/metrics`)).text();
+    const text = await (await transport.fetch(`${base}/metrics`)).text();
     expect(text).toContain('frontfall_usage_total{dimension="games",value="solo"} 1');
     expect(text).toContain("frontfall_game_duration_minutes_count 0");
   });
@@ -101,14 +118,14 @@ describe("/api/usage", () => {
   it("shows the last days on the status page", async () => {
     const base = await start();
     await post(base, GAME);
-    const page = await (await fetch(`${base}/status`)).text();
+    const page = await (await transport.fetch(`${base}/status`)).text();
     expect(page).toContain("Last 7 days / 7 derniers jours");
     expect(page).toMatch(/<td>\d{4}-\d{2}-\d{2}<\/td><td>1<\/td>/);
   });
 
   it("serves /api/stats for a minute from caches", async () => {
     const base = await start();
-    const response = await fetch(`${base}/api/stats`);
+    const response = await transport.fetch(`${base}/api/stats`);
     expect(response.headers.get("cache-control")).toBe("public, max-age=60");
   });
 
@@ -121,29 +138,26 @@ describe("/api/usage", () => {
       () => clock,
       2,
     );
-    const http = createServer((request, response) => {
-      inbox.handle(request, response, String(request.headers["x-address"]));
-    });
-    await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
-    const url = `http://127.0.0.1:${String((http.address() as AddressInfo).port)}/api/usage`;
     const from = async (address: string) =>
       (
-        await fetch(url, {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-address": address },
-          body: JSON.stringify({ kind: "error", release: "0.5.0", type: "webgl" }),
-        })
+        await exchange(
+          (request, response) => {
+            inbox.handle(request, response, address);
+          },
+          {
+            method: "POST",
+            url: "/api/usage",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ kind: "error", release: "0.5.0", type: "webgl" }),
+          },
+        )
       ).status;
-    try {
-      expect([await from("a"), await from("b"), await from("c"), await from("a")]).toEqual([
-        204, 204, 429, 204,
-      ]);
-      // Once the old buckets are full again, they are forgotten and make room.
-      clock = 10 * 60 * 1000;
-      expect(await from("c")).toBe(204);
-    } finally {
-      await new Promise((resolve) => http.close(resolve));
-    }
+    expect([await from("a"), await from("b"), await from("c"), await from("a")]).toEqual([
+      204, 204, 429, 204,
+    ]);
+    // Once the old buckets are full again, they are forgotten and make room.
+    clock = 10 * 60 * 1000;
+    expect(await from("c")).toBe(204);
   });
 
   it("refuses what is not a report", async () => {
@@ -153,8 +167,8 @@ describe("/api/usage", () => {
     expect(
       (await post(base, GAME, { "content-type": "application/x-www-form-urlencoded" })).status,
     ).toBe(415);
-    expect((await fetch(`${base}/api/usage`)).status).toBe(405);
-    const stats = (await (await fetch(`${base}/api/stats`)).json()) as { total: object };
+    expect((await transport.fetch(`${base}/api/usage`)).status).toBe(405);
+    const stats = (await (await transport.fetch(`${base}/api/stats`)).json()) as { total: object };
     expect(stats.total).toEqual({});
   });
 
@@ -213,9 +227,11 @@ describe("/api/usage", () => {
     expect((await post(base, { ...error, where: "elsewhere.js:1:1" })).status).toBe(204);
     expect((await post(base, { ...error, where: "https://x.example/a.js:1:1" })).status).toBe(400);
     const url = `${base}/admin/errors?days=7`;
-    expect((await fetch(url, { headers: { "x-client-ip": "1.2.3.4" } })).status).toBe(404);
-    expect((await fetch(`${base}/admin/errors?days=x`)).status).toBe(400);
-    const answer = (await (await fetch(url)).json()) as {
+    expect((await transport.fetch(url, { headers: { "x-client-ip": "1.2.3.4" } })).status).toBe(
+      404,
+    );
+    expect((await transport.fetch(`${base}/admin/errors?days=x`)).status).toBe(400);
+    const answer = (await (await transport.fetch(url)).json()) as {
       groups: {
         message: string;
         where: string;
@@ -231,12 +247,14 @@ describe("/api/usage", () => {
     expect(answer.groups[0]?.message).toBe("Cannot read properties of undefined (reading <text>)");
     expect(answer.groups[0]?.browsers).toEqual({ safari: 1, firefox: 1 });
     expect(answer.groups[0]?.devices).toEqual({ phone: 1, desktop: 1 });
-    // Kept across a restart, readable by the server's user only.
+    // Kept across a restart, in data.db.
     await server?.close();
     server = undefined;
-    expect(readFileSync(join(dataDir, "usage", "errors.json"), "utf8")).toContain("Ab12");
+    expect(documentOf("errors")).toContain("Ab12");
     const again = await start({ dataDir });
-    const kept = (await (await fetch(`${again}/admin/errors`)).json()) as { groups: unknown[] };
+    const kept = (await (await transport.fetch(`${again}/admin/errors`)).json()) as {
+      groups: unknown[];
+    };
     expect(kept.groups).toHaveLength(2);
   });
 
@@ -244,9 +262,9 @@ describe("/api/usage", () => {
     await post(await start({ dataDir }), GAME);
     await server?.close();
     server = undefined;
-    expect(readFileSync(join(dataDir, "usage", "usage.json"), "utf8")).toContain('"solo":1');
+    expect(documentOf("usage")).toContain('"solo":1');
     const base = await start({ dataDir });
-    const stats = (await (await fetch(`${base}/api/stats`)).json()) as {
+    const stats = (await (await transport.fetch(`${base}/api/stats`)).json()) as {
       total: Record<string, Record<string, number>>;
     };
     expect(stats.total.games).toEqual({ solo: 1 });

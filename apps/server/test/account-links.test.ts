@@ -1,13 +1,16 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Accounts, accountsFile } from "../src/accounts.ts";
+import { Accounts, BEFORE_MERGES } from "../src/accounts.ts";
+import { readDocument } from "../src/database.ts";
 import type { Logger } from "../src/log.ts";
 import type { MailMessage } from "../src/mail.ts";
+import { FakeTransport } from "./support/fake-transport.ts";
 import { createGameServer, type GameServer } from "../src/server.ts";
+import { dataOf } from "./support/database.ts";
 
 const SECRET = "a-session-secret-of-at-least-32-characters";
 const ORIGIN = "https://play.example";
@@ -16,6 +19,10 @@ const NOW = 1_800_000_000_000;
 let staticRoot: string;
 let dataDir: string;
 let server: GameServer | undefined;
+/** The server's transport: requests and sockets reach it without the network. */
+let transport: FakeTransport;
+/** Where the fake transport's requests go; only its host, the loopback, is read. */
+const BASE = "http://127.0.0.1";
 let provider: Server | undefined;
 let sent: MailMessage[];
 let lines: string[];
@@ -49,6 +56,7 @@ afterEach(async () => {
 const logger: Logger = {
   info: (event, fields) => lines.push(JSON.stringify({ event, ...fields })),
   warn: (event, fields) => lines.push(JSON.stringify({ event, ...fields })),
+  error: (event, fields) => lines.push(JSON.stringify({ event, ...fields })),
 };
 
 describe("ways to sign in to one account", () => {
@@ -69,8 +77,8 @@ describe("ways to sign in to one account", () => {
   });
 
   it("merges another account only once asked, keeping the most of both", () => {
-    const file = accountsFile(dataDir);
-    const accounts = new Accounts(file);
+    const db = dataOf(dataDir);
+    const accounts = new Accounts(db);
     const nelly = accounts.signIn("discord", "1", "Nelly", NOW);
     const other = accounts.signIn("google", "g1", "Nelly Two", NOW - 86_400_000);
     accounts.mergeAchievements(nelly.id, achievements(1, NOW, 3));
@@ -80,7 +88,7 @@ describe("ways to sign in to one account", () => {
     const held = accounts.link(nelly.id, "google", subject);
     expect(held).toMatchObject({ ok: false, error: "other", other: { name: "Nelly Two" } });
     expect(accounts.size).toBe(2);
-    expect(existsSync(`${file}.before-merges`)).toBe(false);
+    expect(readDocument(db, BEFORE_MERGES)).toBeUndefined();
 
     const merged = accounts.link(nelly.id, "google", subject, true);
     expect(merged).toMatchObject({ ok: true, merged: { id: other.id } });
@@ -91,13 +99,16 @@ describe("ways to sign in to one account", () => {
     expect(nelly.achievements).toEqual(achievements(2, NOW - 5, 7));
     expect(nelly.createdAt).toBe(other.createdAt);
     expect(accounts.knownIds(nelly.id)).toEqual([nelly.id, other.id]);
-    // The file as it was before, kept aside once.
-    const copy = JSON.parse(readFileSync(`${file}.before-merges`, "utf8")) as {
-      accounts: unknown[];
+    // The accounts as they were before, kept aside once, in the form of the file of the earlier releases.
+    const copy = JSON.parse(readDocument(db, BEFORE_MERGES) ?? "{}") as {
+      accounts: { name: string; achievements?: unknown }[];
     };
-    expect(copy.accounts).toHaveLength(2);
+    expect(copy.accounts.map(({ name }) => name).sort()).toEqual(["Nelly", "Nelly Two"]);
+    expect(copy.accounts.find(({ name }) => name === "Nelly")?.achievements).toEqual(
+      achievements(1, NOW, 3),
+    );
 
-    const again = new Accounts(file);
+    const again = new Accounts(dataOf(dataDir));
     expect(again.load()).toEqual({ usable: true });
     expect(again.signIn("google", "g1", "x", NOW).id).toBe(nelly.id);
     expect(again.knownIds(nelly.id)).toEqual([nelly.id, other.id]);
@@ -137,7 +148,9 @@ async function fakeDiscord(): Promise<string> {
 
 async function start(): Promise<string> {
   const service = await fakeDiscord();
+  transport = new FakeTransport();
   server = createGameServer({
+    transport,
     staticRoot,
     version: "abc123",
     dataDir,
@@ -165,13 +178,12 @@ async function start(): Promise<string> {
       },
     },
   });
-  const http = server.http;
-  await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
-  return `http://127.0.0.1:${String((http.address() as AddressInfo).port)}`;
+  await server.listen(0);
+  return BASE;
 }
 
 function post(base: string, path: string, body: unknown, session?: string): Promise<Response> {
-  return fetch(`${base}${path}`, {
+  return transport.fetch(`${base}${path}`, {
     method: "POST",
     redirect: "manual",
     headers: {
@@ -208,22 +220,25 @@ async function emailSignIn(base: string, email: string, name: string): Promise<s
 async function discord(base: string, session?: string, link = false): Promise<Response> {
   const started = link
     ? await post(base, "/auth/discord/link", {}, session)
-    : await fetch(`${base}/auth/discord`, { redirect: "manual" });
+    : await transport.fetch(`${base}/auth/discord`, { redirect: "manual" });
   const location = link
     ? ((await started.json()) as { location: string }).location
     : (started.headers.get("location") ?? "");
   const state = new URL(location).searchParams.get("state") ?? "";
   const cookies = [`frontfall_sign_in=${cookie(started, "frontfall_sign_in") ?? ""}`];
   if (session) cookies.push(`frontfall_session=${session}`);
-  return fetch(`${base}/auth/discord/callback?code=good&state=${encodeURIComponent(state)}`, {
-    redirect: "manual",
-    headers: { cookie: cookies.join("; ") },
-  });
+  return transport.fetch(
+    `${base}/auth/discord/callback?code=good&state=${encodeURIComponent(state)}`,
+    {
+      redirect: "manual",
+      headers: { cookie: cookies.join("; ") },
+    },
+  );
 }
 
 async function me(base: string, session: string): Promise<{ account: unknown }> {
   return (await (
-    await fetch(`${base}/api/me`, { headers: { cookie: `frontfall_session=${session}` } })
+    await transport.fetch(`${base}/api/me`, { headers: { cookie: `frontfall_session=${session}` } })
   ).json()) as { account: unknown };
 }
 
@@ -244,13 +259,15 @@ describe("adding a way to sign in", () => {
   it("starts only from a form of the game's own page", async () => {
     const base = await start();
     const session = await emailSignIn(base, "nelly@example.org", "Nelly");
-    const elsewhere = await fetch(`${base}/auth/discord/link`, {
+    const elsewhere = await transport.fetch(`${base}/auth/discord/link`, {
       method: "POST",
       redirect: "manual",
       headers: { origin: "https://evil.example", cookie: `frontfall_session=${session}` },
     });
     expect(elsewhere.status).toBe(403);
-    expect((await fetch(`${base}/auth/discord/link`, { redirect: "manual" })).status).toBe(405);
+    expect(
+      (await transport.fetch(`${base}/auth/discord/link`, { redirect: "manual" })).status,
+    ).toBe(405);
   });
 
   it("merges an existing account only once the player says yes", async () => {
@@ -278,7 +295,9 @@ describe("adding a way to sign in", () => {
     expect(await me(base, discordSession)).toMatchObject({ account: null });
     const again = cookie(await discord(base), "frontfall_session") ?? "";
     expect(await me(base, again)).toMatchObject({ account: { name: "Nelly Mail" } });
-    expect(existsSync(`${accountsFile(dataDir)}.before-merges`)).toBe(true);
+    const db = dataOf(dataDir);
+    expect(readDocument(db, BEFORE_MERGES)).toBeDefined();
+    db.close();
   });
 
   it("merges only the account named to the player", async () => {

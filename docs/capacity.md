@@ -6,9 +6,23 @@ How many games and players one game server holds, how it was measured, and what 
 
 The server never simulates a game: it relays orders and sends every player one turn every 100 ms. Its cost is therefore one WebSocket send per player per tick, about 10 µs each, most of it in the system call. Lobbies, orders and the public list barely count. Turn logs grow with play, about 2 MiB for a busy 4-hour game.
 
-## Measured, 29 October 2026
+## Measured on Bun, 7 November 2026
 
-Bench: `pnpm load -- --spawn-server --players 16 --ramp 50,100,200,300,350 --minutes 2 --order-interval 1000 --client-procs 3 --heap-mib 512` ([performance.md](performance.md#server-load)). Private games of 16 players, each sending one order a second, which is more than people do. Machine: 4 × Xeon at 2.1 GHz, Node 22; the server runs in its own process with the heap of the image, the simulated players in three others.
+Bench: `bun run load -- --spawn-server --players 16 --ramp 50,100,190 --minutes 2 --order-interval 1000 --client-procs 3` ([performance.md](performance.md#server-load)). Private games of 16 players, each sending one order a second, which is more than people do. Machine: 4 × Xeon at 2.3 GHz; the server runs on Bun 1.4.4 in its own process, the simulated players on Node 24 in three others.
+
+| Players | Server CPU, one core | Memory (RSS) | Event loop p99 | Turn late by, p95 | Order to turn, p95 |
+| ------: | -------------------: | -----------: | -------------: | ----------------: | -----------------: |
+|     800 |                8.0 % |       65 MiB |         0.8 ms |           +0.9 ms |             181 ms |
+|    1600 |               13.4 % |       74 MiB |         1.2 ms |           +1.1 ms |             181 ms |
+|    3040 |               23.5 % |      101 MiB |         2.6 ms |           +2.4 ms |             182 ms |
+
+No turn was lost, reordered or desynchronised, and no step saturated the server. The order to turn time follows the pace of a normal game, three ticks in four beats, not the runtime. The same bench on the same machine with the server of the commit before, on Node 24 and `node:http` with `ws`, gave 139 MiB and 11.8 % at 800 players, and 228 MiB and 33.6 % at 3040, with an order to turn p95 of 184 ms.
+
+**The memory limit.** Bun has no heap cap like the `--max-old-space-size=512` the Node image had: the container's limit bounds the server. At the default of 3000 players the server took 101 MiB at its peak. The turn logs grow with play up to `FRONTFALL_MAX_LOG_MIB`, 192 MiB, and a client that stops reading holds at most 4 MiB before it is dropped. That makes about 300 MiB at the limits; `mem_limit: 1g` in `compose.yaml` keeps more than three times that, and 512 MiB is the least to give the container. Raise it with the limits.
+
+## Measured on Node, 29 October 2026
+
+Before the move to Bun, with the bench of then: `--ramp 50,100,200,300,350` and the server on Node 22 with the image's 512 MiB heap, on 4 × Xeon at 2.1 GHz.
 
 | Players | Server CPU, one core | Memory (RSS) | Event loop p99 | Turn late by, p95 | Order to turn, p95 |
 | ------: | -------------------: | -----------: | -------------: | ----------------: | -----------------: |
@@ -27,7 +41,7 @@ Two harder cases, at 3040 players:
 
 ## The production server
 
-The game runs in a container of 2 CPUs and 768 MiB, with a 512 MiB heap, beside the website, Caddy and the preview server on the same machine. The defaults keep about half the measured ceiling in reserve for them, for a slower processor and for bursts:
+The game runs in a container of 2 CPUs and 768 MiB, beside the website, Caddy and the preview server on the same machine. The defaults keep about half the measured ceiling in reserve for them, for a slower processor and for bursts:
 
 | Limit                       | Default | Why                                                                              |
 | --------------------------- | ------: | -------------------------------------------------------------------------------- |

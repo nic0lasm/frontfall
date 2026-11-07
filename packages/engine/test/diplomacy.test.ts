@@ -26,6 +26,7 @@ import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
 import { WHOLE_PRICES } from "./whole-prices.ts";
+import { writable } from "../src/state/lists.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
@@ -309,7 +310,7 @@ describe("diplomacy", () => {
   it("keeps only the latest events when nobody reads the log", () => {
     const { game, ally } = newGame();
     for (let i = 0; i < DIPLOMACY_LOG_SIZE; i++) {
-      game.diplomacyEvents.push({ tick: 0, type: "ended", a: 2, b: 3 });
+      writable(game, "diplomacyEvents").push({ tick: 0, type: "ended", a: 2, b: 3 });
     }
     ally(1, 2);
     ally(2, 1);

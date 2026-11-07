@@ -1,9 +1,9 @@
+import { safeStorage } from "../storage.ts";
 import { CATALOGUE, badgeLevel } from "../achievements/catalog.ts";
-import { badge } from "../achievements/badge.ts";
+import { badge } from "./achievement-badge.ts";
 import { AchievementStore } from "../achievements/store.ts";
 import { applyTranslations, t, type MessageKey } from "../i18n/index.ts";
-import { h } from "./dom.ts";
-import { safeStorage } from "./setup.ts";
+import { h } from "../dom.ts";
 
 /** How many achievements the player has earned, for the menu's button. */
 export function earnedCount(): number {

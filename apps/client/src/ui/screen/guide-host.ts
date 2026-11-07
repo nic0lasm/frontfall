@@ -1,9 +1,10 @@
-import type { GameUpdate } from "../../game/solo-game.ts";
+import { youOf } from "../../game/selectors.ts";
+import { safeStorage } from "../../storage.ts";
+import type { GameUpdate } from "../../game/game-runner.ts";
 // The guide loads when first shown, out of the first download.
 import type { Guide, Step } from "../guide.ts";
 import type { due as dueHint, Hints } from "../hints.ts";
 import { hintsSeen, markHint, setGuideDone, turnHintsOff } from "../guide-state.ts";
-import { safeStorage } from "../setup.ts";
 
 /** The guide of a solo game, shown over the HUD while it lasts: the whole tutorial, or the first steps of a first game. */
 export class GuideHost {
@@ -69,7 +70,7 @@ export class GuideHost {
       );
       this.parent.append(this.guide.element);
       const latest = this.latest();
-      const human = latest?.players.find((player) => player.id === latest.you);
+      const human = latest ? youOf(latest) : undefined;
       if (latest) this.follow(latest, human?.tiles ?? 0);
     });
   }
@@ -113,7 +114,7 @@ export class GuideHost {
       return;
     }
     if (update.phase === "play") this.tilesAtPlay ??= tiles;
-    const you = update.players.find((player) => player.id === update.you);
+    const you = youOf(update);
     // Eliminated: the steps ahead no longer apply, so the card goes.
     if (you && !you.alive && update.phase === "play") {
       guide.element.remove();

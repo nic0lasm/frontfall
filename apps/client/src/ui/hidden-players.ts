@@ -1,4 +1,4 @@
-import type { GameUpdate } from "../game/solo-game.ts";
+import type { GameUpdate } from "../game/game-runner.ts";
 import { t } from "../i18n/index.ts";
 
 /**

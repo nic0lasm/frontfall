@@ -15,8 +15,8 @@ import {
   fetchMaps,
   warmMap,
   type MapInfo,
-} from "../src/game/maps.ts";
-import { SoloGame } from "../src/game/solo-game.ts";
+} from "../src/maps.ts";
+import { GameRunner } from "../src/game/game-runner.ts";
 import { CITY_STATES_PER_NATION } from "../src/game/simulation.ts";
 import { botLimit, onlineMaps } from "../src/ui/lobby.ts";
 
@@ -94,7 +94,7 @@ describe("desync report", () => {
     const maps = await fetchMaps(PAGE, fromDisk);
     const info = maps.find((map) => map.id === "europe") as MapInfo;
     const map = await fetchMapData(info, await fetchManifest(info, fromDisk), fromDisk);
-    const game = new SoloGame(
+    const game = new GameRunner(
       {
         map: "europe",
         seed: 9,
@@ -152,7 +152,7 @@ describe("desync report", () => {
   });
 
   it("has nothing to report on a generated map, or solo", async () => {
-    const solo = new SoloGame(
+    const solo = new GameRunner(
       { map: "continents", seed: 1, bots: 1, difficulty: "easy", playerName: "Me" },
       await fetchMapData(GENERATED_MAPS[0] as MapInfo, undefined),
     );

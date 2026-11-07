@@ -1,5 +1,5 @@
 import type { GameRecord } from "@frontfall/engine";
-import { BUILD } from "../net/build.ts";
+import { BUILD } from "../build.ts";
 import { REPLAY_EXTENSION } from "./replay-rules.ts";
 
 // What the simulation worker needs too, kept apart from the file reading.

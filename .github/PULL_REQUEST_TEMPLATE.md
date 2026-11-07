@@ -4,9 +4,9 @@
 
 ## How it was checked
 
-- [ ] `pnpm test` passes, with tests added for new behaviour
+- [ ] `bun run test` passes, with tests added for new behaviour
 - [ ] Engine changes keep the simulation deterministic (seeded `Random`, no clock, integer maths)
-- [ ] Played it locally with `pnpm dev` when the change is visible in game
+- [ ] Played it locally with `bun run dev` when the change is visible in game
 
 ## Verified or hypothesis
 

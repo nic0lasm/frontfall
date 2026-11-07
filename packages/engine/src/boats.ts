@@ -1,6 +1,8 @@
-import { captureCost, defenderLoss } from "./attacks.ts";
+import { ATTACK_EARLY, captureCost, defenderLoss, targetError } from "./attacks.ts";
 import { isAllied } from "./diplomacy.ts";
 import type { Game } from "./game.ts";
+import { PLAY_PHASE, defineOrder } from "./order-rules.ts";
+import { writable } from "./state/lists.ts";
 import { TileKind } from "./terrain.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
 
@@ -49,6 +51,45 @@ export function reachableCoasts(
   return searchFor(game).coasts(player, limit, accept);
 }
 
+/** Refusals of an embark order besides those of `targetError`. */
+export const BoatError = {
+  Coast: "ships can only land on a coast",
+  Max: "too many ships at sea",
+  /** No coast of the player's lies within B-BOAT-RANGE of the target by sea. */
+  Route: "no coast of yours within reach of the target by sea",
+} as const;
+
+/**
+ * R-UNIT-02: `embark` ships troops to a coastal tile the player does not
+ * own, from a coast of theirs within B-BOAT-RANGE by sea; without one, the
+ * order is refused. The route found is the plan, so it is searched once.
+ */
+export const EMBARK_ORDER = defineOrder("embark", {
+  phases: PLAY_PHASE,
+  wrongPhase: ATTACK_EARLY,
+  validate(game, player, order) {
+    const error = targetError(game, player, order.target, order.troops);
+    if (error) return error;
+    if (!game.terrain.isCoast(order.target)) return BoatError.Coast;
+    const atSea = game.boats.filter((boat) => boat.player === player.id).length;
+    if (atSea >= game.balance.boatMax) return BoatError.Max;
+    const route = seaRoute(game, player.id, order.target);
+    if (!route) return BoatError.Route;
+    return { target: order.target, troops: order.troops, path: route.path };
+  },
+  execute(game, player, { target, troops, path }) {
+    player.troops -= troops;
+    writable(game, "boats").push({
+      id: game.nextBoatId++,
+      player: player.id,
+      target,
+      troops,
+      path,
+      step: 0,
+    });
+  },
+});
+
 /**
  * Transport ships (R-UNIT-02, R-ATTACK-09). An embark order sends troops from
  * the player's coast closest to the target; the ship sails B-BOAT-SPEED water
@@ -57,24 +98,10 @@ export function reachableCoasts(
  */
 export function installBoats(game: Game): void {
   const { territory, terrain, balance } = game;
-  const boats = game.boats;
+  const boats = writable(game, "boats");
   const around = new Int32Array(4);
 
-  game.onOrder((_, player, order) => {
-    if (order.type !== "embark") return false;
-    const route = seaRoute(game, player.id, order.target);
-    if (!route) return false;
-    player.troops -= order.troops;
-    boats.push({
-      id: game.nextBoatId++,
-      player: player.id,
-      target: order.target,
-      troops: order.troops,
-      path: route.path,
-      step: 0,
-    });
-    return true;
-  });
+  game.onOrder(EMBARK_ORDER);
 
   game.onTick(() => {
     let kept = 0;
@@ -122,6 +149,15 @@ export function installBoats(game: Game): void {
       return;
     }
   }
+}
+
+/**
+ * R-UNIT-04: the transport ship at `index` of `game.boats` sinks with its
+ * troops, hit by a warship. The warship rules call it; the boats are this
+ * module's to change (ADR 0010).
+ */
+export function sinkBoat(game: Game, index: number): void {
+  writable(game, "boats").splice(index, 1);
 }
 
 const searches = new WeakMap<Game, SeaSearch>();

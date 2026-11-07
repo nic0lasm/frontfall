@@ -35,6 +35,8 @@ export function parseSound(raw: string | null | undefined): SoundSettings {
   return settings;
 }
 
+// localStorage directly, not through storage.ts: imported from this module, the bundler would split
+// storage.ts into a chunk of its own that the first visit loads too. The try blocks do its work.
 function read(): string | null {
   try {
     return globalThis.localStorage.getItem(STORAGE_KEY);

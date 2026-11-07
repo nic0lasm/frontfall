@@ -1,5 +1,5 @@
 import { Disable } from "@frontfall/engine";
-import type { BuildView, ClickMode } from "../game/solo-game.ts";
+import type { BuildView, ClickMode } from "../game/game-runner.ts";
 
 /**
  * The build buttons, with their shortcut keys and numbers (screen/game-keys.ts), in the order the HUD

@@ -1,16 +1,10 @@
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { USED_NAMES, type UsageReport } from "@frontfall/protocol";
 import { ClientErrors } from "./client-errors.ts";
+import { readDocument, writeDocument } from "./database.ts";
+import { transaction, type SqlDriver } from "./sql/driver.ts";
 
 /**
  * Counts of what players do, from the reports their pages send
@@ -300,46 +294,33 @@ export class UsageStats {
   }
 }
 
-/** Where the counts are kept between restarts, inside the server's data directory. */
+/** The file the counts were kept in before data.db, which the first start imports. */
 export function usageFile(dataDir: string): string {
   return join(dataDir, "usage", "usage.json");
 }
 
-/** Reads the counts kept by an earlier run, or the copy made before the last save. */
-export function loadUsage(stats: UsageStats, file: string): Error | undefined {
-  // A missing file beside a copy was lost, not never written; starting empty
-  // would let the second save write the empty counts over that copy.
-  const error =
-    existsSync(file) || !existsSync(`${file}.bak`)
-      ? loadUsageFile(stats, file)
-      : new Error(`${file} is missing`);
-  if (error === undefined) return undefined;
-  if (!existsSync(`${file}.bak`)) return error;
-  // The copy stands in for the damaged file; the error still says what happened to it.
-  const backup = loadUsageFile(stats, `${file}.bak`);
-  return backup === undefined
-    ? new Error(`${error.message}; went on with the copy made before the last save`)
-    : new Error(`${error.message}; the copy did not read either: ${backup.message}`);
+/** Where the counts are kept in data.db, as one document. */
+const USAGE = "usage";
+
+/**
+ * Takes back the counts kept by an earlier run. Counts that do not read are
+ * kept aside as `usage.broken-<time>`, so they can be mended by hand, and the
+ * server starts from none.
+ */
+export function loadUsage(stats: UsageStats, db: SqlDriver, now: number): Error | undefined {
+  const text = readDocument(db, USAGE);
+  if (text === undefined || stats.restore(text)) return undefined;
+  const aside = `${USAGE}.broken-${String(now)}`;
+  transaction(db, () => {
+    writeDocument(db, aside, text);
+    db.run("DELETE FROM documents WHERE name = ?", [USAGE]);
+  });
+  return new Error(`unreadable usage counts, kept as ${aside}`);
 }
 
-/** Reads one file of counts; an error says why they could not be read. */
-function loadUsageFile(stats: UsageStats, file: string): Error | undefined {
-  let text: string;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch (error) {
-    // A first start has nothing to read.
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    return error as Error;
-  }
-  if (stats.restore(text)) return undefined;
-  // Kept aside rather than overwritten by the next save, so the counts can be mended by hand.
-  try {
-    renameSync(file, `${file}.broken`);
-  } catch {
-    // Left in place: the next save replaces it.
-  }
-  return new Error(`unreadable usage counts, kept as ${file}.broken`);
+/** Writes the counts, replacing the last ones at once. */
+export function saveUsage(stats: UsageStats, db: SqlDriver, now: number): void {
+  writeDocument(db, USAGE, stats.serialize(now));
 }
 
 /** Writes a file readable by the server's user only, replacing the old one at once. */
@@ -355,23 +336,9 @@ function writePrivate(file: string, text: string): void {
   }
 }
 
-/** Writes the counts readable by the server's user only, replacing the old file at once. */
-export function saveUsage(stats: UsageStats, file: string, now: number): void {
-  mkdirSync(join(file, ".."), { recursive: true, mode: 0o700 });
-  const text = stats.serialize(now);
-  try {
-    // The last good counts stay beside the new ones; a file that does not read is not kept over them.
-    const before = readFileSync(file, "utf8");
-    if (Stored.safeParse(JSON.parse(before)).success) writePrivate(`${file}.bak`, before);
-  } catch {
-    // A first save has nothing to copy, and a damaged file is not worth a copy.
-  }
-  writePrivate(file, text);
-}
-
-/** Where the months are exported, beside the counts: `usage/months/2026-10.json`. */
-export function monthsDirectory(file: string): string {
-  return join(file, "..", "months");
+/** Where the months are exported, under the data directory: `usage/months/2026-10.json`. */
+export function monthsDirectory(dataDir: string): string {
+  return join(dataDir, "usage", "months");
 }
 
 const MonthFile = z.object({

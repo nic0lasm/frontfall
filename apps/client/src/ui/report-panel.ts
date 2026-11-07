@@ -1,6 +1,6 @@
 import { ReportReason } from "@frontfall/protocol";
 import { getLanguage, type Language } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import "./report-panel.css";
 
 /**

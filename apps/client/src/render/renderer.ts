@@ -1,6 +1,10 @@
 import { FlatCamera, type CameraView, type ViewCamera } from "./camera.ts";
+import { GlContext } from "./gl-context.ts";
 import type * as Lazy from "./lazy.ts";
 import { MapView } from "./map-view.ts";
+import type { BakedGround } from "./prebaked-ground.ts";
+
+export type { BakedGround } from "./prebaked-ground.ts";
 
 export { FRONT_SECONDS } from "./fronts.ts";
 
@@ -108,19 +112,54 @@ export interface RendererOptions {
   readonly flat?: boolean | undefined;
   /** A phone, which asks for larger ships. */
   readonly phone?: boolean | undefined;
+  /** The ground another view of the same game baked already (Renderer.bakedGround), to bake it once. */
+  readonly ground?: BakedGround | undefined;
   /** Owner of every tile, kept up to date by the caller and read in place. */
   readonly owners: Uint16Array;
   readonly maxOwner: number;
 }
 
 /**
- * Draws the game (ADR 0003): the flat map today, the globe later. The page
- * owns the game state and tells the renderer what changed; the renderer
- * owns its canvas, and draws a frame for the view its camera gives. No
- * module outside `src/render` sees Three.js or WebGL.
+ * The combat effects a renderer draws over the map: what follows a missile,
+ * a front that gives way, a capital that falls, a player wiped out.
+ */
+export interface RendererEffects {
+  /** A missile was stopped in the air. */
+  missileIntercepted(end: MissileEnd): void;
+  /** A missile came down on its target. */
+  missileStruck(end: MissileEnd): void;
+  /** A front gave way around `tile` (R-ATTACK-10). */
+  collapsed(tile: number): void;
+  /** A capital fell or was razed on `tile` (R-CAP-03, R-CAP-04). */
+  capitalFell(tile: number): void;
+  /** A player in `color` lost their last tile, around `tile`. */
+  eliminated(tile: number, color: string): void;
+  /** The capital of the player at this screen is under threat (R-CAP-05), or `undefined` once safe. */
+  capitalThreat(tile: number | undefined): void;
+  /** Whether effects are still playing, which keeps frames coming. */
+  animating(): boolean;
+}
+
+/**
+ * What a renderer can do beyond the contract every renderer keeps. The page
+ * asks here rather than calling hooks a renderer may leave out: the flat map
+ * draws the combat effects, the globe (a prototype, ADR 0005) does not yet.
+ */
+export interface RendererCapabilities {
+  readonly kind: ViewKind;
+  /** The combat effects, or `undefined` for a renderer that draws none. */
+  readonly effects: RendererEffects | undefined;
+}
+
+/**
+ * Draws the game (ADR 0003): the flat map, or the globe. The page owns the
+ * game state and tells the renderer what changed; the renderer draws a
+ * frame for the view its camera gives, on the canvas of the game's one
+ * context (`RenderContext`), which outlives it. No module outside
+ * `src/render` sees Three.js or WebGL.
  */
 export interface Renderer {
-  readonly canvas: HTMLCanvasElement;
+  readonly capabilities: RendererCapabilities;
   setPlayerColor(id: number, color: string): void;
   /** The player whose land is marked out, usually the one at this screen. */
   setHighlight(id: number): void;
@@ -132,39 +171,50 @@ export interface Renderer {
   setMotion(moving: boolean): void;
   /** Tiles whose owner changed in the shared array; they fade in and light their front for FRONT_SECONDS. */
   markChanged(tiles: ArrayLike<number>): void;
-  /** Every tile changed at once, after a full resynchronisation. */
+  /** Every tile changed at once, after a full resynchronisation or when the view is shown again. */
   markAllChanged(): void;
   /** Transport and trade ships at sea, replacing the previous ones. */
   setShips(ships: readonly UnitMark[]): void;
   /** Discs of land under fallout (R-UNIT-06), replacing the previous ones; whether the ground changed. */
   setFallout(zones: readonly FalloutZone[]): boolean;
-  /** A missile was stopped in the air; a renderer without effects leaves it out. */
-  missileIntercepted?(end: MissileEnd): void;
-  /** A missile came down on its target; a renderer without effects leaves it out. */
-  missileStruck?(end: MissileEnd): void;
-  /** A front gave way around `tile` (R-ATTACK-10); a renderer without effects leaves it out. */
-  collapsed?(tile: number): void;
-  /** A capital fell or was razed on `tile` (R-CAP-03, R-CAP-04); a renderer without effects leaves it out. */
-  capitalFell?(tile: number): void;
-  /** A player in `color` lost their last tile, around `tile`; a renderer without effects leaves it out. */
-  eliminated?(tile: number, color: string): void;
-  /** The capital of the player at this screen is under threat (R-CAP-05), or `undefined` once safe. */
-  capitalThreat?(tile: number | undefined): void;
   /** Every structure on the map, replacing the previous ones. */
   setStructures(structures: readonly StructureMark[]): void;
-  /** Whether effects are still playing, which keeps frames coming; a renderer without effects leaves it out. */
-  animating?(): boolean;
   /** The baked colours of the ground, with the distance to the coast in alpha, for the minimap to reuse. */
-  ground?(): Uint8Array | undefined;
+  ground(): Uint8Array;
+  /** A copy of the ground as baked, without fallout, for another view of the same game. */
+  bakedGround(): BakedGround;
   resize(width: number, height: number): void;
   /** Device pixels per CSS pixel the map is drawn at (render-scale.ts). */
   setPixelRatio(ratio: number): void;
   render(view: CameraView): void;
+  /**
+   * Gets the next frame ready while another view is shown: the shaders built
+   * in parallel and the textures sent, so that showing this one does not
+   * wait. Settles once the shaders are built, or failed to.
+   */
+  warm(): Promise<void>;
   /** Why the frames come out blank (a shader that did not build, a lost context), once known. */
-  fault?(): string | undefined;
-  /** Waits for the graphics card to finish what was sent (`?perf` timings only). */
-  sync?(): void;
+  fault(): string | undefined;
+  /** Frees what the renderer made; the context it drew with stays. */
   dispose(): void;
+}
+
+/**
+ * The one WebGL context of a game and its canvas, which every renderer of
+ * the game draws on in turn: a switch between the flat map and the globe
+ * keeps it (M7-07).
+ */
+export interface RenderContext {
+  readonly canvas: HTMLCanvasElement;
+  /** Waits for the graphics card to finish what was sent (`?perf` timings only). */
+  sync(): void;
+  /** Frees the context; every renderer made with it must be disposed first. */
+  dispose(): void;
+}
+
+/** The context of a game's renderers; throws if WebGL 2 is missing or refused. */
+export function createContext(): RenderContext {
+  return new GlContext();
 }
 
 /** The territories', the globe's and the pieces' code, once loadGlobe or loadPieces has fetched it. */
@@ -188,10 +238,17 @@ export function globeLoaded(): boolean {
   return lazy !== undefined;
 }
 
-/** The renderer for a map; throws if WebGL 2 is missing or refused, or before loadGlobe has completed. */
-export function createRenderer(options: RendererOptions, kind: ViewKind = "flat"): Renderer {
+/** The renderer for a map, on the game's context; throws before loadGlobe has completed. */
+export function createRenderer(
+  context: RenderContext,
+  options: RendererOptions,
+  kind: ViewKind = "flat",
+): Renderer {
   if (!lazy) throw new Error("the map's drawing code is not loaded (loadGlobe)");
-  return kind === "globe" ? new lazy.GlobeView(options) : new MapView(options, lazy, lazy, lazy);
+  if (!(context instanceof GlContext)) throw new TypeError("a context of createContext is needed");
+  return kind === "globe"
+    ? new lazy.GlobeView(context, options)
+    : new MapView(context, options, lazy, lazy, lazy);
 }
 
 /** The minimap of a game, once the chunk is there; none before, and the game goes on without it. */

@@ -1,3 +1,4 @@
+import { DIFFICULTIES, defaultRules } from "../game/defaults.ts";
 import { Disable, leftOut } from "@frontfall/engine";
 import {
   GAME_SPEEDS,
@@ -11,18 +12,16 @@ import {
   type GameSpeed,
   type Teams,
 } from "@frontfall/protocol";
-import { MAP_GROUPS, type MapInfo } from "../game/maps.ts";
-import { MAX_BOTS } from "../game/solo-game.ts";
-import { activeRuleNames, defaultRules, rulesFieldset } from "./rules-fieldset.ts";
+import { MAP_GROUPS, type MapInfo } from "../maps.ts";
+import { MAX_BOTS } from "../game/game-runner.ts";
+import { activeRuleNames, rulesFieldset } from "./rules-fieldset.ts";
 import { OPERATOR_BONUSES, operatorBonusLine } from "./operator-bonuses.ts";
 import { LEFT_OUT, TEAM_CHOICES } from "./setup.ts";
 import { applyTranslations, getLanguage, t, type MessageKey, type Params } from "../i18n/index.ts";
 import type { LobbyState } from "../net/online.ts";
 import { playerColor, teamColor } from "../palette.ts";
-import { h, swatch } from "./dom.ts";
+import { h, swatch } from "../dom.ts";
 import { formatSpeed } from "./format.ts";
-
-const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
 
 /** Maps an online game can be played on: those the server knows, from the published catalogue. */
 export function onlineMaps(maps: readonly MapInfo[]): MapInfo[] {

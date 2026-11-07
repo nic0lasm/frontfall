@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { LabelAnchor } from "../src/game/label-anchors.ts";
-import type { PlayerView } from "../src/game/solo-game.ts";
+import type { PlayerView } from "../src/game/game-runner.ts";
 import type { Camera } from "../src/render/camera.ts";
-import { PlayerLabels } from "../src/ui/labels.ts";
+import { PlayerLabels, relationMarks } from "../src/ui/labels.ts";
 
 /** Just enough of a DOM element for the labels, counting what the page would be asked to do. */
 class FakeElement {
@@ -116,7 +116,7 @@ describe("player labels", () => {
     });
     const relations = (allies: number[]): never =>
       ({ phase: "play", players, diplomacy: diplomacy(allies) }) as never;
-    labels.setRelations(relations([1]));
+    labels.setMarks(relationMarks(relations([1])));
     const texts = (): string[] =>
       [...(labels as unknown as { labels: Map<number, { count: string }> }).labels.values()].map(
         (label) => label.count,
@@ -124,10 +124,21 @@ describe("player labels", () => {
     expect(texts()[0]).toMatch(/^\u2713 /);
     expect(texts()[1]).toMatch(/^\u265B /);
     const writes = FakeElement.styleWrites;
-    labels.setRelations(relations([1]));
+    labels.setMarks(relationMarks(relations([1])));
     expect(texts()[0]).toMatch(/^\u2713 /);
-    labels.setRelations(relations([]));
+    labels.setMarks(relationMarks(relations([])));
     expect(texts()[0]).toBe("10");
     expect(FakeElement.styleWrites).toBe(writes);
+  });
+
+  it("gives a label made after the marks the marks of its player", () => {
+    fakeDocument();
+    const labels = new PlayerLabels();
+    labels.setMarks(new Map([[3, "\u2713"]]));
+    labels.update([player(3)], undefined);
+    const [label] = (
+      labels as unknown as { labels: Map<number, { count: string }> }
+    ).labels.values();
+    expect(label?.count).toBe("\u2713 30");
   });
 });

@@ -1,8 +1,9 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { MAX_USAGE_BYTES, parseUsageReport, scrubMessage } from "@frontfall/protocol";
 import { groupId } from "./client-errors.ts";
+import { systemClock } from "./clock.ts";
 import type { Logger } from "./log.ts";
 import { TokenBucket } from "./rate-limit.ts";
+import type { HttpRequest, HttpResponse } from "./transport.ts";
 import type { UsageStats } from "./usage.ts";
 
 /** Reports one address may send at once, then one every 20 s: a game, a vote, a few errors. */
@@ -22,7 +23,7 @@ const FORGET_AFTER_MS = (PER_ADDRESS.burst / PER_ADDRESS.perSecond) * 1000;
 
 export interface UsageInbox {
   /** Answers a POST to /api/usage. */
-  handle(request: IncomingMessage, response: ServerResponse, address: string): void;
+  handle(request: HttpRequest, response: HttpResponse, address: string): void;
 }
 
 /**
@@ -33,7 +34,7 @@ export function usageInbox(
   stats: UsageStats,
   logger: Logger,
   isAllowed: (origin: string | undefined) => boolean,
-  now: () => number = Date.now,
+  now: () => number = () => systemClock.now(),
   maxAddresses = MAX_ADDRESSES,
 ): UsageInbox {
   const buckets = new Map<string, { bucket: TokenBucket; usedAt: number }>();
@@ -67,46 +68,37 @@ export function usageInbox(
   return {
     handle(request, response, address) {
       const end = (status: number): void => {
-        response.writeHead(status, { "cache-control": "no-store" }).end();
+        response.send(status, { "cache-control": "no-store" });
       };
       if (request.method !== "POST") {
-        response.writeHead(405, { allow: "POST" }).end();
+        response.send(405, { allow: "POST" });
         return;
       }
-      const type = (request.headers["content-type"] ?? "").split(";")[0]?.trim();
+      // Refused before the body is read: the transport drains what is left of it.
+      const type = (request.header("content-type") ?? "").split(";")[0]?.trim();
       if (type !== "application/json" && type !== "text/plain") {
         end(415);
-        request.resume();
         return;
       }
-      if (!isAllowed(request.headers.origin)) {
+      if (!isAllowed(request.header("origin"))) {
         end(403);
-        request.resume();
         return;
       }
       if (!allow(address, now())) {
         end(429);
-        request.resume();
         return;
       }
-      const chunks: Buffer[] = [];
-      let size = 0;
-      let done = false;
-      request.on("data", (chunk: Buffer) => {
-        if (done) return;
-        size += chunk.length;
-        if (size > MAX_USAGE_BYTES) {
-          done = true;
-          response.writeHead(413, { connection: "close" }).end();
-          request.destroy();
+      void request.body(MAX_USAGE_BYTES).then((body) => {
+        if (body.kind === "aborted") return;
+        if (body.kind === "too_large") {
+          response.send(413, { connection: "close" });
+          response.abort();
           return;
         }
-        chunks.push(chunk);
-      });
-      request.on("end", () => {
-        if (done) return;
-        done = true;
-        const parsed = parseUsageReport(Buffer.concat(chunks).toString("utf8"));
+        const { bytes } = body;
+        const parsed = parseUsageReport(
+          Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("utf8"),
+        );
         if (!parsed.ok) {
           end(400);
           return;
@@ -124,9 +116,6 @@ export function usageInbox(
           });
         }
         end(204);
-      });
-      request.on("error", () => {
-        done = true;
       });
     },
   };

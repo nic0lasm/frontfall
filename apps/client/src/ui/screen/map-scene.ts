@@ -1,21 +1,27 @@
+import { youOf } from "../../game/selectors.ts";
+import { safeStorage } from "../../storage.ts";
 import { TileKind } from "@frontfall/engine";
-import type { MapData, MapInfo } from "../../game/maps.ts";
-import type { GameUpdate } from "../../game/solo-game.ts";
+import type { MapData, MapInfo } from "../../maps.ts";
+import type { GameUpdate } from "../../game/game-runner.ts";
 import type { MessageKey } from "../../i18n/index.ts";
 import { colorOf } from "../../palette.ts";
 import type { CameraView, ViewCamera } from "../../render/camera.ts";
 import {
   createCamera,
+  createContext,
   createMinimap,
   createRenderer,
   fitsGlobe,
   FRONT_SECONDS,
   globeLoaded,
+  type BakedGround,
   type MissileEnd,
+  type RenderContext,
   type Renderer,
   type StructureMark,
   type ViewKind,
 } from "../../render/renderer.ts";
+import { SwitchCamera } from "../../render/switch-camera.ts";
 import type { Minimap } from "../../render/minimap.ts";
 import { RenderScale } from "../../render/render-scale.ts";
 import {
@@ -29,8 +35,7 @@ import {
 } from "../graphics.ts";
 import { usage } from "../../usage.ts";
 import { accessibility, motionReduced } from "../accessibility.ts";
-import { probe } from "../probe.ts";
-import { safeStorage } from "../setup.ts";
+import { probe } from "../../probe.ts";
 import { sailing, ShipMotion } from "./ship-motion.ts";
 
 /** Between two frames drawn for slow motion alone: 30 a second. The frame clock jitters, hence the margin. */
@@ -47,8 +52,19 @@ const START_TILE_PIXELS = 6;
 /** Plate of a landmark nobody holds yet (R-LAND-01). */
 const LANDMARK_UNHELD = "#a8875a";
 
-/** What the map is drawn with, known once the game starts. */
+/**
+ * The view a game starts with, and whether G may switch to the globe: only
+ * a page opened with `?view=` turns the globe on (a prototype, ADR 0005).
+ */
+export interface SceneView {
+  readonly globe: boolean;
+  readonly kind: ViewKind;
+}
 
+/** The flat map, with no globe to switch to. */
+export const FLAT_VIEW: SceneView = { globe: false, kind: "flat" };
+
+/** What the map is drawn with, known once the game starts. */
 export interface SceneStart {
   readonly map: MapData;
   readonly you: number;
@@ -65,17 +81,34 @@ export interface SceneStart {
  * the renderer that draws it, flat or globe. It draws a frame only when
  * something changed, and keeps the renderer told of what the game shows:
  * ships, structures, fallout, allies and the land under the pointer.
+ *
+ * The game has one WebGL context, made with the first renderer. On the
+ * globe path both renderers live on it once the browser had time to make
+ * the second, and G swaps which one draws, and which camera the input's
+ * camera passes to (M7-07): nothing is disposed or made again.
  */
 export class MapScene {
   /** Owner of every tile, read in place by the renderer. */
   private owners = new Uint16Array(0);
-  private cam: ViewCamera;
+  /** The camera the input and the interface hold; it passes every call to the view shown's. */
+  private readonly cam: SwitchCamera;
+  /** The camera of each view made so far. */
+  private readonly cameras: Partial<Record<ViewKind, ViewCamera>> = {};
+  /** The game's one WebGL context, made with the first renderer and kept until dispose. */
+  private context: RenderContext | undefined;
+  /** The renderer of each view made so far: the one not shown waits, ready, for G. */
+  private readonly views: Partial<Record<ViewKind, Renderer>> = {};
+  /** Stops waiting for the browser to be idle to make the other view. */
+  private cancelPrepare: (() => void) | undefined;
+  /** The view made ahead, to draw once under the next frame of the view shown. */
+  private rehearsal: Renderer | undefined;
   /** How sharp the map is drawn, lowered when the GPU cannot keep up with the display. */
   private scale: RenderScale;
   /** What the map is drawn with, from the graphics setting and the device. */
   private profile: GraphicsProfile;
   /** The scale changed since the last frame, and the renderer has yet to follow. */
   private rescaled = false;
+  /** The renderer shown. */
   private view: Renderer | undefined;
   /** The overview in a corner, once the code it comes with has arrived. */
   private minimap: Minimap | undefined;
@@ -113,20 +146,23 @@ export class MapScene {
   private readonly mapSize: { readonly width: number; readonly height: number };
   /** What the renderer is made from, kept to make another one when the view switches. */
   private shown: SceneStart | undefined;
+  private disposed = false;
 
   constructor(
     /** The layer the canvas goes in. */
     private readonly surface: HTMLElement,
     map: MapInfo,
-    /** The view to start with; "globe" also lets G switch views (a prototype, ADR 0005). */
-    view: ViewKind,
+    /** The view to start with, and whether G may switch to the globe. */
+    view: SceneView,
     /** No renderer could be made; the key names the message to show. */
     private readonly onFailure: (key: MessageKey) => void,
   ) {
-    this.globeAllowed = view === "globe" && fitsGlobe(map) && globeLoaded();
-    this.viewKind = this.globeAllowed ? "globe" : "flat";
+    this.globeAllowed = view.globe && fitsGlobe(map) && globeLoaded();
+    this.viewKind = this.globeAllowed ? view.kind : "flat";
     this.mapSize = { width: map.width, height: map.height };
-    this.cam = createCamera(map, this.viewKind);
+    const camera = createCamera(map, this.viewKind);
+    this.cameras[this.viewKind] = camera;
+    this.cam = new SwitchCamera(camera);
     this.profile = chooseProfile(
       accessibility().graphics,
       readDevice(),
@@ -160,18 +196,14 @@ export class MapScene {
     rememberSaver(safeStorage());
     this.profile = SAVER;
     this.scale = new RenderScale(window.devicePixelRatio, SAVER.maxPixelRatio);
-    const kept = this.view;
-    this.unwatchContext?.();
-    this.unwatchContext = undefined;
-    kept.dispose();
-    this.view = undefined;
-    // The owners are already there to draw.
-    this.mount()?.markAllChanged();
-    this.drawnStructures = [];
-    if (this.latest) this.placeStructures(this.latest);
+    // Both views are made again with the light picture, on the same context and ground.
+    const ground = this.view.bakedGround();
+    this.disposeViews();
+    this.present(ground);
+    this.prepareOther();
   }
 
-  /** The camera of the current view; another one after a switch. */
+  /** The camera the input and the interface hold for the whole game, whatever the view. */
   get camera(): ViewCamera {
     return this.cam;
   }
@@ -208,14 +240,25 @@ export class MapScene {
     return kind !== undefined && kind !== TileKind.Water && kind !== TileKind.Impassable;
   }
 
-  /** Disposes the renderer, whose context it frees on purpose, without reporting that as lost. */
+  /** Disposes the renderers, then the context, which it frees on purpose, without reporting that as lost. */
   dispose(): void {
+    this.disposed = true;
+    this.cancelPrepare?.();
     this.unwatchContext?.();
     this.unwatchContext = undefined;
     this.minimap?.dispose();
     this.minimap = undefined;
-    this.view?.dispose();
+    this.disposeViews();
+    this.context?.dispose();
+    this.context = undefined;
+  }
+
+  private disposeViews(): void {
+    for (const view of Object.values(this.views)) view.dispose();
+    delete this.views.flat;
+    delete this.views.globe;
     this.view = undefined;
+    delete this.surface.dataset.ready;
   }
 
   /** The tile under the pointer changed, or the pointer left the map. */
@@ -237,8 +280,10 @@ export class MapScene {
     this.owners = new Uint16Array(start.map.width * start.map.height);
     this.wrapsX = start.map.wrapsX;
     this.shown = start;
-    const view = this.mount();
-    if (view) this.addMinimap(start, view);
+    const view = this.present();
+    if (!view) return;
+    this.addMinimap(start, view);
+    this.prepareOther();
   }
 
   /** The minimap of a game: over the ground the renderer baked, in the players' colours. */
@@ -250,7 +295,7 @@ export class MapScene {
         height: map.height,
         kinds: map.kinds,
         wrapsX: map.wrapsX,
-        ground: view.ground?.(),
+        ground: view.ground(),
       },
       owners: this.owners,
       maxOwner: maxPlayer,
@@ -269,13 +314,42 @@ export class MapScene {
     }
   }
 
-  /** Makes the renderer of the current kind over the owners array, already filled or not. */
-  private mount(): Renderer | undefined {
+  /** The kind of view G switches to. */
+  private get otherKind(): ViewKind {
+    return this.viewKind === "globe" ? "flat" : "globe";
+  }
+
+  /** The game's context, made with its first renderer, its canvas put in the surface. */
+  private open(): RenderContext {
+    const context = createContext();
+    // Only a loss the browser inflicts is an error: disposing frees the context on purpose.
+    const onLost = (): void => {
+      usage().error("context_lost");
+    };
+    context.canvas.addEventListener("webglcontextlost", onLost);
+    this.unwatchContext = () => {
+      context.canvas.removeEventListener("webglcontextlost", onLost);
+    };
+    context.canvas.classList.add("map-canvas");
+    this.surface.append(context.canvas);
+    this.surface.removeAttribute("aria-busy");
+    return context;
+  }
+
+  /**
+   * Makes the renderer of `kind` on the game's context, over the owners
+   * array, with the ground another view baked when there is one. Failing
+   * says so, unless `quiet`: the view made ahead of a switch fails alone.
+   */
+  private make(kind: ViewKind, ground?: BakedGround, quiet = false): Renderer | undefined {
     if (!this.shown) return undefined;
     const { map, you, maxPlayer, firstNation, teams } = this.shown;
     let view: Renderer;
     try {
+      this.context ??= this.open();
+      const other = this.views[kind === "globe" ? "flat" : "globe"];
       view = createRenderer(
+        this.context,
         {
           width: map.width,
           height: map.height,
@@ -286,14 +360,16 @@ export class MapScene {
           groundSource: map.source && { id: map.id, sha256: map.source.sha256 },
           flat: this.flat,
           phone: isPhone(readDevice()),
+          ground: ground ?? other?.bakedGround(),
           owners: this.owners,
           maxOwner: maxPlayer,
         },
-        this.viewKind,
+        kind,
       );
     } catch (error) {
       // Most likely the WebGL context, lost or refused after the check of the menu.
       console.error(error);
+      if (quiet) return undefined;
       usage().error("webgl");
       this.onFailure("webgl.missing");
       return undefined;
@@ -302,51 +378,112 @@ export class MapScene {
       view.setPlayerColor(id, colorOf(id, firstNation, teams));
     }
     view.setHighlight(you);
+    this.views[kind] = view;
+    return view;
+  }
+
+  /**
+   * Shows the renderer of the current kind, made now if it was not made
+   * ahead, and tells it everything the game shows: it may have waited
+   * through a part of the game while the other view was shown.
+   */
+  private present(ground?: BakedGround): Renderer | undefined {
+    const view = this.views[this.viewKind] ?? this.make(this.viewKind, ground);
+    if (!view) return undefined;
+    this.view = view;
     view.setHovered(this.hoveredOwner);
     view.setMotion(!motionReduced());
+    view.setPixelRatio(this.scale.ratio);
+    // The tiles that changed hands meanwhile were marked on it too (update): only those are sent.
     this.drawnAllies = "";
-    // Only a loss the browser inflicts is an error: disposing frees the context on purpose.
-    const onLost = (): void => {
-      usage().error("context_lost");
-    };
-    view.canvas.addEventListener("webglcontextlost", onLost);
-    this.unwatchContext = () => {
-      view.canvas.removeEventListener("webglcontextlost", onLost);
-    };
-    view.canvas.classList.add("map-canvas");
-    this.surface.append(view.canvas);
-    this.surface.removeAttribute("aria-busy");
-    this.view = view;
+    this.drawnStructures = [];
+    if (this.latest) {
+      this.placeStructures(this.latest);
+      this.placeFallout(this.latest);
+      this.placeAllies(this.latest);
+    }
+    this.surface.dataset.view = this.viewKind;
     this.dirty = true;
     this.drawnView = undefined;
-    view.setPixelRatio(this.scale.ratio);
     this.resize();
     return view;
   }
 
   /**
-   * Flat map to globe and back in a running game: a new camera over the same
-   * tile and zoom, and a new renderer over the same owners array. The caller
-   * wires its input to the new camera. Whether the view switched.
+   * On the globe path, makes the other view once the browser is idle, its
+   * shaders built and its textures sent, then draws it once under a frame
+   * of the view shown (rehearse), so that G only swaps the two.
+   */
+  private prepareOther(): void {
+    this.cancelPrepare?.();
+    this.cancelPrepare = undefined;
+    if (!this.globeAllowed) return;
+    const prepare = (): void => {
+      this.cancelPrepare = undefined;
+      const kind = this.otherKind;
+      if (this.disposed || this.views[kind] || !this.context) return;
+      const view = this.make(kind, undefined, true);
+      const { width, height } = this.mapSize;
+      this.cameras[kind] ??= createCamera({ width, height, wrapsX: this.wrapsX }, kind);
+      void view?.warm().then(() => {
+        if (this.views[kind] !== view) return;
+        this.rehearsal = view;
+        this.dirty = true;
+      });
+    };
+    if ("requestIdleCallback" in window) {
+      const handle = window.requestIdleCallback(prepare, { timeout: 2_000 });
+      this.cancelPrepare = () => {
+        window.cancelIdleCallback(handle);
+      };
+    } else {
+      const handle = setTimeout(prepare, 2_000);
+      this.cancelPrepare = () => {
+        clearTimeout(handle);
+      };
+    }
+  }
+
+  /**
+   * Draws the view made ahead once, just before the view shown draws over
+   * it in the same frame, so nothing of it reaches the screen: what a
+   * renderer makes on its first frame (buffers, the first use of its
+   * shaders) is made now rather than on the frame after G.
+   */
+  private rehearse(): void {
+    const view = this.rehearsal;
+    if (!view) return;
+    this.rehearsal = undefined;
+    const { kind } = view.capabilities;
+    const camera = this.cameras[kind];
+    if (!camera || this.views[kind] !== view || view === this.view) return;
+    camera.resize(this.cam.viewportWidth, this.cam.viewportHeight);
+    view.setPixelRatio(this.scale.ratio);
+    view.resize(window.innerWidth, window.innerHeight);
+    view.render(camera.view());
+    // The view G shows next is ready: the end-to-end test of the switch waits for it.
+    this.surface.dataset.ready = kind;
+  }
+
+  /**
+   * Flat map to globe and back in a running game: the input's camera passes
+   * to the other view's camera, over the same tile and zoom, and the other
+   * renderer draws on the same context, over the same owners array. Whether
+   * the view switched.
    */
   switchKind(): boolean {
     if (!this.globeAllowed) return false;
-    const { centerX, centerY } = this.cam.view();
+    const kind = this.otherKind;
     const { width, height } = this.mapSize;
-    const centre = Math.min(height - 1, Math.floor(centerY)) * width + Math.floor(centerX);
-    const zoom = this.cam.zoom;
-    this.viewKind = this.viewKind === "globe" ? "flat" : "globe";
-    this.cam = createCamera({ width, height, wrapsX: this.wrapsX }, this.viewKind);
-    this.cam.resize(window.innerWidth, window.innerHeight);
-    this.cam.focus(centre, zoom);
+    const camera = (this.cameras[kind] ??= createCamera(
+      { width, height, wrapsX: this.wrapsX },
+      kind,
+    ));
+    this.cam.swap(camera, width, height);
+    this.viewKind = kind;
     // The tile under the pointer is another one in the new view, known on its next move.
     this.hover(undefined);
-    if (!this.view) return true;
-    this.dispose();
-    // The owners are already there to draw.
-    this.mount()?.markAllChanged();
-    this.drawnStructures = [];
-    if (this.latest) this.placeStructures(this.latest);
+    if (this.view) this.present();
     return true;
   }
 
@@ -376,7 +513,7 @@ export class MapScene {
     if (update.owners) {
       this.owners.set(update.owners);
       this.minimap?.noteAll();
-      this.view?.markAllChanged();
+      for (const view of Object.values(this.views)) view.markAllChanged();
       this.dirty = true;
     } else if (update.changedTiles.length > 0) {
       const { changedTiles, changedOwners } = update;
@@ -389,28 +526,32 @@ export class MapScene {
         this.minimap?.noteChange(tile, before, owner, now);
         this.owners[tile] = owner;
       }
-      this.view?.markChanged(changedTiles);
+      // The view waiting for G is told too, so that showing it sends only what changed.
+      for (const view of Object.values(this.views)) view.markChanged(changedTiles);
       this.dirty = true;
       this.fadingUntil = performance.now() + FADE_MS;
       this.frontsOffAt = performance.now() + FRONT_MS;
     }
-    for (const event of update.events) {
-      if (event.type === "collapsed" && event.tile !== undefined)
-        this.view?.collapsed?.(event.tile);
-      // The capital that fell is the one its owner had on the previous update.
-      if (event.type === "capital" || event.type === "razed") {
-        const tile = this.latest?.players.find((p) => p.id === event.b)?.capital;
-        if (tile !== undefined) this.view?.capitalFell?.(tile);
+    // Only a renderer that draws the combat effects is told of them.
+    const effects = this.view?.capabilities.effects;
+    if (effects) {
+      for (const event of update.events) {
+        if (event.type === "collapsed" && event.tile !== undefined) effects.collapsed(event.tile);
+        // The capital that fell is the one its owner had on the previous update.
+        if (event.type === "capital" || event.type === "razed") {
+          const tile = this.latest?.players.find((p) => p.id === event.b)?.capital;
+          if (tile !== undefined) effects.capitalFell(tile);
+        }
+        if (event.type === "eliminated" && this.shown) {
+          const tile =
+            lost.get(event.b) ?? this.latest?.players.find((p) => p.id === event.b)?.capital;
+          const { firstNation, teams } = this.shown;
+          if (tile !== undefined) effects.eliminated(tile, colorOf(event.b, firstNation, teams));
+        }
       }
-      if (event.type === "eliminated" && this.shown) {
-        const tile =
-          lost.get(event.b) ?? this.latest?.players.find((p) => p.id === event.b)?.capital;
-        const { firstNation, teams } = this.shown;
-        if (tile !== undefined) this.view?.eliminated?.(tile, colorOf(event.b, firstNation, teams));
-      }
+      const mine = youOf(update)?.capital;
+      effects.capitalThreat(update.capitals?.threat ? mine : undefined);
     }
-    const mine = update.players.find((p) => p.id === update.you)?.capital;
-    this.view?.capitalThreat?.(update.capitals?.threat ? mine : undefined);
     this.lightHovered();
     this.placeStructures(update);
     this.placeFallout(update);
@@ -460,10 +601,12 @@ export class MapScene {
     // Between two ticks (a tenth of a second) only the cell fade, the ships' glide and the effects move,
     // and the map's shader runs once per pixel, which is the GPU's whole load: 30 frames a second are
     // enough for them. A new view, a change from the game or from the player draws at once.
-    const gentle = moving || this.settling || fading || this.view?.animating?.() === true;
+    const gentle =
+      moving || this.settling || fading || this.view?.capabilities.effects?.animating() === true;
     const wanted = urgent || (gentle && now - this.drawnAt >= GENTLE_FRAME_MS);
     const drawn = this.view !== undefined && wanted;
     if (this.view && drawn) {
+      this.rehearse();
       let phase = probe.mark();
       this.placeShips(now);
       probe.since("ships place", phase);
@@ -472,10 +615,10 @@ export class MapScene {
       probe.since("map render", phase);
       if (probe.on) {
         phase = probe.mark();
-        this.view.sync?.();
+        this.context?.sync();
         probe.since("gpu wait", phase);
       }
-      const fault = this.view.fault?.();
+      const fault = this.view.fault();
       if (fault) {
         console.error(`the map cannot be drawn: ${fault}`);
         usage().error("webgl");
@@ -608,8 +751,8 @@ export class MapScene {
 
   /** Missiles that were stopped in the air or came down since the last update: each starts its own effect. */
   private placeMissileEnds(update: GameUpdate): void {
-    const view = this.view;
-    if (!view || !this.shown) return;
+    const effects = this.view?.capabilities.effects;
+    if (!effects || !this.shown) return;
     const { width } = this.mapSize;
     const { firstNation, teams } = this.shown;
     const at = (tile: number) => ({ x: tile % width, y: Math.floor(tile / width) });
@@ -623,8 +766,8 @@ export class MapScene {
         to: at(event.to),
         ...(event.site === undefined ? {} : { site: at(event.site) }),
       };
-      if (event.type === "struck") view.missileStruck?.(end);
-      else view.missileIntercepted?.(end);
+      if (event.type === "struck") effects.missileStruck(end);
+      else effects.missileIntercepted(end);
       this.dirty = true;
     }
   }

@@ -1,6 +1,6 @@
 import { getLanguage, type MessageKey } from "../i18n/index.ts";
 import { RELEASE } from "../release.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 
 const REPOSITORY = "https://github.com/nic0lasm/frontfall";
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AttackError } from "../src/attacks.ts";
 import { DEFAULT_BALANCE } from "../src/balance.ts";
 import { Game, type Order, type Player } from "../src/game.ts";
 import { orderError } from "../src/orders.ts";
@@ -69,7 +70,8 @@ describe("orderError", () => {
 
   it("checks the attack named by a retreat", () => {
     const { game, ada } = newGame(0);
-    expect(orderError(game, ada, { type: "retreat", attack: 3 })).toBeUndefined();
+    // No attack 3 of hers is under way.
+    expect(orderError(game, ada, { type: "retreat", attack: 3 })).toBe(AttackError.Retreat);
     expect(orderError(game, ada, { type: "retreat", attack: 0 })).toBe("invalid attack id");
     expect(orderError(game, ada, { type: "retreat", attack: 1.5 })).toBe("invalid attack id");
   });

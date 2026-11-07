@@ -30,7 +30,7 @@ curl -sSi https://nclsmgr.com/frontfall/healthz
 ```sh
 docker ps --filter name=frontfall          # status and health
 docker stats --no-stream frontfall-frontfall-1
-docker exec frontfall-frontfall-1 wget -qO- http://127.0.0.1:8080/metrics
+docker exec frontfall-frontfall-1 bun -e "fetch('http://127.0.0.1:8080/metrics').then((r) => r.text()).then(console.log)"
 ```
 
 ## If Cloudflare is down
@@ -79,7 +79,7 @@ journalctl -t frontfall-frontfall-1 -o cat --since today | jq -c 'select(.level 
 docker restart frontfall-frontfall-1
 ```
 
-Games in progress live in memory. On a restart the server drains first (see [server.md](server.md#shutdown)): it stops opening games, lets running ones go on for `FRONTFALL_DRAIN_SECONDS`, then ends them with reason `restart` and the page tells players why. Prefer a quiet moment: `curl -s https://nclsmgr.com/frontfall/api/games` gives `running`, the games a restart would stop. Deployments from main announce the update to players and wait for it to reach 0, for 10 minutes at most. To warn players before a manual restart: `docker exec frontfall-frontfall-1 node -e "fetch('http://127.0.0.1:8080/admin/maintenance?minutes=5', { method: 'POST' }).then((r) => r.text()).then(console.log)"`.
+Games in progress live in memory. On a restart the server drains first (see [server.md](server.md#shutdown)): it stops opening games, lets running ones go on for `FRONTFALL_DRAIN_SECONDS`, then ends them with reason `restart` and the page tells players why. Prefer a quiet moment: `curl -s https://nclsmgr.com/frontfall/api/games` gives `running`, the games a restart would stop. Deployments from main announce the update to players and wait for it to reach 0, for 10 minutes at most. To warn players before a manual restart: `docker exec frontfall-frontfall-1 bun -e "fetch('http://127.0.0.1:8080/admin/maintenance?minutes=5', { method: 'POST' }).then((r) => r.text()).then(console.log)"`. The image runs Bun and carries no other tool: `wget`, `curl` and `node` are not to be relied on inside it.
 
 ## Roll back
 
@@ -98,7 +98,7 @@ The next push to `main` deploys again. Revert the faulty commit on `main` before
 
 ## Back up and restore
 
-The data volume (usage counts, accounts, reports and bans) is copied every night, encrypted, to storage outside the host. On the host, as the administrator:
+The data volume (usage counts, accounts, reports and bans in `data.db`, and the monthly usage files in `usage/months/`) is copied every night, encrypted, to storage outside the host. From this release on, the copy must be taken from `frontfall-admin backup`, never from the live `data.db` ([self-hosting](self-hosting.md#backing-up-and-restoring)): the host job runs `docker exec frontfall-frontfall-1 sh -c 'frontfall-admin backup /tmp/frontfall.db >&2 && cat /tmp/frontfall.db; status=$?; rm -f /tmp/frontfall.db; exit $status'` with its output written to a file readable by root only, then copies `usage/months/` out of the volume (`docker cp frontfall-frontfall-1:/var/lib/frontfall/usage/months …`). `docker cp` cannot take the backup file itself: `/tmp` in the container is a `tmpfs` mount, which it does not read. A restore puts it back as `data.db`, owned by uid 1000, with `data.db-wal` and `data.db-shm` removed. On the host, as the administrator:
 
 ```sh
 sudo nclsmgr-restaurer-frontfall --essai       # rehearsal: reads the latest copy, checks every file, touches nothing
@@ -106,6 +106,17 @@ sudo nclsmgr-restaurer-frontfall --confirmer   # restore: stops the game, replac
 ```
 
 The rehearsal of 28 October 2026 took 3 seconds for 7 files. A real restore adds the stop (up to 30 seconds, running games are cut) and the wait for a healthy container, so plan for about two minutes. The previous content of the volume is set aside and removed only once the game is healthy again. [Self-hosting](self-hosting.md#backing-up-and-restoring) covers a server of your own.
+
+## Bans and reports
+
+```sh
+docker exec frontfall-frontfall-1 frontfall-admin reports list --days 7
+docker exec frontfall-frontfall-1 frontfall-admin bans add <reference-or-address> --days 7 --note insults
+docker exec frontfall-frontfall-1 frontfall-admin bans list
+docker exec frontfall-frontfall-1 frontfall-admin bans remove <reference-or-address>
+```
+
+The running server reads a ban at once and closes the connections it bans ([server.md](server.md#reports-and-bans)).
 
 ## After an alert
 

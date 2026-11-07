@@ -1,13 +1,12 @@
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, defaultRules } from "../game/defaults.ts";
 import { Disable, leftOut } from "@frontfall/engine";
-import { DEFAULT_RULES } from "@frontfall/protocol";
-import { suggestedBots, type MapInfo } from "../game/maps.ts";
-import { MAX_BOTS, type Difficulty, type SoloOptions } from "../game/solo-game.ts";
+import { suggestedBots, type MapInfo } from "../maps.ts";
+import { MAX_BOTS, type Difficulty, type SoloOptions } from "../game/game-runner.ts";
 
 /** What the player chooses in the menu; the seed is drawn when the game starts. */
 export type GameSetup = Omit<SoloOptions, "seed">;
 
 const STORAGE_KEY = "frontfall.setup";
-const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
 export const MAX_NAME_LENGTH = 20;
 /** Free-for-all, then 2, 3 or 4 teams (R-MODE-02). */
 export const TEAM_CHOICES = [0, 2, 3, 4] as const;
@@ -28,9 +27,9 @@ export function defaultSetup(maps: readonly MapInfo[]): GameSetup {
   return {
     map: map.id,
     bots: suggestedBots(map, true),
-    difficulty: "easy",
+    difficulty: DEFAULT_DIFFICULTY,
     nations: true,
-    rules: { ...DEFAULT_RULES },
+    rules: defaultRules(),
     playerName: "",
   };
 }
@@ -69,8 +68,8 @@ export function sanitizeSetup(
   // Special rules (R-MODE-08): stored as an object, each one on or off; never in a link.
   const stored = input.rules;
   if (typeof stored === "object" && stored !== null) {
-    const rules = { ...DEFAULT_RULES, ...setup.rules };
-    for (const name of Object.keys(DEFAULT_RULES) as (keyof typeof DEFAULT_RULES)[]) {
+    const rules = { ...defaultRules(), ...setup.rules };
+    for (const name of Object.keys(rules) as (keyof typeof rules)[]) {
       const value = (stored as Record<string, unknown>)[name];
       if (typeof value === "boolean") rules[name] = value;
     }
@@ -140,13 +139,4 @@ export function setupQuery(setup: GameSetup): string {
     params.set("perf", "1");
   }
   return `?${params.toString()}`;
-}
-
-/** localStorage, or undefined where merely touching it throws. */
-export function safeStorage(): Storage | undefined {
-  try {
-    return window.localStorage;
-  } catch {
-    return undefined;
-  }
 }

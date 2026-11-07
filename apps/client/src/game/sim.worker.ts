@@ -1,10 +1,10 @@
 import type { Order, Turn } from "@frontfall/engine";
 import { transferables, type WorkerReply, type WorkerRequest } from "./messages.ts";
-import { fetchMapData } from "./maps.ts";
+import { fetchMapData } from "../maps.ts";
 import { BeatClock } from "./beat-clock.ts";
 import { REPLAY_MAP_CHANGED, REPLAY_SPEEDS, sameReplayMap } from "./replay-rules.ts";
 import { BASE_PACE } from "./pace.ts";
-import { SoloGame } from "./solo-game.ts";
+import { GameRunner } from "./game-runner.ts";
 
 interface WorkerScope {
   onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;
@@ -33,7 +33,7 @@ const HALF_SPEED = 0.5;
 /** Fastest a replay runs, in ticks per beat. */
 const MAX_SPEED = Math.max(...REPLAY_SPEEDS);
 
-let game: SoloGame | undefined;
+let game: GameRunner | undefined;
 let started = false;
 let clock: BeatClock | undefined;
 let paused = false;
@@ -109,7 +109,7 @@ async function start(request: Extract<WorkerRequest, { type: "start" }>): Promis
   const record = request.options.record;
   // The map of a replay must be the one its game was played on, terrain and nations.
   if (record && !sameReplayMap(record.map, map.source)) throw new Error(REPLAY_MAP_CHANGED);
-  game = new SoloGame(request.options, map);
+  game = new GameRunner(request.options, map);
   const {
     ticksPerSecond,
     winSharePercent,

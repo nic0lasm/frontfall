@@ -1,6 +1,5 @@
-import { randomInt } from "node:crypto";
 import { MAX_GAME_NAME_LENGTH, isDefaultRules, type PublicGame } from "@frontfall/protocol";
-import { newGameId } from "./ids.ts";
+import { systemIds, type Ids } from "./ids.ts";
 import {
   Room,
   type FinishReason,
@@ -39,6 +38,8 @@ export interface DirectoryOptions {
   /** Games a player creates and starts themselves; public ones are listed. */
   privateGame: Omit<RoomSettings, "visibility" | "name">;
   observer?: RoomObserver;
+  /** Where game ids, seeds and reconnect tokens are drawn. */
+  ids?: Ids;
 }
 
 /** How a game is opened: from "play", or created by a host who starts it. */
@@ -157,7 +158,8 @@ export class Directory {
             // The host sets the bots of their own game.
             soloBots: 0,
           };
-    const room = new Room(newGameId(), settings, randomInt(2 ** 31), this.options.observer, owner);
+    const ids = this.options.ids ?? systemIds;
+    const room = new Room(ids.gameId(), settings, ids.seed(), this.options.observer, owner, ids);
     this.rooms.set(room.id, room);
     this.openedAt.set(room, this.opened++);
     return room;
@@ -197,6 +199,7 @@ export class Directory {
       { ...saved, settings: { ...base, ...saved.settings } },
       this.options.observer ?? {},
       now,
+      this.options.ids,
     );
     if (room) {
       this.rooms.set(room.id, room);

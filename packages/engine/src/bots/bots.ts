@@ -73,6 +73,8 @@ export function installBots(
     if (!game.player(id)) throw new RangeError(`unknown player ${String(id)}`);
     game.bots.add(id);
   }
+  // Without bots there is nothing to run or keep: no part, so the game saves and hashes as one without the call.
+  if (bots.length === 0) return;
   const seaCooldowns: Cooldowns = new Map();
   const cityCooldowns: Cooldowns = new Map();
   const portCooldowns: Cooldowns = new Map();

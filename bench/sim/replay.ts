@@ -12,7 +12,7 @@ interface PublishedManifest extends MapDescription {
 }
 
 /**
- * `pnpm sim --replay report.json`: plays a desync report again on the
+ * `bun run sim --replay report.json`: plays a desync report again on the
  * published map it names and says where hashes first part. Exits with 1 when
  * the replay does not give the client's own hashes back, since the report then
  * cannot be trusted to reproduce anything.

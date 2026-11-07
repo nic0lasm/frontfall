@@ -1,15 +1,10 @@
-import { createHmac, randomBytes } from "node:crypto";
-import {
-  chmodSync,
-  constants,
-  copyFileSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { createHmac } from "node:crypto";
 import { join } from "node:path";
 import { nameKey as foldName, MAX_NAME_LENGTH, normalizeName } from "@frontfall/protocol";
+import { systemClock, type Clock } from "./clock.ts";
+import { readDocument, readMeta, writeDocument, writeMeta } from "./database.ts";
+import { systemIds, type Ids } from "./ids.ts";
+import { transaction, type SqlDriver } from "./sql/driver.ts";
 
 /** Services a player may sign in with. */
 export const PROVIDERS = ["discord", "google"] as const;
@@ -109,15 +104,57 @@ export function nameKey(name: string): string {
   return foldName(name);
 }
 
-/** The accounts file, under the server's data directory. */
+/** The file accounts were kept in before data.db, which the first start imports. */
 export function accountsFile(dataDir: string): string {
   return join(dataDir, "accounts", "accounts.json");
 }
 
+/** Where the salt is kept, in the `meta` table. */
+const SALT_KEY = "accounts.salt";
+/** The accounts as they were before the first merge, in the `documents` table. */
+export const BEFORE_MERGES = "accounts.before-merges";
+
+/** The accounts and their salt, as the file kept them before data.db. */
+export interface AccountsFile {
+  salt: string;
+  accounts: Account[];
+}
+
+/** Reads an accounts file of the earlier releases; undefined when it is not one. */
+export function parseAccountsFile(text: string): AccountsFile | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (
+    !isRecord(parsed) ||
+    parsed.version !== FILE_VERSION ||
+    typeof parsed.salt !== "string" ||
+    parsed.salt.length < 32 ||
+    !Array.isArray(parsed.accounts)
+  )
+    return undefined;
+  const accounts = parsed.accounts.filter(isAccount);
+  if (accounts.length !== parsed.accounts.length) return undefined;
+  return { salt: parsed.salt, accounts };
+}
+
+/** Writes accounts read from a file into data.db, with their salt, in the transaction of the caller. */
+export function writeAccounts(db: SqlDriver, file: AccountsFile): void {
+  writeMeta(db, SALT_KEY, file.salt);
+  for (const account of file.accounts) {
+    db.run(
+      "INSERT INTO accounts (id, body) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET body = excluded.body",
+      [account.id, JSON.stringify(account)],
+    );
+  }
+}
+
 /**
- * The accounts, all in memory and written to one file after each change.
- * Sign-ups and renames are rare next to games: a file holds tens of
- * thousands of accounts before it needs a database.
+ * The accounts, all in memory, each one written to data.db as it changes.
+ * Sign-ups and renames are rare next to games.
  */
 export class Accounts {
   private readonly byId = new Map<string, Account>();
@@ -127,44 +164,65 @@ export class Accounts {
    * Key the services' ids are hashed with, drawn once when the file is
    * created and kept in it: the accounts depend on no setting of the server.
    */
-  private salt = randomBytes(32).toString("base64url");
+  private salt: string;
+  /** Ids of the accounts whose last write failed: they are written again with the next change. */
+  private readonly unsaved = new Set<string>();
 
   /**
-   * @param file where the accounts are kept; unset keeps them in memory only, for tests.
-   * @param onWriteError told when the file could not be written, as on a full disk.
+   * @param db where the accounts are kept; unset keeps them in memory only, for tests.
+   * @param onWriteError told when the database could not be written, as on a full disk.
+   * @param ports where the salt, the account ids and the digits of free names are drawn, and the time.
    */
   constructor(
-    private readonly file: string | undefined,
+    private readonly db: SqlDriver | undefined,
     private readonly onWriteError: (error: Error) => void = () => undefined,
-  ) {}
+    private readonly ports: { clock: Clock; ids: Ids } = { clock: systemClock, ids: systemIds },
+  ) {
+    this.salt = ports.ids.bytes(32).toString("base64url");
+  }
 
   get size(): number {
     return this.byId.size;
   }
 
   /**
-   * Reads the file; a missing one is a first start. One that cannot be read,
-   * as with wrong permissions, is an error the accounts cannot start with:
-   * the next write would replace it. One that can be read but not understood
-   * is kept aside, and the accounts start empty.
+   * Reads the accounts; an empty database is a first start, which keeps a new
+   * salt. Accounts that cannot be read, as with a database that does not open
+   * or a row that is not an account, are an error the accounts cannot start
+   * with: a later write could replace them.
    */
   load(): { error?: Error; usable: boolean } {
-    if (this.file === undefined) return { usable: true };
-    let text: string;
+    const db = this.db;
+    if (db === undefined) return { usable: true };
+    let salt: string | undefined;
+    let rows: { body: string }[];
     try {
-      text = readFileSync(this.file, "utf8");
+      salt = readMeta(db, SALT_KEY);
+      rows = db.all<{ body: string }>("SELECT body FROM accounts ORDER BY rowid");
+      if (salt === undefined) {
+        if (rows.length > 0)
+          return { error: new Error("accounts without their salt"), usable: false };
+        writeMeta(db, SALT_KEY, this.salt);
+        return { usable: true };
+      }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return { usable: true };
       return { error: error as Error, usable: false };
     }
-    if (this.restore(text)) return { usable: true };
-    const aside = `${this.file}.broken-${String(Date.now())}`;
-    try {
-      renameSync(this.file, aside);
-    } catch {
-      // Left in place: the next write replaces it.
+    const accounts: Account[] = [];
+    for (const { body } of rows) {
+      let account: unknown;
+      try {
+        account = JSON.parse(body);
+      } catch {
+        account = undefined;
+      }
+      if (!isAccount(account))
+        return { error: new Error("an account row does not read"), usable: false };
+      accounts.push(account);
     }
-    return { error: new Error(`unreadable accounts, kept as ${aside}`), usable: true };
+    this.salt = salt;
+    for (const account of accounts) this.add(account);
+    return { usable: true };
   }
 
   get(id: string): Account | undefined {
@@ -196,12 +254,12 @@ export class Accounts {
       // Written at most once a day, not at every sign-in.
       if (now - found.seenAt >= DAY_MS) {
         found.seenAt = dayOf(now);
-        this.save();
+        this.save([found]);
       }
       return found;
     }
     const account: Account = {
-      id: randomBytes(12).toString("base64url"),
+      id: this.ports.ids.bytes(12).toString("base64url"),
       provider,
       subject,
       name: this.freeName(suggested),
@@ -210,7 +268,7 @@ export class Accounts {
       sessions: 0,
     };
     this.add(account);
-    this.save();
+    this.save([account]);
     return account;
   }
 
@@ -225,7 +283,7 @@ export class Accounts {
     this.byName.delete(nameKey(account.name));
     account.name = checked.name;
     this.byName.set(nameKey(account.name), account);
-    this.save();
+    this.save([account]);
     return { ok: true, name: account.name };
   }
 
@@ -234,7 +292,7 @@ export class Accounts {
     const account = this.byId.get(id);
     if (!account) return;
     account.sessions++;
-    this.save();
+    this.save([account]);
   }
 
   /**
@@ -245,9 +303,9 @@ export class Accounts {
     const account = this.byId.get(id);
     if (!account) return false;
     this.drop(account);
-    // A deletion that never reached the file would bring the account back at
-    // the next start: the player is told it failed, and the account stays.
-    if (this.save()) return true;
+    // A deletion that never reached the database would bring the account back
+    // at the next start: the player is told it failed, and the account stays.
+    if (this.save([], [account.id])) return true;
     this.add(account);
     return false;
   }
@@ -294,8 +352,8 @@ export class Accounts {
     }
     account.links = [...(account.links ?? []), ...added];
     for (const link of added) this.bySubject.set(link.subject, account);
-    if (holder) this.keepCopy();
-    if (this.save()) return { ok: true, merged: holder };
+    if (holder) this.keepCopy(before, holder);
+    if (this.save([account], holder ? [holder.id] : [])) return { ok: true, merged: holder };
     // Left as it was: a merge only half written would bring both accounts back.
     this.drop(account);
     this.add(before);
@@ -322,7 +380,7 @@ export class Accounts {
     account.subject = first.subject;
     account.links = kept.slice(1);
     if (account.links.length === 0) delete account.links;
-    if (this.save()) return { ok: true };
+    if (this.save([account])) return { ok: true };
     // A way taken off only in memory would come back at the next start.
     this.drop(account);
     this.add(before);
@@ -339,7 +397,7 @@ export class Accounts {
     const account = this.byId.get(id);
     if (!account) return undefined;
     const changed = mergeInto(account, sent);
-    if (changed) this.save();
+    if (changed) this.save([account]);
     return account.achievements;
   }
 
@@ -358,7 +416,7 @@ export class Accounts {
     for (let attempt = 0; ; attempt++) {
       // Four digits, then more as the short ones run out.
       const digits = String(
-        1000 + Math.floor(Math.random() * 9000 * 10 ** Math.floor(attempt / 50)),
+        1000 + Math.floor(this.ports.ids.fraction() * 9000 * 10 ** Math.floor(attempt / 50)),
       );
       const name = `${Array.from(base)
         .slice(0, MAX_NAME_LENGTH - digits.length)
@@ -369,17 +427,25 @@ export class Accounts {
   }
 
   /**
-   * Copies the file aside before the first merge it ever sees, so that the
-   * operator can go back if merges turn out wrong. Kept once: later merges
-   * leave the copy as it was.
+   * Keeps the accounts as they were before the first merge the server ever
+   * makes, so that the operator can go back if merges turn out wrong. Kept
+   * once: later merges leave the copy as it was. `account` and `holder` are
+   * the two accounts as they were before this merge.
    */
-  private keepCopy(): void {
-    if (this.file === undefined) return;
+  private keepCopy(account: Account, holder: Account): void {
+    const db = this.db;
+    if (db === undefined) return;
     try {
-      copyFileSync(this.file, `${this.file}.before-merges`, constants.COPYFILE_EXCL);
-      chmodSync(`${this.file}.before-merges`, 0o600);
+      if (readDocument(db, BEFORE_MERGES) !== undefined) return;
+      const others = [...this.byId.values()].filter((one) => one.id !== account.id);
+      const body = JSON.stringify({
+        version: FILE_VERSION,
+        salt: this.salt,
+        accounts: [...others, account, holder],
+      });
+      writeDocument(db, BEFORE_MERGES, body);
     } catch {
-      // Already kept, or no file yet: nothing to go back to.
+      // Not kept: the merge goes on, as when the copy could not be made before.
     }
   }
 
@@ -397,49 +463,39 @@ export class Accounts {
     this.byName.delete(nameKey(account.name));
   }
 
-  private restore(text: string): boolean {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return false;
-    }
-    if (
-      !isRecord(parsed) ||
-      parsed.version !== FILE_VERSION ||
-      typeof parsed.salt !== "string" ||
-      parsed.salt.length < 32 ||
-      !Array.isArray(parsed.accounts)
-    )
-      return false;
-    const accounts = parsed.accounts.filter(isAccount);
-    if (accounts.length !== parsed.accounts.length) return false;
-    this.salt = parsed.salt;
-    for (const account of accounts) this.add({ ...account });
-    return true;
-  }
-
   /**
-   * Readable by the server's user only, replaced at once so that a crash never
-   * leaves half a file. A write that fails, as on a full disk, must not stop
-   * the server: the accounts stay right in memory and the next change writes
-   * them all again.
+   * Writes the accounts that changed and deletes those that went, in one
+   * transaction, so that a crash never leaves half a change. A write that
+   * fails, as on a full disk, must not stop the server: the accounts stay
+   * right in memory and the caller decides what to undo. What it does not
+   * undo, as a new account or a rename, is written again with the next
+   * change, so that it is not lost at the next restart.
    */
-  private save(): boolean {
-    if (this.file === undefined) return true;
+  private save(changed: readonly Account[], removed: readonly string[] = []): boolean {
+    const db = this.db;
+    if (db === undefined) return true;
+    const given = new Set([...changed.map(({ id }) => id), ...removed]);
+    const retried = [...this.unsaved]
+      .filter((id) => !given.has(id))
+      .map((id) => this.byId.get(id))
+      .filter((account) => account !== undefined);
+    const written = [...changed, ...retried];
     try {
-      mkdirSync(join(this.file, ".."), { recursive: true, mode: 0o700 });
-      const temporary = `${this.file}.tmp`;
-      const body = JSON.stringify({
-        version: FILE_VERSION,
-        salt: this.salt,
-        accounts: [...this.byId.values()],
+      transaction(db, () => {
+        // The salt goes with the first account, as it went with the first file.
+        writeMeta(db, SALT_KEY, this.salt);
+        for (const id of removed) db.run("DELETE FROM accounts WHERE id = ?", [id]);
+        for (const account of written) {
+          db.run(
+            "INSERT INTO accounts (id, body) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET body = excluded.body",
+            [account.id, JSON.stringify(account)],
+          );
+        }
       });
-      writeFileSync(temporary, body, { mode: 0o600 });
-      chmodSync(temporary, 0o600);
-      renameSync(temporary, this.file);
+      this.unsaved.clear();
       return true;
     } catch (error) {
+      for (const { id } of written) this.unsaved.add(id);
       this.onWriteError(error as Error);
       return false;
     }

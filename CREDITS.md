@@ -2,15 +2,17 @@
 
 Frontfall is written from scratch. It relies on these open source projects:
 
-| Project                                | Used for                    | License    |
-| -------------------------------------- | --------------------------- | ---------- |
-| [Three.js](https://threejs.org/)       | Rendering                   | MIT        |
-| [ws](https://github.com/websockets/ws) | WebSocket server            | MIT        |
-| [zod](https://zod.dev/)                | Message validation          | MIT        |
-| [Vite](https://vite.dev/)              | Client build and dev server | MIT        |
-| [Vitest](https://vitest.dev/)          | Tests                       | MIT        |
-| [Playwright](https://playwright.dev/)  | End-to-end tests            | Apache-2.0 |
-| [Inter](https://rsms.me/inter/)        | Interface and logo typeface | OFL-1.1    |
+| Project                                               | Used for                        | License    |
+| ----------------------------------------------------- | ------------------------------- | ---------- |
+| [Three.js](https://threejs.org/)                      | Rendering                       | MIT        |
+| [Bun](https://bun.sh/)                                | Install, scripts and the server | MIT        |
+| [ws](https://github.com/websockets/ws)                | Load test of the server         | MIT        |
+| [Preact Signals](https://github.com/preactjs/signals) | Client panel state              | MIT        |
+| [zod](https://zod.dev/)                               | Message validation              | MIT        |
+| [Vite](https://vite.dev/)                             | Client build and dev server     | MIT        |
+| [Vitest](https://vitest.dev/)                         | Tests                           | MIT        |
+| [Playwright](https://playwright.dev/)                 | End-to-end tests                | Apache-2.0 |
+| [Inter](https://rsms.me/inter/)                       | Interface and logo typeface     | OFL-1.1    |
 
 The end screen's display face, `apps/client/src/ui/fonts/inter-display-800.woff2`, is Inter (from `@fontsource-variable/inter`, `opsz` file) fixed at weight 800 and optical size 32 and cut down to Basic Latin, Latin-1 letters and a few punctuation marks with fontTools, under the same OFL-1.1.
 

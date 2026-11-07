@@ -1,7 +1,8 @@
+import { youOf } from "../game/selectors.ts";
 import { DOCTRINE_EFFECTS, Doctrine, type DoctrineEffects } from "@frontfall/engine";
-import type { GameUpdate } from "../game/solo-game.ts";
+import type { GameUpdate } from "../game/game-runner.ts";
 import { t, type MessageKey } from "../i18n/index.ts";
-import { h, setText } from "./dom.ts";
+import { h, setText } from "../dom.ts";
 
 /** The doctrines offered, in the order of their cards (R-DOCTRINE). */
 const OFFERED = [Doctrine.Conqueror, Doctrine.Merchant, Doctrine.Bastion] as const;
@@ -34,6 +35,26 @@ export function effectLines(code: number): { text: string; good: boolean }[] {
   });
 }
 
+/** What the cards show: it changes once a second at most, and only in the spawn phase. */
+export interface DoctrineView {
+  readonly open: boolean;
+  readonly seconds: number;
+  /** The doctrine the engine has for the player, if any. */
+  readonly picked: number | undefined;
+}
+
+const CLOSED: DoctrineView = { open: false, seconds: 0, picked: undefined };
+
+/** The cards' part of an update. */
+export function doctrineView(update: GameUpdate | undefined, ticksPerSecond: number): DoctrineView {
+  if (update?.doctrines !== true || update.phase !== "spawn") return CLOSED;
+  return {
+    open: true,
+    seconds: Math.ceil(update.spawnTicksLeft / ticksPerSecond),
+    picked: youOf(update)?.doctrine,
+  };
+}
+
 /**
  * The choice of a doctrine (R-DOCTRINE-01): three cards over the map for the
  * spawn phase of a game with doctrines, each a button with its effects. The
@@ -51,6 +72,8 @@ export class DoctrinePicker {
   private readonly cards: HTMLButtonElement[] = [];
   /** The pick sent, shown at once rather than when the update carrying it arrives. */
   private pending: number | undefined;
+  /** Seconds left to pick, as last shown. */
+  private seconds = 0;
 
   constructor(private readonly onPick: (pick: number) => void) {
     const cards = h("div", { class: "doctrine-cards" });
@@ -75,6 +98,7 @@ export class DoctrinePicker {
   /** Writes the cards in the current language. */
   translate(): void {
     this.title.textContent = t("doctrine.title");
+    if (!this.element.hidden) setText(this.timer, t("doctrine.timer", { seconds: this.seconds }));
     for (const [i, card] of this.cards.entries()) {
       const key = KEYS[i] as (typeof KEYS)[number];
       card.replaceChildren(
@@ -92,17 +116,15 @@ export class DoctrinePicker {
   }
 
   /** Shows the cards while the spawn phase of a game with doctrines lasts, and the pick the engine has. */
-  update(update: GameUpdate, ticksPerSecond: number): void {
-    const open = update.doctrines === true && update.phase === "spawn";
-    if (this.element.hidden === open) {
-      this.element.hidden = !open;
-      if (!open) this.pending = undefined;
+  show(view: DoctrineView): void {
+    if (this.element.hidden === view.open) {
+      this.element.hidden = !view.open;
+      if (!view.open) this.pending = undefined;
     }
-    if (!open) return;
-    const you = update.players.find((player) => player.id === update.you);
-    const seconds = Math.ceil(update.spawnTicksLeft / ticksPerSecond);
-    setText(this.timer, t("doctrine.timer", { seconds }));
-    this.mark(this.pending ?? you?.doctrine);
+    this.seconds = view.seconds;
+    if (!view.open) return;
+    setText(this.timer, t("doctrine.timer", { seconds: view.seconds }));
+    this.mark(this.pending ?? view.picked);
   }
 
   private mark(pick: number | undefined): void {

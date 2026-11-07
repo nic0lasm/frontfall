@@ -163,6 +163,38 @@ describe("TerritoryLayer", () => {
     expect(data[11]).toBe(255);
   });
 
+  it("hands its ground, without fallout, to another layer of the same map", () => {
+    const width = 8;
+    const terrain = new Uint8Array(width * 8).fill(1);
+    const options = {
+      width,
+      height: 8,
+      owners: new Uint16Array(width * 8),
+      terrain,
+      relief: new Uint8Array(width * 8).map((_, i) => i % 7),
+      wrapsX: false,
+      maxOwner: 1,
+    };
+    const flat = new TerritoryLayer(options);
+    const baked = (flat.groundTexture.image.data as Uint8Array).slice();
+    flat.setFallout([{ x: 3, y: 3, radius: 2 }]);
+    const ground = flat.bakedGround();
+    // A copy as baked, not the scorched ground on screen.
+    expect(Array.from(ground.colors)).toEqual(Array.from(baked));
+    expect(ground.colors).not.toBe(flat.groundTexture.image.data);
+    expect(Array.from(ground.heights)).toEqual(
+      Array.from(flat.heightTexture.image.data as Uint8Array),
+    );
+    const globe = new TerritoryLayer({ ...options, surface: "sphere", baked: ground });
+    expect(globe.groundTexture.image.data).toBe(ground.colors);
+    expect(globe.heightTexture.image.data).toBe(ground.heights);
+    // Each layer scorches its own copy.
+    globe.setFallout([{ x: 1, y: 1, radius: 1 }]);
+    expect(Array.from(flat.bakedGround().colors)).toEqual(Array.from(baked));
+    flat.dispose();
+    globe.dispose();
+  });
+
   it("scorches the land under fallout and restores it when the zone clears (R-UNIT-06)", () => {
     const width = 8;
     const terrain = new Uint8Array(width * 8).fill(1);

@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GameReport } from "@frontfall/protocol";
 import { afterEach, describe, expect, it } from "vitest";
+import { readDocument, writeDocument } from "../src/database.ts";
+import { tempDatabase } from "./support/database.ts";
 import {
   botsRange,
   firstOrderRange,
@@ -13,7 +15,6 @@ import {
   loadUsage,
   minutesRange,
   saveUsage,
-  usageFile,
   UsageStats,
   usageTable,
 } from "../src/usage.ts";
@@ -294,29 +295,35 @@ describe("UsageStats", () => {
 });
 
 describe("saving the counts", () => {
-  it("writes them for the server's user only, and reads them back", () => {
-    directory = mkdtempSync(join(tmpdir(), "frontfall-data-"));
-    const file = usageFile(directory);
-    const usage = stats();
-    usage.record(GAME, NOW);
-    saveUsage(usage, file, NOW);
-    expect(statSync(file).mode & 0o777).toBe(0o600);
-    const again = stats();
-    expect(loadUsage(again, file)).toBeUndefined();
-    expect(again.export(NOW)).toEqual(usage.export(NOW));
-    expect(readFileSync(file, "utf8")).not.toContain(GAME.game);
+  it("writes them to data.db, without the ids of the games, and reads them back", () => {
+    const data = tempDatabase();
+    try {
+      const usage = stats();
+      usage.record(GAME, NOW);
+      saveUsage(usage, data.db, NOW);
+      const again = stats();
+      expect(loadUsage(again, data.reopen(), NOW)).toBeUndefined();
+      expect(again.export(NOW)).toEqual(usage.export(NOW));
+      expect(readDocument(data.db, "usage")).not.toContain(GAME.game);
+    } finally {
+      data.remove();
+    }
   });
 
-  it("starts empty without a file, and says when the file cannot be read", () => {
-    directory = mkdtempSync(join(tmpdir(), "frontfall-data-"));
-    const usage = stats();
-    expect(loadUsage(usage, usageFile(directory))).toBeUndefined();
-    const broken = join(directory, "broken.json");
-    writeFileSync(broken, "{ not json");
-    expect(loadUsage(usage, broken)).toBeInstanceOf(Error);
-    // Set aside, so that the next save does not write over what could be mended.
-    expect(readFileSync(`${broken}.broken`, "utf8")).toBe("{ not json");
-    expect(usage.export(NOW).days).toEqual([]);
+  it("starts empty without counts, and sets aside counts that do not read", () => {
+    const data = tempDatabase();
+    try {
+      const usage = stats();
+      expect(loadUsage(usage, data.db, NOW)).toBeUndefined();
+      writeDocument(data.db, "usage", "{ not json");
+      expect(loadUsage(usage, data.db, NOW)?.message).toContain(`usage.broken-${String(NOW)}`);
+      // Set aside, so that the next save does not write over what could be mended.
+      expect(readDocument(data.db, `usage.broken-${String(NOW)}`)).toBe("{ not json");
+      expect(readDocument(data.db, "usage")).toBeUndefined();
+      expect(usage.export(NOW).days).toEqual([]);
+    } finally {
+      data.remove();
+    }
   });
 });
 
@@ -330,50 +337,6 @@ describe("usageTable", () => {
     expect(usageTable(stats().export(NOW))).toContain(
       "No games counted yet / Aucune partie comptée",
     );
-  });
-
-  it("goes on with the copy of the last save when the file is damaged", () => {
-    directory = mkdtempSync(join(tmpdir(), "frontfall-data-"));
-    const file = usageFile(directory);
-    const usage = stats();
-    usage.record(GAME, NOW);
-    saveUsage(usage, file, NOW);
-    saveUsage(usage, file, NOW);
-    writeFileSync(file, "{ not json");
-    const again = stats();
-    expect(loadUsage(again, file)).toBeInstanceOf(Error);
-    expect(again.export(NOW)).toEqual(usage.export(NOW));
-  });
-
-  it("goes on with the copy of the last save when the file is missing", () => {
-    directory = mkdtempSync(join(tmpdir(), "frontfall-data-"));
-    const file = usageFile(directory);
-    const usage = stats();
-    usage.record(GAME, NOW);
-    saveUsage(usage, file, NOW);
-    const saved = structuredClone(usage.export(NOW));
-    usage.record({ ...GAME, game: "1111111111111111" }, NOW);
-    saveUsage(usage, file, NOW);
-    rmSync(file);
-    const again = stats();
-    expect(loadUsage(again, file)?.message).toContain("went on with the copy");
-    expect(again.export(NOW)).toEqual(saved);
-    // The next saves keep those counts rather than starting again from nothing.
-    saveUsage(again, file, NOW);
-    saveUsage(again, file, NOW);
-    const later = stats();
-    expect(loadUsage(later, `${file}.bak`)).toBeUndefined();
-    expect(later.export(NOW)).toEqual(saved);
-  });
-
-  it("says so when the copy does not read either", () => {
-    directory = mkdtempSync(join(tmpdir(), "frontfall-data-"));
-    const file = usageFile(directory);
-    mkdirSync(join(file, ".."), { recursive: true });
-    writeFileSync(`${file}.bak`, "{ not json");
-    const usage = stats();
-    expect(loadUsage(usage, file)?.message).toContain("the copy did not read either");
-    expect(usage.export(NOW).days).toEqual([]);
   });
 
   it("exports one file per month and never cuts an old one down", () => {
@@ -419,19 +382,5 @@ describe("usageTable", () => {
     expect(readFileSync(join(months, `2026-10.json.broken-${String(NOW)}`), "utf8")).toBe(
       "{ not json",
     );
-  });
-
-  it("does not copy a damaged file over the last good copy", () => {
-    directory = mkdtempSync(join(tmpdir(), "frontfall-data-"));
-    const file = usageFile(directory);
-    const usage = stats();
-    usage.record(GAME, NOW);
-    saveUsage(usage, file, NOW);
-    saveUsage(usage, file, NOW);
-    const good = readFileSync(`${file}.bak`, "utf8");
-    writeFileSync(file, "{ not json");
-    saveUsage(usage, file, NOW);
-    expect(readFileSync(`${file}.bak`, "utf8")).toBe(good);
-    expect(statSync(`${file}.bak`).mode & 0o777).toBe(0o600);
   });
 });

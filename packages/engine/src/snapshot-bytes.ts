@@ -1,10 +1,12 @@
+import type { StateWriter } from "./state/writer.ts";
+
 /**
  * The byte encoding of snapshots (docs/engine.md): safe integers as
  * variable-length quantities, seven bits a byte, low bits first, with the
  * sign folded into the lowest bit, and text as its UTF-16 code units behind their count.
  * Small numbers, the most common in a game, take one byte.
  */
-export class SnapshotWriter {
+export class SnapshotWriter implements StateWriter {
   private bytes = new Uint8Array(1 << 16);
   private length = 0;
 
@@ -66,6 +68,31 @@ export class SnapshotWriter {
       this.int(tile - previous);
       previous = tile;
     }
+  }
+
+  /** A value for every tile, as runs of equal values: land and sea come in long stretches. */
+  tiles(values: Uint16Array | Uint32Array): void {
+    const runs: number[] = [];
+    let start = 0;
+    for (let i = 1; i <= values.length; i++) {
+      if (i < values.length && values[i] === values[start]) continue;
+      runs.push(values[start] as number, i - start);
+      start = i;
+    }
+    this.uint(runs.length / 2);
+    for (const value of runs) this.uint(value);
+  }
+
+  /** As `tiles`: a loaded game reads them back as they were. */
+  derivedTiles(values: Uint32Array): void {
+    this.tiles(values);
+  }
+
+  /** What `write` writes, as a blob: a reader checks the section ends where its length says. */
+  section(write: (out: StateWriter) => void): void {
+    const inner = new SnapshotWriter();
+    write(inner);
+    this.blob(inner.finish());
   }
 
   /** The bytes written so far. */
@@ -140,6 +167,11 @@ export class SnapshotReader {
     const value = this.bytes.subarray(this.offset, this.offset + length);
     this.offset += length;
     return value;
+  }
+
+  /** A section `SnapshotWriter.section` wrote, as a reader of its own bytes. */
+  section(): SnapshotReader {
+    return new SnapshotReader(this.blob());
   }
 
   /** A path of tiles below `size`, at most `limit` long. */

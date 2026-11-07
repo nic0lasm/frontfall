@@ -1,12 +1,10 @@
-import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { createGameServer } from "@frontfall/server";
 import { describe, expect, it } from "vitest";
 import { Histogram } from "../server/histogram.ts";
 import type { GameData } from "../server/client.ts";
 import { isSlow, mergeSamples, runLoad, summarizeLoad, type LoadSample } from "../server/load.ts";
 import { saturation, serverWindow } from "../server/report.ts";
 import type { ServerStats } from "../server/serve.ts";
+import { SpawnedServer } from "../server/spawn.ts";
 
 describe("Histogram", () => {
   it("reports percentiles to a tenth of a millisecond and the exact maximum", () => {
@@ -115,13 +113,12 @@ describe("client processes", () => {
 });
 
 describe("server load", () => {
-  it("delivers every turn in order and on time to 2 games of 8 players", async () => {
-    const server = createGameServer({ staticRoot: tmpdir(), version: "load" });
-    await new Promise<void>((resolve) => server.http.listen(0, "127.0.0.1", resolve));
-    const { port } = server.http.address() as AddressInfo;
+  it("delivers every turn in order and on time to 2 games of 8 players, from a server on Bun", async () => {
+    const server = await SpawnedServer.start({ players: 8, serverLimits: false });
     try {
+      expect(server.bun).toMatch(/^\d+\.\d+\.\d+/);
       const report = await runLoad({
-        url: `ws://127.0.0.1:${String(port)}/ws`,
+        url: server.url,
         games: 2,
         players: 8,
         durationMs: 10_000,
@@ -142,8 +139,11 @@ describe("server load", () => {
         expect(game.ordersSeen).toBeGreaterThanOrEqual(game.ordersSent - game.players);
       }
       expect(report.interval.p95).toBeLessThan(300);
+      const stats = await server.request("stats");
+      expect(stats.rssBytes).toBeGreaterThan(0);
+      expect(stats.turnPasses.count).toBeGreaterThan(0);
     } finally {
-      await server.close();
+      await server.stop();
     }
   }, 20_000);
 });

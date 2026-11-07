@@ -1,16 +1,5 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
-import { connect, type AddressInfo } from "node:net";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { get } from "node:http";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import {
@@ -22,12 +11,16 @@ import {
   type ServerMessage,
 } from "@frontfall/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import WebSocket from "ws";
+import { writeBans } from "../src/moderation.ts";
 import { createGameServer, type GameServer, type ServerOptions } from "../src/server.ts";
+import { dataOf } from "./support/database.ts";
+import { FakeSocket, FakeTransport } from "./support/fake-transport.ts";
 
 let staticRoot: string;
 let server: GameServer | undefined;
-let clients: WebSocket[] = [];
+/** The transport of the server: no socket, each event on a later turn of the event loop. */
+let fake: FakeTransport | undefined;
+let clients: FakeSocket[] = [];
 
 beforeEach(() => {
   staticRoot = mkdtempSync(join(tmpdir(), "frontfall-static-"));
@@ -42,8 +35,8 @@ afterEach(async () => {
   rmSync(staticRoot, { recursive: true, force: true });
 });
 
-async function start(options: Partial<ServerOptions> = {}): Promise<string> {
-  server = createGameServer({
+function serve(options: Partial<ServerOptions>): GameServer {
+  return createGameServer({
     staticRoot,
     version: "abc123",
     drainMs: 0,
@@ -51,15 +44,42 @@ async function start(options: Partial<ServerOptions> = {}): Promise<string> {
     gameListMs: 0,
     ...options,
   });
-  const http = server.http;
-  await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
-  return `127.0.0.1:${String((http.address() as AddressInfo).port)}`;
+}
+
+/** Starts a server on the fake transport; the host it gives names the loopback, as the admin routes ask. */
+async function start(options: Partial<ServerOptions> = {}): Promise<string> {
+  fake = new FakeTransport();
+  server = serve({ transport: fake, ...options });
+  await server.listen(0);
+  return "127.0.0.1";
+}
+
+/** The server's transport; what the wire itself decides is tested on Bun, in test-bun/. */
+function transport(): FakeTransport {
+  if (!fake) throw new Error("no server");
+  return fake;
+}
+
+/** `fetch` through the fake transport. */
+function request(url: string, init?: RequestInit): Promise<Response> {
+  return transport().fetch(url, init);
+}
+
+/** A WebSocket to `path` through the fake transport, with the events and calls of a `ws` client. */
+function socketTo(
+  _host: string,
+  path: string,
+  headers: Record<string, string> = {},
+  autoPong = true,
+): FakeSocket {
+  const socket = transport().connect(path, { headers, autoPong });
+  clients.push(socket);
+  return socket;
 }
 
 /** A client that buffers every message, so none is lost between two awaits. */
 function open(host: string, headers: Record<string, string> = {}, autoPong = true) {
-  const socket = new WebSocket(`ws://${host}/ws`, { headers, autoPong });
-  clients.push(socket);
+  const socket = socketTo(host, "/ws", headers, autoPong);
   const inbox: ServerMessage[] = [];
   const waiters: (() => void)[] = [];
   socket.on("message", (data: Buffer, isBinary: boolean) => {
@@ -82,7 +102,7 @@ function open(host: string, headers: Record<string, string> = {}, autoPong = tru
   return { socket, next, send };
 }
 
-function opened(socket: WebSocket): Promise<void> {
+function opened(socket: FakeSocket): Promise<void> {
   return new Promise((resolve, reject) => {
     socket.once("open", () => {
       resolve();
@@ -91,7 +111,7 @@ function opened(socket: WebSocket): Promise<void> {
   });
 }
 
-function closed(socket: WebSocket): Promise<number> {
+function closed(socket: FakeSocket): Promise<number> {
   return new Promise((resolve) => socket.once("close", resolve));
 }
 
@@ -106,7 +126,7 @@ async function player(host: string, name: string, autoPong = true) {
 
 describe("HTTP", () => {
   it("answers the health check with the build version, never cached", async () => {
-    const response = await fetch(`http://${await start()}/healthz`);
+    const response = await request(`http://${await start()}/healthz`);
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("ok");
     expect(response.headers.get("x-frontfall-version")).toBe("abc123");
@@ -115,13 +135,13 @@ describe("HTTP", () => {
   });
 
   it("names the release next to the build when it knows it", async () => {
-    const response = await fetch(`http://${await start({ release: "0.4.0" })}/healthz`);
+    const response = await request(`http://${await start({ release: "0.4.0" })}/healthz`);
     expect(response.headers.get("x-frontfall-release")).toBe("0.4.0");
   });
 
   it("fails the health check once turns stop being closed", async () => {
     // With no delay allowed, the last turn is always too old.
-    const response = await fetch(`http://${await start({ stallAfterMs: 0 })}/healthz`);
+    const response = await request(`http://${await start({ stallAfterMs: 0 })}/healthz`);
     expect(response.status).toBe(503);
     expect(await response.text()).toBe("stalled");
     expect(response.headers.get("x-frontfall-version")).toBe("abc123");
@@ -131,37 +151,13 @@ describe("HTTP", () => {
   it("stays healthy while the turn timer keeps up, with no game running", async () => {
     const host = await start({ stallAfterMs: 500 });
     await new Promise((resolve) => setTimeout(resolve, 700));
-    expect((await fetch(`http://${host}/healthz`)).status).toBe(200);
-  });
-
-  it("fails the health check of a request still in flight at shutdown", async () => {
-    const host = await start();
-    const [address, port] = host.split(":");
-    const socket = connect(Number(port), address);
-    await new Promise((resolve) => socket.once("connect", resolve));
-    // Half a request keeps the connection busy, so close() leaves it open.
-    socket.write("GET /healthz HTTP/1.1\r\nHost: x\r\n");
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const closed = server?.close();
-    server = undefined;
-    const reply = new Promise<string>((resolve) => {
-      let text = "";
-      socket.on("data", (chunk: Buffer) => (text += chunk.toString()));
-      socket.on("end", () => {
-        resolve(text);
-      });
-    });
-    socket.end("Connection: close\r\n\r\n");
-    const text = await reply;
-    await closed;
-    expect(text).toMatch(/^HTTP\/1\.1 503/);
-    expect(text.slice(text.indexOf("\r\n\r\n"))).toContain("stopping");
+    expect((await request(`http://${host}/healthz`)).status).toBe(200);
   });
 
   it("serves the client, caching hashed assets only", async () => {
     writeFileSync(join(staticRoot, "app.js"), "export {};");
     const host = await start();
-    const page = await fetch(`http://${host}/`);
+    const page = await request(`http://${host}/`);
     expect(await page.text()).toBe("<!doctype html>");
     expect(page.headers.get("cache-control")).toBe("no-cache");
     expect(page.headers.get("x-content-type-options")).toBe("nosniff");
@@ -170,56 +166,38 @@ describe("HTTP", () => {
     expect(page.headers.get("content-security-policy")).toContain("default-src 'self'");
     expect(page.headers.get("referrer-policy")).toBe("same-origin");
 
-    const head = await fetch(`http://${host}/app.js`, { method: "HEAD" });
+    const head = await request(`http://${host}/app.js`, { method: "HEAD" });
     expect(head.headers.get("content-type")).toContain("text/javascript");
     expect(await head.text()).toBe("");
-    expect((await fetch(`http://${host}/missing.js`)).status).toBe(404);
+    expect((await request(`http://${host}/missing.js`)).status).toBe(404);
   });
 
   it("marks files under /assets/ as immutable", async () => {
     mkdirSync(join(staticRoot, "assets"));
     writeFileSync(join(staticRoot, "assets/index-1a2b.js"), "export {};");
-    const response = await fetch(`http://${await start()}/assets/index-1a2b.js`);
+    const response = await request(`http://${await start()}/assets/index-1a2b.js`);
     expect(response.headers.get("cache-control")).toContain("immutable");
   });
 
   it("refuses a request target that names another host", async () => {
-    const host = await start();
-    const [address, port] = host.split(":");
-    const socket = connect(Number(port), address);
-    const reply = new Promise<string>((resolve) => {
-      let text = "";
-      socket.on("data", (chunk: Buffer) => (text += chunk.toString()));
-      socket.on("end", () => {
-        resolve(text);
-      });
-    });
-    socket.end("GET //evil.example/metrics HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
-    expect(await reply).toMatch(/^HTTP\/1\.1 400/);
+    await start();
+    const answer = async (url: string) => (await transport().request({ url })).status;
+    expect(await answer("//evil.example/metrics")).toBe(400);
     // A backslash reads as a slash to the URL parser, not to a proxy.
-    expect((await fetch(`http://${host}/%5Chealthz`)).status).not.toBe(400);
-    const back = connect(Number(port), address);
-    const answer = new Promise<string>((resolve) => {
-      let text = "";
-      back.on("data", (chunk: Buffer) => (text += chunk.toString()));
-      back.on("end", () => {
-        resolve(text);
-      });
-    });
-    back.end("GET /\\evil.example/metrics HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
-    expect(await answer).toMatch(/^HTTP\/1\.1 400/);
+    expect(await answer("/\\evil.example/metrics")).toBe(400);
+    expect(await answer("/%5Chealthz")).not.toBe(400);
   });
 
   it("serves metrics to the host only, never through the proxy", async () => {
     const host = await start();
-    const direct = await fetch(`http://${host}/metrics`);
+    const direct = await request(`http://${host}/metrics`);
     expect(direct.status).toBe(200);
     expect(direct.headers.get("content-type")).toContain("text/plain");
     const text = await direct.text();
     expect(text).toContain('frontfall_games{state="open"} 0');
     expect(text).toContain("frontfall_turn_duration_seconds_count");
     for (const header of ["x-client-ip", "x-forwarded-for", "forwarded"]) {
-      const proxied = await fetch(`http://${host}/metrics`, { headers: { [header]: "1.2.3.4" } });
+      const proxied = await request(`http://${host}/metrics`, { headers: { [header]: "1.2.3.4" } });
       expect(proxied.status).toBe(404);
     }
   });
@@ -228,31 +206,24 @@ describe("HTTP", () => {
     const map = new Uint8Array(64 * 1024).fill(3);
     writeFileSync(join(staticRoot, "world.bin"), map);
     const host = await start();
-    const raw = (encoding?: string) =>
-      new Promise<{ headers: Record<string, unknown>; body: Buffer }>((resolve, reject) => {
-        get(
-          `http://${host}/world.bin`,
-          { headers: encoding ? { "accept-encoding": encoding } : {} },
-          (response) => {
-            const chunks: Buffer[] = [];
-            response.on("data", (chunk: Buffer) => chunks.push(chunk));
-            response.on("end", () => {
-              resolve({ headers: response.headers, body: Buffer.concat(chunks) });
-            });
-          },
-        ).on("error", reject);
+    // The fake transport hands the body over as the server sent it, never unzipped.
+    const raw = async (encoding?: string) => {
+      const response = await request(`http://${host}/world.bin`, {
+        headers: encoding ? { "accept-encoding": encoding } : {},
       });
+      return { headers: response.headers, body: Buffer.from(await response.arrayBuffer()) };
+    };
 
     const zipped = await raw("gzip, deflate, br");
-    expect(zipped.headers["content-encoding"]).toBe("gzip");
-    expect(zipped.headers.vary).toBe("Accept-Encoding");
-    expect(zipped.headers["content-type"]).toBe("application/octet-stream");
-    expect(Number(zipped.headers["content-length"])).toBe(zipped.body.length);
+    expect(zipped.headers.get("content-encoding")).toBe("gzip");
+    expect(zipped.headers.get("vary")).toBe("Accept-Encoding");
+    expect(zipped.headers.get("content-type")).toBe("application/octet-stream");
+    expect(Number(zipped.headers.get("content-length"))).toBe(zipped.body.length);
     expect(gunzipSync(zipped.body).equals(Buffer.from(map))).toBe(true);
 
     for (const encoding of [undefined, "br", "gzip;q=0"]) {
       const plain = await raw(encoding);
-      expect(plain.headers["content-encoding"]).toBeUndefined();
+      expect(plain.headers.get("content-encoding")).toBeNull();
       expect(plain.body.length).toBe(map.length);
     }
   });
@@ -260,23 +231,23 @@ describe("HTTP", () => {
   it("lets browsers revalidate files with their ETag", async () => {
     writeFileSync(join(staticRoot, "world.json"), JSON.stringify({ id: "world" }));
     const host = await start();
-    const first = await fetch(`http://${host}/world.json`);
+    const first = await request(`http://${host}/world.json`);
     const etag = first.headers.get("etag");
     expect(etag).toMatch(/^W\/"[\w-]{22}"$/);
-    const again = await fetch(`http://${host}/world.json`, {
+    const again = await request(`http://${host}/world.json`, {
       headers: { "if-none-match": `"other", ${etag?.slice(2) ?? ""}` },
     });
     expect(again.status).toBe(304);
     expect(again.headers.get("etag")).toBe(etag);
     expect(await again.text()).toBe("");
-    const changed = await fetch(`http://${host}/world.json`, {
+    const changed = await request(`http://${host}/world.json`, {
       headers: { "if-none-match": 'W/"stale"' },
     });
     expect(changed.status).toBe(200);
   });
 
   it("rejects other methods", async () => {
-    const response = await fetch(`http://${await start()}/`, { method: "POST" });
+    const response = await request(`http://${await start()}/`, { method: "POST" });
     expect(response.status).toBe(405);
     expect(response.headers.get("allow")).toBe("GET, HEAD");
   });
@@ -325,7 +296,7 @@ describe("WebSocket", () => {
     const alice = await player(host, "Alice");
     alice.send({ type: "play", name: "Partie de Alice" });
     const { game } = await alice.next("lobby");
-    const response = await fetch(`http://${host}/api/games`);
+    const response = await request(`http://${host}/api/games`);
     expect(response.headers.get("cache-control")).toBe("no-cache");
     expect(await response.json()).toEqual({
       games: [
@@ -348,12 +319,14 @@ describe("WebSocket", () => {
     });
     const etag = response.headers.get("etag") ?? "";
     expect(etag).not.toBe("");
-    const again = await fetch(`http://${host}/api/games`, { headers: { "if-none-match": etag } });
+    const again = await request(`http://${host}/api/games`, { headers: { "if-none-match": etag } });
     expect(again.status).toBe(304);
     const bob = await player(host, "Bob");
     bob.send({ type: "join", game });
     await bob.next("lobby");
-    const changed = await fetch(`http://${host}/api/games`, { headers: { "if-none-match": etag } });
+    const changed = await request(`http://${host}/api/games`, {
+      headers: { "if-none-match": etag },
+    });
     expect(changed.status).toBe(200);
   });
 
@@ -419,7 +392,7 @@ describe("WebSocket", () => {
     expect((await alice.next("error")).code).toBe("invalid_settings");
     alice.send({ type: "start" });
     expect((await bob.next("started")).teams).toBe(2);
-    const listed = (await (await fetch(`http://${host}/api/games`)).json()) as {
+    const listed = (await (await request(`http://${host}/api/games`)).json()) as {
       games: { state: string }[];
     };
     expect(listed.games.map((game) => game.state)).toEqual(["running"]);
@@ -451,7 +424,7 @@ describe("WebSocket", () => {
     alice.send({ type: "create" });
     const { game, host: hostId } = await alice.next("lobby");
     expect(hostId).toBe(1);
-    expect(await (await fetch(`http://${host}/api/games`)).json()).toEqual({
+    expect(await (await request(`http://${host}/api/games`)).json()).toEqual({
       games: [],
       running: 0,
     });
@@ -873,7 +846,7 @@ describe("WebSocket", () => {
     waiting.send({ type: "create" });
     await waiting.next("lobby");
     expect(await closed(idle.socket)).toBe(CloseCode.idle);
-    expect(waiting.socket.readyState).toBe(WebSocket.OPEN);
+    expect(waiting.socket.readyState).toBe(FakeSocket.OPEN);
   });
 
   it("logs games and rejected connections without client addresses", async () => {
@@ -882,6 +855,7 @@ describe("WebSocket", () => {
       logger: {
         info: (event, fields) => lines.push(JSON.stringify({ event, ...fields })),
         warn: (event, fields) => lines.push(JSON.stringify({ event, ...fields })),
+        error: (event, fields) => lines.push(JSON.stringify({ event, ...fields })),
       },
     });
     const alice = await player(host, "Alice");
@@ -907,8 +881,7 @@ describe("WebSocket", () => {
   });
 
   it("refuses upgrades outside /ws", async () => {
-    const socket = new WebSocket(`ws://${await start()}/other`);
-    clients.push(socket);
+    const socket = socketTo(await start(), "/other");
     await expect(opened(socket)).rejects.toThrow("403");
   });
 
@@ -927,31 +900,6 @@ describe("WebSocket", () => {
     first.socket.close();
     await closed(first.socket);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    await expect(
-      opened(open(host, { "x-client-ip": "203.0.113.9" }).socket),
-    ).resolves.toBeUndefined();
-  });
-
-  it("gives the address its connection back when the handshake is refused", async () => {
-    const host = await start({ maxConnectionsPerAddress: 2 });
-    const [address, port] = host.split(":");
-    for (let i = 0; i < 3; i++) {
-      const socket = connect(Number(port), address);
-      const reply = new Promise<string>((resolve, reject) => {
-        let text = "";
-        socket.on("data", (chunk: Buffer) => (text += chunk.toString()));
-        socket.on("error", reject);
-        socket.on("close", () => {
-          resolve(text);
-        });
-      });
-      socket.write(
-        "GET /ws HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n" +
-          "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: not-a-key\r\n" +
-          "X-Client-IP: 203.0.113.9\r\n\r\n",
-      );
-      expect(await reply).toMatch(/^HTTP\/1\.1 400/);
-    }
     await expect(
       opened(open(host, { "x-client-ip": "203.0.113.9" }).socket),
     ).resolves.toBeUndefined();
@@ -1030,10 +978,10 @@ describe("WebSocket", () => {
     expect((await bob.next("reported")).player).toBe(you);
 
     const url = `http://${host}/admin/reports`;
-    expect((await fetch(url, { headers: { "x-client-ip": "1.2.3.4" } })).status).toBe(404);
+    expect((await request(url, { headers: { "x-client-ip": "1.2.3.4" } })).status).toBe(404);
     // A web page open in a browser on the server itself cannot reach them either.
-    expect((await fetch(url, { headers: { origin: "https://evil.example" } })).status).toBe(404);
-    const { reports, targets } = (await (await fetch(url)).json()) as {
+    expect((await request(url, { headers: { origin: "https://evil.example" } })).status).toBe(404);
+    const { reports, targets } = (await (await request(url)).json()) as {
       reports: { reason: string; name: string; target: string }[];
       targets: { target: string; reports: number; names: string[] }[];
     };
@@ -1055,15 +1003,17 @@ describe("WebSocket", () => {
     const url = `http://${host}/admin/bans`;
     expect(
       (
-        await fetch(`${url}?target=203.0.113.9`, {
+        await request(`${url}?target=203.0.113.9`, {
           method: "POST",
           headers: { "x-client-ip": "1.2.3.4" },
         })
       ).status,
     ).toBe(404);
-    expect((await fetch(`${url}?target=nobody`, { method: "POST" })).status).toBe(400);
+    expect((await request(`${url}?target=nobody`, { method: "POST" })).status).toBe(400);
     const gone = closed(troll.socket);
-    const answer = await fetch(`${url}?target=203.0.113.9&days=7&note=insults`, { method: "POST" });
+    const answer = await request(`${url}?target=203.0.113.9&days=7&note=insults`, {
+      method: "POST",
+    });
     expect(await answer.json()).toMatchObject({
       bans: [{ target: "203.0.113.9", note: "insults" }],
       closed: 1,
@@ -1075,8 +1025,8 @@ describe("WebSocket", () => {
     const other = open(host, { "x-client-ip": "198.51.100.4" });
     await opened(other.socket);
 
-    expect((await fetch(`${url}?target=203.0.113.9`, { method: "DELETE" })).status).toBe(200);
-    expect((await fetch(`${url}?target=203.0.113.9`, { method: "DELETE" })).status).toBe(404);
+    expect((await request(`${url}?target=203.0.113.9`, { method: "DELETE" })).status).toBe(200);
+    expect((await request(`${url}?target=203.0.113.9`, { method: "DELETE" })).status).toBe(404);
     await expect(
       opened(open(host, { "x-client-ip": "203.0.113.9" }).socket),
     ).resolves.toBeUndefined();
@@ -1138,25 +1088,6 @@ describe("WebSocket", () => {
     expect((await last.next("lobby")).visibility).toBe("public");
   });
 
-  it("drops a client that stops reading what it is sent", async () => {
-    const host = await start();
-    const client = await player(host, "A");
-    client.send({ type: "create" });
-    await client.next("lobby");
-    const [room] = [...(server?.games.all() ?? [])];
-    const peer = room?.seatOf(1)?.peer;
-    if (!peer) throw new Error("not seated");
-    const gone = closed(client.socket);
-    // The client reads nothing for a while: what the server sends piles up on its side.
-    const tcp = (client.socket as unknown as { _socket: { pause(): void; resume(): void } })
-      ._socket;
-    tcp.pause();
-    const frame = "x".repeat(1024 * 1024);
-    for (let i = 0; i < 64; i++) peer.send(frame);
-    tcp.resume();
-    expect(await gone).toBe(1006);
-  });
-
   it("caps the solo games one address keeps running, Play now included", async () => {
     const host = await start({ maxGamesPerAddress: 4 });
     const players = await Promise.all(["A", "B", "C", "D", "E"].map((name) => player(host, name)));
@@ -1183,7 +1114,7 @@ describe("WebSocket", () => {
     const healthy = open(host);
     await Promise.all([opened(silent.socket), opened(healthy.socket)]);
     expect(await closed(silent.socket)).toBe(1006);
-    expect(healthy.socket.readyState).toBe(WebSocket.OPEN);
+    expect(healthy.socket.readyState).toBe(FakeSocket.OPEN);
   });
 
   /** Alice hosts a private game that Bob joined; it runs once both have `started`. */
@@ -1215,8 +1146,8 @@ describe("WebSocket", () => {
     expect((await waiting.next("ended")).reason).toBe("restart");
     late.send({ type: "play" });
     expect((await late.next("error")).code).toBe("restarting");
-    expect(await (await fetch(`http://${host}/healthz`)).text()).toBe("stopping");
-    expect(await (await fetch(`http://${host}/api/games`)).json()).toEqual({
+    expect(await (await request(`http://${host}/healthz`)).text()).toBe("stopping");
+    expect(await (await request(`http://${host}/api/games`)).json()).toEqual({
       games: [],
       running: 1,
     });
@@ -1239,7 +1170,7 @@ describe("WebSocket", () => {
     alice.socket.terminate();
     bob.socket.terminate();
     await Promise.all([closed(alice.socket), closed(bob.socket)]);
-    expect(await (await fetch(`http://${host}/api/games`)).json()).toMatchObject({ running: 1 });
+    expect(await (await request(`http://${host}/api/games`)).json()).toMatchObject({ running: 1 });
   });
 
   it("stops the games still running when the drain runs out, saying why", async () => {
@@ -1261,6 +1192,16 @@ describe("WebSocket", () => {
     afterEach(() => {
       rmSync(dataDir, { recursive: true, force: true });
     });
+
+    /** What data.db keeps of a saved game, as text; undefined once taken back. */
+    function savedBody(game: string): string | undefined {
+      const db = dataOf(dataDir);
+      try {
+        return db.get<{ body: string }>("SELECT body FROM games WHERE id = ?", [game])?.body;
+      } finally {
+        db.close();
+      }
+    }
 
     /** A running game with turns, stopped by the end of the drain; the token and the last tick. */
     async function savedGame(simulation: string) {
@@ -1300,12 +1241,12 @@ describe("WebSocket", () => {
 
     it("keeps the games still running for the next run, which gives the seats back", async () => {
       const { game, token, tick } = await savedGame("5e5e5e5e5e5e");
-      const file = join(dataDir, "games", `${game}.json`);
-      expect(statSync(file).mode & 0o777).toBe(0o600);
-      expect(readFileSync(file, "utf8")).not.toContain("127.0.0.1");
+      expect(statSync(join(dataDir, "data.db")).mode & 0o777).toBe(0o600);
+      expect(savedBody(game)).toContain('"seed"');
+      expect(savedBody(game)).not.toContain("127.0.0.1");
 
       const host = await start({ dataDir, simulation: "5e5e5e5e5e5e" });
-      expect(existsSync(file)).toBe(false);
+      expect(savedBody(game)).toBeUndefined();
       const back = await player(host, "Alice");
       back.send({ type: "rejoin", token, from: 0 });
       expect(await back.next("started")).toMatchObject({
@@ -1322,12 +1263,14 @@ describe("WebSocket", () => {
       expect(turns.flatMap((turn) => turn.orders)).toEqual([
         { player: 1, order: { type: "spawn", tile: 5 } },
       ]);
-      expect(await (await fetch(`http://${host}/api/games`)).json()).toMatchObject({ running: 1 });
+      expect(await (await request(`http://${host}/api/games`)).json()).toMatchObject({
+        running: 1,
+      });
     });
 
     it("does not drain, and says it keeps its games", async () => {
       const host = await start({ drainMs: 60_000, dataDir });
-      expect(await (await fetch(`http://${host}/api/status`)).json()).toMatchObject({
+      expect(await (await request(`http://${host}/api/status`)).json()).toMatchObject({
         keepsGames: true,
       });
       const alice = await player(host, "Alice");
@@ -1342,46 +1285,50 @@ describe("WebSocket", () => {
       await server?.close();
       server = undefined;
       expect(performance.now() - began).toBeLessThan(5_000);
-      expect(existsSync(join(dataDir, "games", `${game}.json`))).toBe(true);
+      expect(savedBody(game)).toBeDefined();
     });
 
     it("drops the games of another simulation build", async () => {
       const { game, token } = await savedGame("5e5e5e5e5e5e");
       const host = await start({ dataDir, simulation: "a1a1a1a1a1a1" });
-      expect(existsSync(join(dataDir, "games", `${game}.json`))).toBe(false);
+      expect(savedBody(game)).toBeUndefined();
       const back = await player(host, "Alice");
       back.send({ type: "rejoin", token, from: 0 });
       expect((await back.next("error")).code).toBe("token_invalid");
     });
 
-    it("starts despite a broken file, which it removes", async () => {
+    it("starts despite a broken file of an earlier release, which it imports and refuses", async () => {
       mkdirSync(join(dataDir, "games"));
       writeFileSync(join(dataDir, "games", "broken.json"), "{");
       writeFileSync(join(dataDir, "games", "cut.json.tmp"), "{");
       await start({ dataDir });
-      expect(readdirSync(join(dataDir, "games"))).toEqual([]);
+      expect(readdirSync(join(dataDir, "games")).sort()).toEqual([
+        "broken.json.imported",
+        "cut.json.tmp.imported",
+      ]);
+      expect(savedBody("broken")).toBeUndefined();
     });
   });
 
-  it("reads a ban list edited by hand when asked to, keeping the old one if it does not read", async () => {
+  it("reads the ban list the admin command changed when asked to, keeping the old one if it does not read", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "frontfall-data-"));
+    const db = dataOf(dataDir);
     try {
       const host = await start({ dataDir });
       const url = `http://${host}/admin/bans`;
-      mkdirSync(join(dataDir, "moderation"), { recursive: true });
-      const file = join(dataDir, "moderation", "bans.json");
-      writeFileSync(file, JSON.stringify({ bans: [{ target: "203.0.113.9" }] }));
-      expect(await (await fetch(url, { method: "POST" })).json()).toEqual({
+      writeBans(db, [{ target: "203.0.113.9", until: null }]);
+      expect(await (await request(url, { method: "POST" })).json()).toEqual({
         bans: [{ target: "203.0.113.9", until: null }],
         closed: 0,
       });
       expect(await closed(open(host, { "x-client-ip": "203.0.113.9" }).socket)).toBe(
         CloseCode.banned,
       );
-      writeFileSync(file, "{ not json");
-      expect((await fetch(url, { method: "POST" })).status).toBe(422);
-      expect(((await (await fetch(url)).json()) as { bans: unknown[] }).bans).toHaveLength(1);
+      db.run("INSERT INTO bans (target, until, note) VALUES ('nobody', NULL, NULL)");
+      expect((await request(url, { method: "POST" })).status).toBe(422);
+      expect(((await (await request(url)).json()) as { bans: unknown[] }).bans).toHaveLength(1);
     } finally {
+      db.close();
       rmSync(dataDir, { recursive: true, force: true });
     }
   });
@@ -1414,17 +1361,17 @@ describe("WebSocket", () => {
     const alice = await player(host, "Alice");
     const url = `http://${host}/admin/maintenance?minutes=5`;
     expect(
-      (await fetch(url, { method: "POST", headers: { "x-client-ip": "1.2.3.4" } })).status,
+      (await request(url, { method: "POST", headers: { "x-client-ip": "1.2.3.4" } })).status,
     ).toBe(404);
-    expect((await fetch(url)).status).toBe(400);
-    const answer = await fetch(url, { method: "POST" });
+    expect((await request(url)).status).toBe(400);
+    const answer = await request(url, { method: "POST" });
     expect(await answer.json()).toEqual({ minutes: 5, running: 0 });
     expect((await alice.next("maintenance")).inMs).toBe(300_000);
 
     // Players who arrive later are told too.
     const bob = await player(host, "Bob");
     expect((await bob.next("maintenance")).inMs).toBeGreaterThan(290_000);
-    const status = (await (await fetch(`http://${host}/api/status`)).json()) as Record<
+    const status = (await (await request(`http://${host}/api/status`)).json()) as Record<
       string,
       unknown
     >;
@@ -1432,16 +1379,16 @@ describe("WebSocket", () => {
     expect(status.restartInMs).toBeGreaterThan(290_000);
     expect(Date.parse(String(status.startedAt))).toBeLessThanOrEqual(Date.now());
     // The same for the whole run, so that a reader sees a restart by it changing.
-    expect(await (await fetch(`http://${host}/api/status`)).json()).toMatchObject({
+    expect(await (await request(`http://${host}/api/status`)).json()).toMatchObject({
       startedAt: status.startedAt,
     });
-    const page = await (await fetch(`http://${host}/status`)).text();
+    const page = await (await request(`http://${host}/status`)).text();
     expect(page).toContain("Players online / Joueurs en ligne");
     expect(page).toContain("dans 5 min");
 
-    await fetch(`http://${host}/admin/maintenance?minutes=0`, { method: "POST" });
+    await request(`http://${host}/admin/maintenance?minutes=0`, { method: "POST" });
     expect((await alice.next("maintenance")).inMs).toBeNull();
-    expect(await (await fetch(`http://${host}/api/status`)).json()).toMatchObject({
+    expect(await (await request(`http://${host}/api/status`)).json()).toMatchObject({
       restartInMs: null,
     });
   });

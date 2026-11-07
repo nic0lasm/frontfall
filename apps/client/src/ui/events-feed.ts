@@ -1,5 +1,5 @@
 import { t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import type { FeedEntry } from "./feed-events.ts";
 
 /** An entry stays this long, longer while the pointer or focus is on the feed. */

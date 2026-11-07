@@ -2,7 +2,7 @@ import { format, Stats } from "./playtest-report.ts";
 
 // Prints how many games were played to the end, from a server's public
 // counters. See docs/playtest.md, "Measuring a playtest".
-//   FRONTFALL_URL=https://nclsmgr.com/frontfall/ pnpm playtest-report [YYYY-MM-DD]
+//   FRONTFALL_URL=https://nclsmgr.com/frontfall/ bun run playtest-report [YYYY-MM-DD]
 
 const base = new URL(process.env.FRONTFALL_URL ?? "https://nclsmgr.com/frontfall/");
 if (!base.pathname.endsWith("/")) base.pathname += "/";

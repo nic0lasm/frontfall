@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { setLanguage } from "../src/i18n/index.ts";
-import { GENERATED_MAPS as maps } from "../src/game/maps.ts";
-import { activeRuleNames, defaultRules, SPECIAL_RULES } from "../src/ui/rules-fieldset.ts";
+import { GENERATED_MAPS as maps } from "../src/maps.ts";
+import { defaultRules } from "../src/game/defaults.ts";
+import { activeRuleNames, SPECIAL_RULES } from "../src/ui/rules-fieldset.ts";
 import { defaultSetup } from "../src/ui/setup.ts";
 import {
   OPERATOR_BONUSES,

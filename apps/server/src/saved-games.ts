@@ -1,15 +1,3 @@
-import {
-  chmodSync,
-  closeSync,
-  fstatSync,
-  openSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
 import { join } from "node:path";
 import {
   GameOptions,
@@ -20,20 +8,21 @@ import {
 } from "@frontfall/protocol";
 import { z } from "zod";
 import type { RoomSettings, SavedRoom } from "./room.ts";
+import { transaction, type SqlDriver } from "./sql/driver.ts";
 
 /**
- * Running games kept across a restart, one file each in
- * `<data>/games`: seed, settings, seats with their tokens, and the turn log.
- * No state of the game: the clients rebuild it from the turns, as on any
+ * Running games kept across a restart, one row each in the `games` table of
+ * data.db: seed, settings, seats with their tokens, and the turn log. No
+ * state of the game: the clients rebuild it from the turns, as on any
  * rejoin, so the server never keeps a state the players have not agreed on.
- * The files hold the names and tokens of the seats, and no address: they
- * are readable by the server's user only, and deleted as soon as read.
+ * A row holds the names and tokens of the seats, and no address, and is
+ * deleted as soon as read.
  */
 
 const FORMAT = 1;
 
 /** A turn log is capped at 64 MiB (`maxLogBytes`); base64 adds a third. */
-const MAX_FILE_BYTES = 96 * 1024 * 1024;
+export const MAX_SAVED_BYTES = 96 * 1024 * 1024;
 
 /** What decides how a game plays, kept; the server's limits come from the new run. */
 const SETTINGS_KEYS = [
@@ -106,13 +95,13 @@ const SavedFile = z
   })
   .strict();
 
+/** The directory games were kept in before data.db, one file each, which the first start imports. */
 export function gamesDirectory(dataDir: string): string {
   return join(dataDir, "games");
 }
 
-/** Writes one game, readable by the server's user only. */
-export function saveGame(directory: string, simulation: string, game: SavedRoom): void {
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
+/** Keeps one game, replacing an earlier save of it. */
+export function saveGame(db: SqlDriver, simulation: string, game: SavedRoom): void {
   const ends = Buffer.alloc(game.log.ends.length * 4);
   game.log.ends.forEach((end, index) => ends.writeUInt32LE(end, index * 4));
   const settings = Object.fromEntries(SETTINGS_KEYS.map((key) => [key, game.settings[key]]));
@@ -129,60 +118,53 @@ export function saveGame(directory: string, simulation: string, game: SavedRoom)
       ends: ends.toString("base64"),
     },
   });
-  const file = join(directory, `${game.id}.json`);
-  const temporary = `${file}.tmp`;
-  writeFileSync(temporary, text, { mode: 0o600 });
-  chmodSync(temporary, 0o600);
-  renameSync(temporary, file);
+  writeSavedGame(db, game.id, simulation, text);
+}
+
+/** Keeps a game as text, as a save writes it or as a file of the earlier releases held it. */
+export function writeSavedGame(db: SqlDriver, id: string, simulation: string, text: string): void {
+  db.run(
+    "INSERT INTO games (id, simulation, body) VALUES (?, ?, ?) ON CONFLICT (id) DO UPDATE SET simulation = excluded.simulation, body = excluded.body",
+    [id, simulation, text],
+  );
 }
 
 export interface LoadResult {
   games: LoadedGame[];
-  /** Files that held no game this server can take back, and why. */
+  /** Saves that held no game this server can take back, and why. */
   refused: { file: string; reason: "unreadable" | "simulation" }[];
 }
 
 /**
- * Reads every saved game and deletes its file, whether it loads or not: a
- * game of another simulation build would desynchronise, and a file left
- * behind would only be refused again. Never throws.
+ * Reads every saved game and deletes it, whether it loads or not: a game of
+ * another simulation build would desynchronise, and a save left behind would
+ * only be refused again. Never throws.
  */
-export function loadGames(directory: string, simulation: string): LoadResult {
+export function loadGames(db: SqlDriver, simulation: string): LoadResult {
   const result: LoadResult = { games: [], refused: [] };
-  let names: string[];
+  let rows: { id: string; body: string }[];
   try {
-    names = readdirSync(directory);
+    rows = transaction(db, () => {
+      const all = db.all<{ id: string; body: string }>("SELECT id, body FROM games ORDER BY id");
+      db.run("DELETE FROM games");
+      return all;
+    });
   } catch {
     return result;
   }
-  for (const name of names.sort()) {
-    const file = join(directory, name);
-    if (!name.endsWith(".json")) {
-      // A save cut short by the end of the process.
-      if (name.endsWith(".json.tmp")) rmSync(file, { force: true });
-      continue;
-    }
-    let text: string | undefined;
-    try {
-      // One descriptor for the size and the content: the file cannot change in between.
-      const fd = openSync(file, "r");
-      try {
-        if (fstatSync(fd).size <= MAX_FILE_BYTES) text = readFileSync(fd, "utf8");
-      } finally {
-        closeSync(fd);
-      }
-    } catch {
-      // Unreadable: refused below.
-    } finally {
-      rmSync(file, { force: true });
-    }
-    const game = text === undefined ? undefined : parse(text);
-    if (game === undefined) result.refused.push({ file: name, reason: "unreadable" });
+  for (const { id, body } of rows) {
+    const game = body.length > MAX_SAVED_BYTES ? undefined : parseSavedGame(body);
+    if (game === undefined) result.refused.push({ file: id, reason: "unreadable" });
     else if (game.simulation !== simulation)
-      result.refused.push({ file: name, reason: "simulation" });
+      result.refused.push({ file: id, reason: "simulation" });
     else result.games.push(game.game);
   }
   return result;
+}
+
+/** A saved game as text, read back; undefined when it is not one. */
+export function parseSavedGame(text: string): { simulation: string; game: LoadedGame } | undefined {
+  return parse(text);
 }
 
 function parse(text: string): { simulation: string; game: LoadedGame } | undefined {

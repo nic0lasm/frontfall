@@ -1,5 +1,5 @@
 import { RELEASE, isBeta } from "../release.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 
 /** The beta badge with the version, or nothing from 1.0 on. */
 export function betaBadge(className: string): HTMLElement | undefined {

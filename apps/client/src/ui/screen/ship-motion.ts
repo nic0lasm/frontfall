@@ -1,4 +1,4 @@
-import type { GameUpdate } from "../../game/solo-game.ts";
+import type { GameUpdate } from "../../game/game-runner.ts";
 import type { UnitMark } from "../../render/renderer.ts";
 
 /** Offset of warship ids among the ships the screen moves, past any transport's. */

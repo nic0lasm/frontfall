@@ -1,6 +1,7 @@
-import { DiplomacyError, inTruce, isAllied, logEvent } from "./diplomacy.ts";
+import { DiplomacyError, inTruce, isAllied, logEvent, playerError } from "./diplomacy.ts";
 import { populationCap, soldiers } from "./economy.ts";
 import type { Game, Player } from "./game.ts";
+import { ANY_PHASE, defineOrder } from "./order-rules.ts";
 import { atWar } from "./warships.ts";
 
 /** Why a gift is refused once its target is known to be an integer. */
@@ -38,7 +39,7 @@ export function giftError(
   if (!Number.isSafeInteger(gold) || gold < 0) return GiftError.Amount;
   if (troops === 0 && gold === 0) return GiftError.Empty;
   // R-ECO-07: workers stay at home.
-  if (troops > soldiers(player)) return GiftError.Troops;
+  if (troops > soldiers(game, player)) return GiftError.Troops;
   if (gold > player.gold) return GiftError.Gold;
   if (gold === 0 && giftedTroops(game, to, troops) === 0) return GiftError.Full;
   if (atWar(game, player.id, target)) return GiftError.War;
@@ -51,17 +52,26 @@ export function giftError(
  * to another at once. The troops the receiver's population cap has no room
  * for stay with the sender. Every player is told.
  */
-export function installGifts(game: Game): void {
-  game.onOrder((_, player, order) => {
-    if (order.type !== "gift") return false;
-    const to = game.player(order.target);
-    if (!to) return false;
-    const troops = giftedTroops(game, to, order.troops);
+export const GIFT_ORDER = defineOrder("gift", {
+  phases: ANY_PHASE,
+  validate: (game, player, order) =>
+    playerError(order.target) ??
+    giftError(game, player, order.target, order.troops, order.gold) ?? {
+      // giftError found the receiver in the game.
+      to: game.player(order.target) as Player,
+      troops: order.troops,
+      gold: order.gold,
+    },
+  execute(game, player, { to, troops: sent, gold }) {
+    const troops = giftedTroops(game, to, sent);
     player.troops -= troops;
     to.troops += troops;
-    player.gold -= order.gold;
-    to.gold += order.gold;
+    player.gold -= gold;
+    to.gold += gold;
     logEvent(game, { tick: game.tick, type: "gift", a: player.id, b: to.id });
-    return true;
-  });
+  },
+});
+
+export function installGifts(game: Game): void {
+  game.onOrder(GIFT_ORDER);
 }

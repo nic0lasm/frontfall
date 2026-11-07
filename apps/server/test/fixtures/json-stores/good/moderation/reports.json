@@ -1,0 +1,13 @@
+{
+  "reports": [
+    {
+      "at": "2026-11-01T12:00:00.000Z",
+      "game": "abcdefgh",
+      "reason": "abuse",
+      "from": "UmVwb3J0ZXJSZWYwMQ",
+      "player": 2,
+      "name": "Troll",
+      "target": "Jm0pQ2xvd2Zy4kTe"
+    }
+  ]
+}

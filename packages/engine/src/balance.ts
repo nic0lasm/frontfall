@@ -1,3 +1,6 @@
+import type { GameRules } from "@frontfall/contracts";
+import { FNV_OFFSET, mix, mixUnit } from "./state/fnv.ts";
+
 /**
  * Balance values from docs/balance.md, converted to the units the engine uses.
  * Each field names its key in that document; change both together.
@@ -335,3 +338,229 @@ export const DEFAULT_BALANCE: Balance = {
   winSharePercent: 75,
   maxDurationTicks: 3600 * 10,
 };
+
+/**
+ * The least and the most a balance value may be: a game refuses its setup
+ * with a value outside them, before the first tick rather than during one.
+ */
+export interface BalanceRange {
+  readonly least: number;
+  readonly most?: number;
+}
+
+/**
+ * When a balance value counts in the balance digest, which the state hash
+ * folds in: in every game, or only in games played with a special rule
+ * (R-MODE-08), or on a map with a feature, so that the other games hash as
+ * they did before the rule or the feature existed.
+ */
+export type DigestGate = { readonly rule: keyof GameRules } | { readonly map: "landmarks" };
+
+/** What the engine checks of one balance value, and when it counts in the digest. */
+export interface BalanceKeySpec {
+  readonly range: BalanceRange | "unchecked";
+  /** Checked after every range: ship routes keep their distances in 16 bits. */
+  readonly most?: number;
+  /** Left out, the value counts in every game. */
+  readonly digest?: DigestGate;
+}
+
+const POSITIVE: BalanceRange = { least: 1 };
+const NON_NEGATIVE: BalanceRange = { least: 0 };
+const PERCENT: BalanceRange = { least: 0, most: 100 };
+const AT_LEAST_100: BalanceRange = { least: 100 };
+/** R-CAP: the values of capital mode count only in games played with it. */
+const CAPITALS: DigestGate = { rule: "capitals" };
+/** R-LAND: the values of landmarks count only on a map that has some. */
+const LANDMARKS: DigestGate = { map: "landmarks" };
+
+/**
+ * Every key of `Balance` (ADR 0009): its range, or "unchecked", and its
+ * digest gate. `checkBalance` checks the ranges in the order of this table,
+ * then the bounds of `most`; the order decides which refusal a setup with
+ * several wrong values gets.
+ */
+export const BALANCE_SPEC = {
+  // Checked first, in this order: a number of at least 1.
+  ticksPerSecond: { range: POSITIVE },
+  attackSpeedDivisor: { range: POSITIVE },
+  encircleMaxTiles: { range: POSITIVE },
+  collapseBuildupTicks: { range: POSITIVE },
+  collapseDepth: { range: POSITIVE },
+  boatSpeed: { range: POSITIVE },
+  boatMax: { range: POSITIVE },
+  boatRange: { range: POSITIVE, most: 0xffff },
+  tradeRange: { range: POSITIVE, most: 0xffff },
+  growthDivisor: { range: POSITIVE },
+  tradeIntervalTicks: { range: POSITIVE },
+  tradeOdds: { range: POSITIVE },
+  warshipPatrol: { range: POSITIVE },
+  warshipReloadTicks: { range: POSITIVE },
+  warshipDamage: { range: POSITIVE },
+  warshipHealth: { range: POSITIVE },
+  missileSpeed: { range: POSITIVE },
+  allianceRequestTicks: { range: POSITIVE },
+  allianceTicks: { range: POSITIVE },
+  maxDurationTicks: { range: POSITIVE },
+  buildSpacing: { range: POSITIVE },
+  // Then a number of at least 0.
+  cityCost: { range: NON_NEGATIVE },
+  fortCost: { range: NON_NEGATIVE },
+  portCost: { range: NON_NEGATIVE },
+  buildTicks: { range: NON_NEGATIVE },
+  tradeMax: { range: NON_NEGATIVE },
+  costMax: { range: NON_NEGATIVE },
+  fortCostMax: { range: NON_NEGATIVE },
+  airDefenseCostMax: { range: NON_NEGATIVE },
+  popBase: { range: NON_NEGATIVE },
+  popLand: { range: NON_NEGATIVE },
+  popPerCity: { range: NON_NEGATIVE },
+  growthBase: { range: NON_NEGATIVE },
+  workGoldPercent: { range: NON_NEGATIVE },
+  warshipCost: { range: NON_NEGATIVE },
+  warshipMax: { range: NON_NEGATIVE },
+  warshipRange: { range: NON_NEGATIVE },
+  warMemoryTicks: { range: NON_NEGATIVE },
+  embargoNoticeTicks: { range: NON_NEGATIVE },
+  embargoAutoTicks: { range: NON_NEGATIVE },
+  tributeTruceTicks: { range: NON_NEGATIVE },
+  tributeBase: { range: NON_NEGATIVE },
+  tributePerTile: { range: NON_NEGATIVE },
+  tributeLeadPercent: { range: NON_NEGATIVE },
+  siloCost: { range: NON_NEGATIVE },
+  airDefenseCost: { range: NON_NEGATIVE },
+  longBuildTicks: { range: NON_NEGATIVE },
+  siloReloadTicks: { range: NON_NEGATIVE },
+  missileCost: { range: NON_NEGATIVE },
+  heavyMissileCost: { range: NON_NEGATIVE },
+  missileRadius: { range: NON_NEGATIVE },
+  heavyMissileRadius: { range: NON_NEGATIVE },
+  falloutTicks: { range: NON_NEGATIVE },
+  lightFalloutTicks: { range: NON_NEGATIVE },
+  falloutCostPercent: { range: NON_NEGATIVE },
+  missileTroopsPercent: { range: NON_NEGATIVE },
+  heavyMissileTroopsPercent: { range: NON_NEGATIVE },
+  airDefenseRadius: { range: NON_NEGATIVE },
+  airDefenseReloadTicks: { range: NON_NEGATIVE },
+  allianceRenewTicks: { range: NON_NEGATIVE },
+  allianceCooldownTicks: { range: NON_NEGATIVE },
+  traitorTicks: { range: NON_NEGATIVE },
+  traitorDefensePercent: { range: NON_NEGATIVE },
+  collapseOddsTenths: { range: NON_NEGATIVE },
+  collapseCostPercent: { range: NON_NEGATIVE },
+  cityLand: { range: NON_NEGATIVE },
+  goldBase: { range: NON_NEGATIVE },
+  attackPacePercent: { range: NON_NEGATIVE },
+  attackPaceOddsTenths: { range: NON_NEGATIVE },
+  capitalRadius: { range: NON_NEGATIVE, digest: CAPITALS },
+  capitalStrengthPercent: { range: NON_NEGATIVE, digest: CAPITALS },
+  capitalAlert: { range: NON_NEGATIVE, digest: CAPITALS },
+  capitalGraceTicks: { range: NON_NEGATIVE, digest: CAPITALS },
+  capitalGarrisonPercent: { range: NON_NEGATIVE, digest: CAPITALS },
+  landmarkGoldPercent: { range: NON_NEGATIVE, digest: LANDMARKS },
+  landmarkGrowthPercent: { range: NON_NEGATIVE, digest: LANDMARKS },
+  landmarkFortressRadius: { range: NON_NEGATIVE, digest: LANDMARKS },
+  landmarkFortressPercent: { range: NON_NEGATIVE, digest: LANDMARKS },
+  landmarkTradePercent: { range: NON_NEGATIVE, digest: LANDMARKS },
+  landmarkShieldRadius: { range: NON_NEGATIVE, digest: LANDMARKS },
+  // Then a share from 0 to 100, and a growth of 100 or more.
+  workMaxPercent: { range: PERCENT },
+  capitalSpoilsPercent: { range: PERCENT, digest: CAPITALS },
+  capitalRazePercent: { range: PERCENT, digest: CAPITALS },
+  landmarkShieldChancePercent: { range: PERCENT, digest: LANDMARKS },
+  landmarkAssaultPercent: { range: PERCENT, digest: LANDMARKS },
+  airDefenseChancePercent: { range: PERCENT },
+  costGrowthPercent: { range: AT_LEAST_100 },
+  // Not checked: a game takes whatever it is given for these.
+  spawnPhaseTicks: { range: "unchecked" },
+  spawnDistance: { range: "unchecked" },
+  spawnRadius: { range: "unchecked" },
+  startTroops: { range: "unchecked" },
+  desertionBasisPoints: { range: "unchecked" },
+  goldPerThousandTroops: { range: "unchecked" },
+  tileWeightTenths: { range: "unchecked" },
+  neutralSharePercent: { range: "unchecked" },
+  botNeutralSharePercent: { range: "unchecked" },
+  attackSpread: { range: "unchecked" },
+  lossBaseThousandths: { range: "unchecked" },
+  lossDensityThousandths: { range: "unchecked" },
+  oddsMinPercent: { range: "unchecked" },
+  oddsMaxPercent: { range: "unchecked" },
+  largeMidTiles: { range: "unchecked" },
+  largeAttackerPercent: { range: "unchecked" },
+  largeDefenderPercent: { range: "unchecked" },
+  botDefensePercent: { range: "unchecked" },
+  retreatPenaltyPercent: { range: "unchecked" },
+  fortRadius: { range: "unchecked" },
+  fortStrengthPercent: { range: "unchecked" },
+  fortLossPercent: { range: "unchecked" },
+  winSharePercent: { range: "unchecked" },
+} satisfies { readonly [K in keyof Balance]-?: BalanceKeySpec };
+
+const SPEC: Readonly<Record<string, BalanceKeySpec | undefined>> = BALANCE_SPEC;
+
+/** The digest gate of a balance key; undefined for a key that counts always, or that the spec does not know. */
+export function digestGate(key: string): DigestGate | undefined {
+  return SPEC[key]?.digest;
+}
+
+function refusal(range: BalanceRange): string {
+  if (range.most !== undefined)
+    return `must be from ${String(range.least)} to ${String(range.most)}`;
+  if (range.least === 1) return "must be a positive integer";
+  if (range.least === 0) return "must be a non-negative integer";
+  return `must be ${String(range.least)} or more`;
+}
+
+/** Refuses balance values the rules cannot run with, before the first tick rather than during one. */
+export function checkBalance(balance: Balance): void {
+  const entries = Object.entries(BALANCE_SPEC) as [keyof Balance, BalanceKeySpec][];
+  for (const [key, { range }] of entries) {
+    if (range === "unchecked") continue;
+    const value = balance[key];
+    if (
+      typeof value !== "number" ||
+      !Number.isSafeInteger(value) ||
+      value < range.least ||
+      (range.most !== undefined && value > range.most)
+    ) {
+      throw new RangeError(`balance ${key} ${refusal(range)}`);
+    }
+  }
+  for (const [key, { most }] of entries) {
+    if (most !== undefined && (balance[key] as number) > most) {
+      throw new RangeError(`balance ${key} is above ${String(most)}`);
+    }
+  }
+}
+
+/** Whether a value behind `gate` counts in a game with these rules, on a map with landmarks or not. */
+export function digestCounts(
+  gate: DigestGate | undefined,
+  rules: GameRules,
+  landmarks: boolean,
+): boolean {
+  if (gate === undefined) return true;
+  return "rule" in gate ? rules[gate.rule] : landmarks;
+}
+
+/**
+ * FNV-1a over the balance values, by key name, so the order fields were
+ * written in does not matter. A value behind a digest gate of `BALANCE_SPEC`
+ * counts only in a game its gate opens for; a key the spec does not know
+ * counts always.
+ */
+export function digestBalance(balance: Balance, rules: GameRules, landmarks: boolean): number {
+  let digest = FNV_OFFSET;
+  const record = balance as unknown as Record<string, number | readonly number[]>;
+  for (const key of Object.keys(record).sort()) {
+    if (!digestCounts(digestGate(key), rules, landmarks)) continue;
+    for (let i = 0; i < key.length; i++) digest = mixUnit(digest, key.charCodeAt(i));
+    const value = record[key];
+    // Halves, like the state hash: balance values are safe integers.
+    for (const number of typeof value === "number" ? [value] : (value ?? [])) {
+      digest = mix(digest, number);
+    }
+  }
+  return digest >>> 0;
+}

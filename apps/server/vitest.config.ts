@@ -1,5 +1,6 @@
-import { defineProject } from "vitest/config";
+import { configDefaults, defineProject } from "vitest/config";
 
 export default defineProject({
-  test: { name: "server" },
+  // test-bun/ runs under `bun test`: the Bun adapter needs Bun itself.
+  test: { name: "server", exclude: [...configDefaults.exclude, "test-bun/**"] },
 });

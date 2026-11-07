@@ -1,4 +1,3 @@
-import type { Socket } from "node:net";
 import {
   encodeClientMessage,
   parseServerMessage,
@@ -252,7 +251,7 @@ export class LoadClient {
   stall(): void {
     this.slow = true;
     clearTimeout(this.orderTimer);
-    (this.socket as unknown as { _socket: Socket })._socket.pause();
+    this.socket.pause();
   }
 
   /**

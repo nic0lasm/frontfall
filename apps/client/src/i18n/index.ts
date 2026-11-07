@@ -1,3 +1,5 @@
+import { safeStorage } from "../storage.ts";
+
 /** English is the reference catalogue: every other language has exactly its keys. */
 export type MessageKey = keyof typeof import("./en.json");
 
@@ -53,7 +55,7 @@ function isLanguage(value: unknown): value is Language {
 // the choice is then simply not remembered.
 function readStored(): string | null {
   try {
-    return globalThis.localStorage.getItem(STORAGE_KEY);
+    return safeStorage()?.getItem(STORAGE_KEY) ?? null;
   } catch {
     return null;
   }
@@ -61,7 +63,7 @@ function readStored(): string | null {
 
 function store(lang: Language): void {
   try {
-    globalThis.localStorage.setItem(STORAGE_KEY, lang);
+    safeStorage()?.setItem(STORAGE_KEY, lang);
   } catch {
     // Not remembered, see readStored.
   }

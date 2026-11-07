@@ -1,28 +1,69 @@
 export {
+  DIFFICULTIES,
+  DISABLE_ALL,
+  Disable,
+  MAX_TEAMS,
+  NO_RULES,
+  OPERATOR_BONUS_ALL,
+  ORDER_SPEC,
+  ORDER_TYPES,
+  OperatorBonus,
+  RuleBit,
+  TICK_RATE,
+  type Difficulty,
+  type GameRules,
+  type Order,
+  type OrderOf,
+  type OrderType,
+  type Turn,
+} from "@frontfall/contracts";
+export {
+  AttackError,
   captureCost,
   cheapestTile,
   collapseDepth,
   defenderLoss,
   defensePerTile,
   installAttacks,
+  pressureOf,
   troopsPerTile,
   type Attack,
 } from "./attacks.ts";
-export { DEFAULT_BALANCE, type Balance } from "./balance.ts";
+export {
+  BALANCE_SPEC,
+  DEFAULT_BALANCE,
+  checkBalance,
+  digestBalance,
+  type Balance,
+  type BalanceKeySpec,
+  type BalanceRange,
+  type DigestGate,
+} from "./balance.ts";
 export {
   capitalAim,
   capitalAlertDistance,
+  capitalFalls,
+  capitalOf,
   capitalRadius,
   capitalThreat,
   capitalsStand,
   guardedByCapital,
   installCapitals,
+  type CapitalFall,
 } from "./capitals.ts";
-export { installBoats, reachableCoasts, seaRoute, type Boat, type SeaRoute } from "./boats.ts";
-export { createGame } from "./create-game.ts";
+export {
+  BoatError,
+  installBoats,
+  reachableCoasts,
+  seaRoute,
+  type Boat,
+  type SeaRoute,
+} from "./boats.ts";
+export { STANDARD_RULES, assertOrderRules, createGame, type Rule } from "./create-game.ts";
 export {
   DiplomacyError,
   allianceOf,
+  allianceState,
   alliesOf,
   truceMatesOf,
   tributeError,
@@ -32,14 +73,18 @@ export {
   betrayError,
   canRenew,
   embargoError,
+  embargoUntil,
   embargoed,
   installDiplomacy,
   isAllied,
+  isTruce,
   isTraitor,
   requestBetween,
   sameTeam,
+  takeDiplomacyEvents,
   type Alliance,
   type AllianceRequest,
+  type AllianceState,
   type DiplomacyEvent,
   type Embargo,
   type RequestCooldown,
@@ -68,6 +113,7 @@ export {
   soldiers,
   troopGrowth,
   workError,
+  workShareOf,
   workers,
 } from "./economy.ts";
 export {
@@ -75,6 +121,7 @@ export {
   DOCTRINE_EFFECTS,
   Doctrine,
   doctrineError,
+  doctrineOf,
   doctrinePercent,
   installDoctrines,
   isDoctrine,
@@ -119,35 +166,28 @@ export {
   type Mood,
 } from "./bots/index.ts";
 export {
-  DISABLE_ALL,
-  leftOut,
-  Disable,
   Game,
-  MAX_TEAMS,
-  ruleBits,
-  NO_RULES,
-  NO_OPERATOR,
-  OPERATOR_BONUS_ALL,
-  OPERATOR_FACTOR,
-  OperatorBonus,
-  type OperatorBonuses,
-  type CapitalFall,
-  type GameRules,
   type GameSetup,
-  type Order,
-  type OrderHandler,
   type OrderObserver,
   type PersistedPart,
   type Phase,
   type Player,
   type PlayerSetup,
   type TickSystem,
-  type Turn,
 } from "./game.ts";
+export { NO_OPERATOR, OPERATOR_FACTOR, leftOut, ruleBits, type OperatorBonuses } from "./modes.ts";
 export { clamp, divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
-export { orderError } from "./orders.ts";
+export { ORDER_RULES, orderError } from "./orders.ts";
+export {
+  ANY_PHASE,
+  PLAY_PHASE,
+  defineOrder,
+  planOrder,
+  type OrderRule,
+  type Refusal,
+} from "./order-rules.ts";
 export { DrawUsage, Random, derivedRandom, type RandomState } from "./random.ts";
-export { installSpawn, spawnSettings } from "./spawn.ts";
+export { SpawnError, installSpawn, spawnSettings } from "./spawn.ts";
 export {
   BuildError,
   MOSQUE_TRIES,
@@ -167,8 +207,10 @@ export {
   buildTime,
   structureCost,
   structureCount,
+  structureState,
   workingCities,
   type Structure,
+  type StructureState,
 } from "./structures.ts";
 export {
   MissileError,
@@ -181,6 +223,7 @@ export {
   missileCost,
   missileError,
   missileTile,
+  takeMissileEvents,
   type Fallout,
   type Missile,
   type MissileEvent,
@@ -195,8 +238,10 @@ export {
   patrolRadius,
   warshipCost,
   warshipError,
+  warshipState,
   type Fight,
   type Warship,
+  type WarshipState,
 } from "./warships.ts";
 export { BoundedFloodFill } from "./territory/bounded-flood-fill.ts";
 export { MAX_PLAYER_ID, NEUTRAL, TerritoryMap } from "./territory/territory-map.ts";

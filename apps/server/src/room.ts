@@ -1,6 +1,4 @@
 import {
-  encodeServerMessage,
-  encodeTurnsFrame,
   HASH_INTERVAL,
   MAX_NAME_LENGTH,
   nameKey,
@@ -8,7 +6,6 @@ import {
   type Difficulty,
   type ErrorCode,
   type GameSpeed,
-  type Frame,
   type GameOptions,
   type GameRules,
   type OperatorBonuses,
@@ -18,8 +15,10 @@ import {
   type Teams,
   type Turn,
 } from "@frontfall/protocol";
-import { newToken } from "./ids.ts";
+import { systemClock } from "./clock.ts";
+import { systemIds, type Ids } from "./ids.ts";
 import { TokenBucket } from "./rate-limit.ts";
+import { RoomOutbox, type Peer } from "./room-outbox.ts";
 import { TurnLog } from "./turn-log.ts";
 
 /**
@@ -30,18 +29,7 @@ import { TurnLog } from "./turn-log.ts";
  */
 const BASE_PACE = 0.75;
 
-/** The connection of one player, as the room sees it. */
-export interface Peer {
-  send(frame: Frame): void;
-  /**
-   * Sends the frames of a catch-up, then `last` if any. A connection may pace
-   * them by what the client reads; the frames must then run on to the end of
-   * the log, and live turns it would get meanwhile are covered by them.
-   */
-  replay?(frames: Iterable<Frame>, last?: Frame): void;
-  /** Asks the connection to prove it is alive, and drops it if it does not answer. */
-  probe(): void;
-}
+export type { Peer } from "./room-outbox.ts";
 
 export interface RoomSettings {
   visibility: "public" | "private";
@@ -105,6 +93,33 @@ export interface RoomSettings {
 }
 
 export type RoomState = "open" | "starting" | "running" | "finished";
+
+/** What a room allows in one state, and the states it may enter from it. */
+export interface RoomStateRules {
+  /** Seats are taken and given up, and the host sets the game up. */
+  readonly lobby: boolean;
+  /** Orders and hashes are taken, and turns closed. */
+  readonly playing: boolean;
+  readonly next: readonly RoomState[];
+}
+
+/**
+ * Every state of a room, and every change it may make. A lobby counts down
+ * or stops counting (`open`, `starting`), starts, or closes; a running game
+ * only ends; an ended one stays ended. A game restored after a restart
+ * enters `running` from the `open` of its new room.
+ */
+export const ROOM_STATES: Readonly<Record<RoomState, RoomStateRules>> = {
+  open: { lobby: true, playing: false, next: ["open", "starting", "running", "finished"] },
+  starting: { lobby: true, playing: false, next: ["open", "starting", "running", "finished"] },
+  running: { lobby: false, playing: true, next: ["finished"] },
+  finished: { lobby: false, playing: false, next: [] },
+};
+
+/** Whether a room in state `from` may enter `to`. */
+export function canEnter(from: RoomState, to: RoomState): boolean {
+  return ROOM_STATES[from].next.includes(to);
+}
 
 export type FinishReason = "abandoned" | "timeout" | "expired" | "empty" | "restart";
 
@@ -188,7 +203,7 @@ export class Room {
   /** Hashes reported for each checked tick, by seat. */
   private readonly hashes = new Map<number, Map<Seat, number>>();
   /** Seats found out of step, with the first tick they disagreed on. */
-  private readonly desyncs = new Map<Seat, Frame>();
+  private readonly desyncs = new Map<Seat, ServerMessage>();
   /** A split of the hashes without a majority was logged: one line per game is enough. */
   private splitLogged = false;
   /** Addresses of the players the host removed: they cannot join this game again. */
@@ -198,6 +213,8 @@ export class Room {
   /** The `OperatorBonus` bits that operator turned on. */
   private operatorBits = 0;
   readonly log = new TurnLog();
+  /** Everything the room sends goes through it, to the peers of these seats. */
+  private readonly outbox = new RoomOutbox(this.seats);
 
   constructor(
     readonly id: string,
@@ -206,6 +223,8 @@ export class Room {
     private readonly observer: RoomObserver = {},
     /** Address of the player who opened the game, for per-address limits. */
     readonly owner?: string,
+    /** Where the reconnect tokens of the seats are drawn. */
+    private readonly ids: Ids = systemIds,
   ) {
     // Copied: the host changes the map, the bots and the name of their own game.
     this.settings = { ...settings };
@@ -215,6 +234,19 @@ export class Room {
 
   get state(): RoomState {
     return this.stateValue;
+  }
+
+  /** Moves the room to `to`; a change the table does not list is a bug, and throws. */
+  private enter(to: RoomState): void {
+    if (!canEnter(this.stateValue, to)) {
+      throw new Error(`room ${this.id} cannot go from ${this.stateValue} to ${to}`);
+    }
+    this.stateValue = to;
+  }
+
+  /** Rules of the state the room is in. */
+  private get rules(): RoomStateRules {
+    return ROOM_STATES[this.stateValue];
   }
 
   get playerCount(): number {
@@ -231,7 +263,7 @@ export class Room {
 
   /** True while the seat belongs to this room and can act in it. */
   holds(seat: Seat): boolean {
-    return this.stateValue !== "finished" && !seat.gone && this.seats.includes(seat);
+    return (this.rules.lobby || this.rules.playing) && !seat.gone && this.seats.includes(seat);
   }
 
   seatFor(token: string): Seat | undefined {
@@ -250,14 +282,14 @@ export class Room {
     address?: string,
     operator = false,
   ): Seat | ErrorCode {
-    if (this.stateValue === "running" || this.stateValue === "finished") return "game_started";
+    if (!this.rules.lobby) return "game_started";
     if (address !== undefined && this.removed.has(address)) return "removed";
     if (this.seats.length >= this.settings.capacity) return "game_full";
     if (address !== undefined && this.atSeatLimit(address)) return "too_many_seats";
     const seat: Seat = {
       id: this.nextLobbyId++,
       name: this.freeName(name),
-      token: newToken(),
+      token: this.ids.token(),
       address,
       peer,
       awaySince: undefined,
@@ -332,7 +364,7 @@ export class Room {
   /** The player leaves for good. Before the start, their seat is freed. */
   leave(seat: Seat, now: number): void {
     if (!this.holds(seat)) return;
-    if (this.stateValue === "running") {
+    if (this.rules.playing) {
       seat.gone = true;
       seat.peer = undefined;
       return;
@@ -356,7 +388,7 @@ export class Room {
    */
   disconnect(seat: Seat, now: number, closedByPage = false): void {
     if (!this.holds(seat)) return;
-    if (this.stateValue !== "running" && (closedByPage || this.settings.lobbyGraceMs <= 0)) {
+    if (this.rules.lobby && (closedByPage || this.settings.lobbyGraceMs <= 0)) {
       this.leave(seat, now);
       return;
     }
@@ -379,22 +411,19 @@ export class Room {
     seat.activeAt = now;
     // A new connection numbers its `configure` messages from 1 again.
     seat.configured = 0;
-    if (this.stateValue !== "running") {
+    if (this.rules.lobby) {
       this.lobbyChanged(now);
       return undefined;
     }
-    peer.send(this.startedMessage(seat));
+    this.outbox.toSeat(seat, this.startedMessage(seat));
     // Replaying from the first turn rebuilds the game from scratch: the hashes
     // it reports next decide afresh. Otherwise the client keeps its old state.
     if (from === 0) this.desyncs.delete(seat);
-    const desync = this.desyncs.get(seat);
-    const frames = this.log.frames(Math.min(from, this.log.length));
-    if (peer.replay) {
-      peer.replay(frames, desync);
-      return undefined;
-    }
-    for (const frame of frames) peer.send(frame);
-    if (desync !== undefined) peer.send(desync);
+    this.outbox.catchUp(
+      seat,
+      this.log.frames(Math.min(from, this.log.length)),
+      this.desyncs.get(seat),
+    );
     return undefined;
   }
 
@@ -413,7 +442,7 @@ export class Room {
     const target = this.seats.find((other) => other.id === player);
     if (!target || target === seat) return "not_found";
     if (target.address !== undefined) this.removed.add(target.address);
-    target.peer?.send(encodeServerMessage({ type: "ended", reason: "removed" }));
+    this.outbox.toSeat(target, { type: "ended", reason: "removed" });
     target.awaySince = undefined;
     this.leave(target, now);
     return undefined;
@@ -458,9 +487,9 @@ export class Room {
    * that hold again.
    */
   refusedConfigure(seat: Seat, seq: number, now: number): void {
-    if (!this.holds(seat) || this.stateValue === "running") return;
+    if (!this.holds(seat) || !this.rules.lobby) return;
     seat.configured = seq;
-    seat.peer?.send(this.lobbyMessage(seat, this.players(), this.startsIn(now)));
+    this.outbox.toSeat(seat, this.lobbyMessage(seat, this.players(), this.startsIn(now)));
   }
 
   /** Host: start now, with at least the game's minimum of players. */
@@ -489,7 +518,7 @@ export class Room {
 
   private hostOnly(seat: Seat): ErrorCode | undefined {
     if (!this.holds(seat)) return "not_in_game";
-    if (this.stateValue === "running") return "game_started";
+    if (!this.rules.lobby) return "game_started";
     if (this.host !== seat) return "not_host";
     return undefined;
   }
@@ -499,8 +528,8 @@ export class Room {
     return new TokenBucket(perSecond, burst, now);
   }
 
-  submit(seat: Seat, order: Order, now: number = Date.now()): boolean {
-    if (this.stateValue !== "running" || !this.holds(seat) || !seat.peer) return false;
+  submit(seat: Seat, order: Order, now: number = systemClock.now()): boolean {
+    if (!this.rules.playing || !this.holds(seat) || !seat.peer) return false;
     if (seat.orders >= this.settings.maxOrdersPerTurn) return false;
     if (!seat.allowance.take(now)) {
       seat.throttled++;
@@ -517,7 +546,7 @@ export class Room {
    * player has reported, or the window has passed, the hashes are compared.
    */
   reportHash(seat: Seat, tick: number, hash: number): void {
-    if (this.stateValue !== "running" || !this.holds(seat) || tick % HASH_INTERVAL !== 0) return;
+    if (!this.rules.playing || !this.holds(seat) || tick % HASH_INTERVAL !== 0) return;
     if (tick >= this.log.length || tick < this.log.length - this.hashWindow) return;
     let reports = this.hashes.get(tick);
     if (!reports) {
@@ -554,9 +583,9 @@ export class Room {
     let flagged: number | undefined;
     for (const [seat, hash] of reports) {
       if (hash === majority || this.desyncs.has(seat)) continue;
-      const message = encodeServerMessage({ type: "desync", tick, hash, expected: majority });
+      const message: ServerMessage = { type: "desync", tick, hash, expected: majority };
       this.desyncs.set(seat, message);
-      seat.peer?.send(message);
+      this.outbox.toSeat(seat, message);
       flagged ??= hash;
     }
     if (firstDesync && flagged !== undefined) this.observer.desync?.(this, tick, flagged, majority);
@@ -595,7 +624,7 @@ export class Room {
 
   /** Stops the game at once, for example when the server shuts down. */
   stop(reason: FinishReason = "abandoned"): void {
-    if (this.stateValue !== "finished") this.finish(reason);
+    if (this.rules.lobby || this.rules.playing) this.finish(reason);
   }
 
   /**
@@ -642,7 +671,7 @@ export class Room {
    * the orders not yet in a turn included.
    */
   save(now: number): SavedRoom | undefined {
-    if (this.stateValue !== "running") return undefined;
+    if (!this.rules.playing) return undefined;
     // Orders sent since the last turn would be lost: they make one more turn.
     if (this.pending.length > 0) this.closeTurns(1);
     return {
@@ -661,7 +690,7 @@ export class Room {
    * saved: they reconnect, and the next server gives them their seats back.
    */
   suspend(): void {
-    this.stateValue = "finished";
+    this.enter("finished");
     for (const seat of this.seats) seat.peer = undefined;
     this.pending = [];
   }
@@ -670,10 +699,15 @@ export class Room {
    * A saved game, running again from its last turn. Every seat waits for its
    * player as after a dropped connection. Undefined when the log is broken.
    */
-  static restore(saved: SavedRoom, observer: RoomObserver, now: number): Room | undefined {
-    const room = new Room(saved.id, saved.settings, saved.seed, observer, saved.owner);
+  static restore(
+    saved: SavedRoom,
+    observer: RoomObserver,
+    now: number,
+    ids: Ids = systemIds,
+  ): Room | undefined {
+    const room = new Room(saved.id, saved.settings, saved.seed, observer, saved.owner, ids);
     if (!room.log.load(saved.log.bodies, saved.log.ends)) return undefined;
-    room.stateValue = "running";
+    room.enter("running");
     room.startedAt = now - saved.elapsedMs;
     for (const { id, name, token, gone } of saved.seats) {
       room.seats.push({
@@ -699,14 +733,14 @@ export class Room {
     if (this.seats.length < this.settings.minPlayers) {
       this.settings.bots = Math.max(this.settings.bots, this.settings.soloBots);
     }
-    this.stateValue = "running";
+    this.enter("running");
     this.startsAt = undefined;
     this.startedAt = now;
     this.seats.forEach((seat, index) => {
       seat.id = index + 1;
     });
     this.settings.operatorBonuses = this.lobbyBonuses();
-    for (const seat of this.seats) seat.peer?.send(this.startedMessage(seat));
+    for (const seat of this.seats) this.outbox.toSeat(seat, this.startedMessage(seat));
     this.observer.started?.(this);
   }
 
@@ -717,7 +751,7 @@ export class Room {
     for (let i = 1; i < count; i++) bodies.push(this.log.append([]));
     this.pending = [];
     for (const seat of this.seats) seat.orders = 0;
-    this.broadcast(encodeTurnsFrame(tick, bodies));
+    this.outbox.turns(tick, bodies);
   }
 
   /** Ticks a late hash is waited for: the same time at every speed. */
@@ -760,8 +794,8 @@ export class Room {
   }
 
   private finish(reason: FinishReason): void {
-    this.stateValue = "finished";
-    if (reason !== "empty") this.broadcast(encodeServerMessage({ type: "ended", reason }));
+    this.enter("finished");
+    if (reason !== "empty") this.outbox.toEverySeat({ type: "ended", reason });
     for (const seat of this.seats) seat.peer = undefined;
     this.pending = [];
     this.observer.finished?.(this, reason);
@@ -778,14 +812,15 @@ export class Room {
     if (counting && count >= enough) {
       this.startsAt ??= now + this.settings.countdownMs;
     } else this.startsAt = undefined;
-    this.stateValue = this.startsAt === undefined ? "open" : "starting";
+    this.enter(this.startsAt === undefined ? "open" : "starting");
     const players = this.players();
     const startsIn = this.startsIn(now);
-    for (const seat of this.seats) seat.peer?.send(this.lobbyMessage(seat, players, startsIn));
+    for (const seat of this.seats)
+      this.outbox.toSeat(seat, this.lobbyMessage(seat, players, startsIn));
   }
 
-  private lobbyMessage(seat: Seat, players: PlayerInfo[], startsIn: number | null): Frame {
-    return encodeServerMessage({
+  private lobbyMessage(seat: Seat, players: PlayerInfo[], startsIn: number | null): ServerMessage {
+    return {
       type: "lobby",
       game: this.id,
       visibility: this.settings.visibility,
@@ -810,11 +845,11 @@ export class Room {
       configured: seat.configured,
       operator: seat.operator && this.settings.visibility === "private",
       operatorBonuses: this.lobbyBonuses(),
-    });
+    };
   }
 
-  private startedMessage(seat: Seat): Frame {
-    return encodeServerMessage({
+  private startedMessage(seat: Seat): ServerMessage {
+    return {
       type: "started",
       game: this.id,
       map: this.settings.map,
@@ -831,7 +866,7 @@ export class Room {
       players: this.players(),
       you: seat.id,
       token: seat.token,
-    } satisfies ServerMessage);
+    };
   }
 
   /** The operator's bonuses as set in the lobby, by the lobby number of their seat. */
@@ -842,9 +877,5 @@ export class Room {
 
   private players(): PlayerInfo[] {
     return this.seats.map(({ id, name }) => ({ id, name }));
-  }
-
-  private broadcast(frame: Frame): void {
-    for (const seat of this.seats) seat.peer?.send(frame);
   }
 }

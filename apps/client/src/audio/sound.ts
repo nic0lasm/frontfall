@@ -1,7 +1,5 @@
 import type { GameUpdate } from "../game/game-view.ts";
-import type { ViewCamera } from "../render/camera.ts";
 import { CueWatcher, type Cue, type CueEvent } from "./cues.ts";
-import { haptic } from "./haptics.ts";
 import { createMix, type Mix, type Place } from "./mix.ts";
 import { Music } from "./music.ts";
 import { PALETTE } from "./palettes.ts";
@@ -24,6 +22,14 @@ const MUSIC = 0.3;
 /** The music is scheduled this far ahead of the clock, in seconds, and the schedule is fed this often. */
 const LOOKAHEAD = 1.6;
 const FEED_MS = 400;
+
+/** What the sound needs to know of the view, to place an effect on the map. */
+export interface SoundCamera {
+  readonly scale: number;
+  readonly viewportWidth: number;
+  readonly viewportHeight: number;
+  tileToScreen(tile: number): { x: number; y: number };
+}
 
 /**
  * The sound of one game, made with the Web Audio API: no file is fetched.
@@ -48,8 +54,14 @@ export class Sound {
   /** The levels last sent to the mix, so that an unchanged setting adds no automation. */
   private applied = "";
 
-  /** `camera` tells where the view is, to place sounds that happen on the map. */
-  constructor(private readonly camera: () => ViewCamera | undefined = () => undefined) {
+  /**
+   * `camera` tells where the view is, to place sounds that happen on the map.
+   * `felt` is told every cue, muted or not, to vibrate where the device can.
+   */
+  constructor(
+    private readonly camera: () => SoundCamera | undefined = () => undefined,
+    private readonly felt: (cue: Cue) => void = () => undefined,
+  ) {
     document.addEventListener("visibilitychange", this.onVisibility);
   }
 
@@ -67,7 +79,7 @@ export class Sound {
   private listen(update: GameUpdate): void {
     const events = this.watcher.observe(update);
     // Felt even when the sound is muted.
-    for (const event of events) haptic(event.cue);
+    for (const event of events) this.felt(event.cue);
     // The end of the game counts even if the sound is not ready to play it.
     if (events.some((event) => event.cue === "victory" || event.cue === "defeat")) {
       this.over = true;
@@ -175,7 +187,7 @@ export class Sound {
   private score(update: GameUpdate, ctx: AudioContext, now: number, wanted: boolean): void {
     const music = this.music;
     if (!music) return;
-    const you = update.players.find((player) => player.id === update.you);
+    const you = update.players.find((p) => p.id === update.you);
     const total = update.players.reduce((sum, player) => sum + player.tiles, 0);
     const share = total > 0 ? (you?.tiles ?? 0) / total : 0;
     let target = 0;

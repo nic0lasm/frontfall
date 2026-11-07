@@ -411,7 +411,7 @@ A turn is its order count, then for each order the player number and the order. 
 | `15` | `tribute`  | `target`                   |
 | `16` | `doctrine` | `pick`                     |
 
-The table is `ORDER_KINDS` in [`orders.ts`](../packages/protocol/src/orders.ts). New orders are added at the end, so existing codes never change. A frame with trailing bytes, an unknown kind or a count larger than the rest of the frame could hold is refused. A client that receives a `turns` frame it cannot read stops and asks for a reload: skipping a turn would desynchronise its game.
+The table is `ORDER_SPEC` in [`packages/contracts/src/orders.ts`](../packages/contracts/src/orders.ts), which the engine shares; the protocol reads it into `ORDER_KINDS` and its schemas in [`orders.ts`](../packages/protocol/src/orders.ts). New orders are added at the end, so existing codes never change. A frame with trailing bytes, an unknown kind or a count larger than the rest of the frame could hold is refused. A client that receives a `turns` frame it cannot read stops and asks for a reload: skipping a turn would desynchronise its game.
 
 A turn with 32 orders takes about a tenth of its JSON size (214 bytes against 2,059 in the protocol tests' example); an empty turn takes 4 to 6 bytes with its header, depending on the tick.
 
@@ -430,6 +430,6 @@ Client and server ship together in one image, so a mismatch only affects pages l
 
 ### Simulation build
 
-The simulation build names what decides how a game plays out from its turns, and nothing else: twelve hex digits of a SHA-256 over the sources of the engine and its balance (`packages/engine/src`), of the protocol (`packages/protocol/src`), the maps' data (`.bin` and `.json` in `apps/client/public/maps`) and the client's setup of a game (`apps/client/src/game/simulation.ts`: the ids, names and order of the players, the rules installed). Each file counts with its path; carriage returns in text are dropped, so every checkout gives the same value. `tools/simulation-build.mjs` computes it when the client and the server are built (`node tools/simulation-build.mjs` prints it); outside a build both sides use `dev`.
+The simulation build names what decides how a game plays out from its turns, and nothing else: twelve hex digits of a SHA-256 over the sources of the engine and its balance (`packages/engine/src`), of the contracts they share (`packages/contracts/src`), of the protocol (`packages/protocol/src`), the maps' data (`.bin` and `.json` in `apps/client/public/maps`) and the client's setup of a game (`apps/client/src/game/simulation.ts`: the ids, names and order of the players, the rules installed). Each file counts with its path; carriage returns in text are dropped, so every checkout gives the same value. `tools/simulation-build.mjs` computes it when the client and the server are built (`node tools/simulation-build.mjs` prints it); outside a build both sides use `dev`.
 
 A release that changes only the interface, the server or the documentation keeps the simulation build, so the pages already open stay in their games. Snapshots ([engine.md](engine.md#snapshots)) and saved replays carry it too, and load in any release of the same simulation build. Code that changes a game's outcome belongs in one of these places; anything the client feeds to the engine that is not in a turn goes in `simulation.ts`.

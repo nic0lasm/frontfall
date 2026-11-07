@@ -6,6 +6,7 @@ import {
   DOCTRINE_COUNT,
   DOCTRINE_EFFECTS,
   Doctrine,
+  doctrineOf,
   doctrinePercent,
   installDoctrines,
 } from "../src/doctrines.ts";
@@ -55,7 +56,11 @@ function newGame(doctrines = true) {
   const pick = (player: number, code: number) => {
     game.step({ tick: game.tick, orders: [{ player, order: { type: "doctrine", pick: code } }] });
   };
-  return { grid, game, ada, bea, pick, create };
+  /** Picks a doctrine without running a tick, to compare prices at the same moment. */
+  const take = (player: number, code: number) => {
+    expect(game.apply(player, { type: "doctrine", pick: code })).toBe(true);
+  };
+  return { grid, game, ada, bea, pick, take, create };
 }
 
 const pickOrder = (pick: number): Order => ({ type: "doctrine", pick });
@@ -64,11 +69,11 @@ describe("doctrines (R-DOCTRINE)", () => {
   it("are picked in the spawn phase, and again until it ends", () => {
     const { game, ada, pick } = newGame();
     expect(game.phase).toBe("spawn");
-    expect(ada.doctrine).toBe(Doctrine.Balanced);
+    expect(doctrineOf(game, ada.id)).toBe(Doctrine.Balanced);
     pick(1, Doctrine.Conqueror);
-    expect(ada.doctrine).toBe(Doctrine.Conqueror);
+    expect(doctrineOf(game, ada.id)).toBe(Doctrine.Conqueror);
     pick(1, Doctrine.Bastion);
-    expect(ada.doctrine).toBe(Doctrine.Bastion);
+    expect(doctrineOf(game, ada.id)).toBe(Doctrine.Bastion);
   });
 
   it("are refused in a game without doctrines, after the spawn phase, or when unknown", () => {
@@ -97,36 +102,37 @@ describe("doctrines (R-DOCTRINE)", () => {
     });
     const before = [goldIncome(game, ada), populationCap(game, ada)];
     const off = newGame(false);
-    off.ada.doctrine = Doctrine.Conqueror;
+    expect(off.game.apply(1, pickOrder(Doctrine.Conqueror))).toBe(false);
+    expect(doctrineOf(off.game, 1)).toBe(Doctrine.Balanced);
     expect(doctrinePercent(off.game, 1, "gold")).toBe(100);
     expect([goldIncome(off.game, off.ada), populationCap(off.game, off.ada)]).toEqual(before);
   });
 
   it("raise and lower income, cap and the price of a fort", () => {
-    const { game, ada } = newGame();
+    const { game, ada, take } = newGame();
     const base = { gold: goldIncome(game, ada), cap: populationCap(game, ada) };
     const fort = structureCost(game, 1, StructureKind.Fort);
-    ada.doctrine = Doctrine.Merchant;
+    take(1, Doctrine.Merchant);
     expect(goldIncome(game, ada)).toBeGreaterThan(base.gold);
-    ada.doctrine = Doctrine.Conqueror;
+    take(1, Doctrine.Conqueror);
     expect(goldIncome(game, ada)).toBeLessThan(base.gold);
     expect(populationCap(game, ada)).toBeLessThan(base.cap);
-    ada.doctrine = Doctrine.Bastion;
+    take(1, Doctrine.Bastion);
     expect(populationCap(game, ada)).toBeGreaterThan(base.cap);
     expect(structureCost(game, 1, StructureKind.Fort)).toBeLessThan(fort);
   });
 
   it("make land cheaper or dearer for the attacker, and spare a bastion's troops", () => {
-    const { game, ada, bea, grid } = newGame();
+    const { game, ada, bea, grid, take } = newGame();
     ada.troops = bea.troops = 100_000;
     const tile = grid.size - 1;
     const base = captureCost(game, tile, bea, 1, 50_000);
     const loss = defenderLoss(game, tile, bea);
-    ada.doctrine = Doctrine.Conqueror;
+    take(1, Doctrine.Conqueror);
     expect(captureCost(game, tile, bea, 1, 50_000)).toBeLessThan(base);
-    ada.doctrine = Doctrine.Merchant;
+    take(1, Doctrine.Merchant);
     expect(captureCost(game, tile, bea, 1, 50_000)).toBeGreaterThan(base);
-    bea.doctrine = Doctrine.Bastion;
+    take(2, Doctrine.Bastion);
     expect(defenderLoss(game, tile, bea)).toBeLessThan(loss);
   });
 
@@ -146,8 +152,8 @@ describe("doctrines (R-DOCTRINE)", () => {
     const loaded = loadSnapshot(saveSnapshot(game, "test"), "test", create);
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
-    expect(loaded.game.player(1)?.doctrine).toBe(ada.doctrine);
-    expect(loaded.game.player(2)?.doctrine).toBe(bea.doctrine);
+    expect(doctrineOf(loaded.game, 1)).toBe(doctrineOf(game, ada.id));
+    expect(doctrineOf(loaded.game, 2)).toBe(doctrineOf(game, bea.id));
     expect(loaded.game.hash()).toBe(hash);
     pick(2, Doctrine.Conqueror);
     expect(game.hash()).not.toBe(hash);
@@ -170,10 +176,10 @@ describe("doctrines (R-DOCTRINE)", () => {
       installDoctrines(game);
       installNations(game, [1, 2], "normal", 0);
       game.step({ tick: 0, orders: [] });
-      return [game.player(1)?.doctrine, game.player(2)?.doctrine];
+      return [doctrineOf(game, 1), doctrineOf(game, 2)];
     };
     const first = picks(1);
-    expect(first.every((code) => code !== undefined && code >= 1 && code <= 3)).toBe(true);
+    expect(first.every((code) => code >= 1 && code <= 3)).toBe(true);
     expect(picks(1)).toEqual(first);
     const seen = new Set([1, 2, 3, 4, 5, 6, 7, 8].flatMap((seed) => picks(seed)));
     expect(seen.size).toBeGreaterThan(1);

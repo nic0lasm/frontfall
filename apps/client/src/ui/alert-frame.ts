@@ -1,5 +1,6 @@
+import { youOf } from "../game/selectors.ts";
 import type { GameUpdate } from "../game/game-view.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 
 /** Land lost between two updates that raises the alarm, as a share of the player's land. */
 const ALERT_SHARE = 0.01;
@@ -22,7 +23,7 @@ export class AlertFrame {
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   observe(update: GameUpdate): void {
-    const you = update.players.find((player) => player.id === update.you);
+    const you = youOf(update);
     const tiles = you?.tiles ?? 0;
     const before = this.tiles;
     this.tiles = tiles;

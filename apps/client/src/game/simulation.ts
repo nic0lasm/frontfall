@@ -11,7 +11,7 @@ import {
   type GameSetup,
   type PlayerSetup,
 } from "@frontfall/engine";
-import type { Difficulty, SoloOptions } from "./solo-game.ts";
+import type { Difficulty, SoloOptions } from "./game-runner.ts";
 
 /**
  * How this client sets up the simulation of a game from its options: who

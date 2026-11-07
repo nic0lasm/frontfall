@@ -10,9 +10,9 @@ import {
   type Frame,
   type GameOptions,
 } from "@frontfall/protocol";
-import type { RawData, WebSocket } from "ws";
 import { isPrivateAddress } from "./address.ts";
 import type { Accounts } from "./accounts.ts";
+import type { Clock } from "./clock.ts";
 import type { MapLimits } from "./catalog.ts";
 import type { Directory } from "./directory.ts";
 import type { Logger } from "./log.ts";
@@ -20,6 +20,7 @@ import type { Metrics } from "./metrics.ts";
 import type { Moderation } from "./moderation.ts";
 import type { TokenBucket } from "./rate-limit.ts";
 import type { Peer, Room, Seat } from "./room.ts";
+import type { Connection } from "./transport.ts";
 
 /** WebSocket close reasons are capped at 123 bytes of UTF-8; ws throws on longer ones. */
 const MAX_CLOSE_REASON_BYTES = 123;
@@ -37,15 +38,6 @@ export function closeReason(text: string): string {
     reason += char;
   }
   return reason;
-}
-
-export function toFrame(data: RawData, isBinary: boolean): Frame {
-  const bytes = Array.isArray(data)
-    ? Buffer.concat(data)
-    : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data);
-  return isBinary
-    ? new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-    : bytes.toString("utf8");
 }
 
 const ERROR_TEXT: Record<ErrorCode, string> = {
@@ -89,7 +81,7 @@ function seatsFor(
 
 /** What one WebSocket connection has done so far. */
 export interface Session {
-  readonly socket: WebSocket;
+  readonly socket: Connection;
   readonly peer: Peer;
   /** Address of the player, for per-address limits. Never logged. */
   readonly address: string;
@@ -121,26 +113,61 @@ export interface MessageContext {
   readonly metrics: Metrics;
   readonly logger: Logger;
   readonly moderation: Moderation;
+  /** The server's time. */
+  readonly clock: Clock;
   /** Whether the server has begun to close: no new game opens. */
   stopping(): boolean;
   /** The announcement of a restart due after `now`, if one is. */
   maintenance(now: number): Frame | undefined;
 }
 
+/** The seat a connection holds in a game. */
+export interface Held {
+  readonly room: Room;
+  readonly seat: Seat;
+}
+
+/** The message of type `T`. */
+type Of<T extends ClientMessage["type"]> = Extract<ClientMessage, { type: T }>;
+
+/**
+ * The answer to one kind of message. `current` is the seat of the connection,
+ * when it holds one; every message but `hello` has already refreshed it.
+ */
+type Handler<T extends ClientMessage["type"]> = (
+  session: Session,
+  message: Of<T>,
+  current: Held | undefined,
+) => void;
+
+/** Every kind of message has an answer: a new one in the protocol does not compile without it. */
+type Handlers = { [T in ClientMessage["type"]]: Handler<T> };
+
+/** What the handling of messages gives the connections around it. */
+export interface MessageHandler {
+  /** Answers a message from the connection, which has passed the rate limit and the parser. */
+  handle(session: Session, message: ClientMessage): void;
+  /** Closes a connection that broke the rules, and records why. */
+  reject(session: Session, code: number, reason: string, label: string): void;
+  /** The seat of this connection, if it still holds one in a game. */
+  seatOf(session: Session): Held | undefined;
+}
+
 /**
  * The answers to what a connection sends, from `hello` to its orders, and
  * how a connection that broke the rules is closed.
  */
-export function messageHandler(ctx: MessageContext): {
-  handle: (session: Session, message: ClientMessage) => void;
-  reject: (session: Session, code: number, reason: string, label: string) => void;
-  seatOf: (session: Session) => { room: Room; seat: Seat } | undefined;
-} {
+export function messageHandler(ctx: MessageContext): MessageHandler {
   function reply(session: Session, code: ErrorCode, message = ERROR_TEXT[code]): void {
     session.peer.send(encodeServerMessage({ type: "error", code, message }));
   }
 
-  /** Closes a connection that broke the rules, and records why. */
+  /** Replies with the error, if the call gave one. */
+  function replyIf(session: Session, error: ErrorCode | undefined): boolean {
+    if (error) reply(session, error);
+    return error !== undefined;
+  }
+
   function reject(session: Session, code: number, reason: string, label: string): void {
     if (session.closing) return;
     session.closing = true;
@@ -149,8 +176,7 @@ export function messageHandler(ctx: MessageContext): {
     session.socket.close(code, closeReason(reason));
   }
 
-  /** The seat of this connection, if it still holds one in a game. */
-  function seatOf(session: Session): { room: Room; seat: Seat } | undefined {
+  function seatOf(session: Session): Held | undefined {
     const { room, seat } = session;
     if (!room || !seat || !room.holds(seat) || seat.peer !== session.peer) return undefined;
     return { room, seat };
@@ -167,7 +193,13 @@ export function messageHandler(ctx: MessageContext): {
       (ctx.accounts?.knownIds(session.account) ?? [session.account]).some((id) =>
         ctx.operators.has(id),
       );
-    const seat = room.join(session.name ?? "", session.peer, Date.now(), session.address, operator);
+    const seat = room.join(
+      session.name ?? "",
+      session.peer,
+      ctx.clock.now(),
+      session.address,
+      operator,
+    );
     if (typeof seat === "string") {
       reply(session, seat);
       return;
@@ -178,8 +210,31 @@ export function messageHandler(ctx: MessageContext): {
     session.idleSince = undefined;
   }
 
-  function handle(session: Session, message: ClientMessage): void {
-    if (message.type === "hello") {
+  /**
+   * Whether a connection may look for a game: not while it holds a seat, not
+   * while the server closes, and not while it is full. A rejoin passes the last
+   * two: players of a running game may still come back while the server drains,
+   * and a full server keeps serving the players it has.
+   */
+  function mayEnter(session: Session, current: Held | undefined, rejoining: boolean): boolean {
+    if (current) {
+      reply(session, "already_in_game");
+      return false;
+    }
+    if (ctx.stopping() && !rejoining) {
+      reply(session, "restarting");
+      return false;
+    }
+    if (ctx.games.full && !rejoining) {
+      ctx.metrics.refused.inc({ reason: "players" });
+      reply(session, "too_many_games");
+      return false;
+    }
+    return true;
+  }
+
+  const handlers: Handlers = {
+    hello(session, message) {
       if (session.name !== undefined) {
         reject(session, CloseCode.invalidMessage, "hello was already sent", "invalid");
         return;
@@ -214,205 +269,206 @@ export function messageHandler(ctx: MessageContext): {
         return;
       }
       session.name = name.name;
-      session.idleSince = Date.now();
+      session.idleSince = ctx.clock.now();
       session.peer.send(encodeServerMessage({ type: "welcome", version: PROTOCOL_VERSION }));
-      const now = Date.now();
+      const now = ctx.clock.now();
       const maintenance = ctx.maintenance(now);
       if (maintenance) session.peer.send(maintenance);
-      return;
-    }
-    if (session.name === undefined) {
-      reject(session, CloseCode.invalidMessage, "hello must come first", "invalid");
-      return;
-    }
+    },
 
-    const current = seatOf(session);
-    if (current) current.room.touch(current.seat, Date.now());
-    switch (message.type) {
-      case "play":
-      case "create":
-      case "join":
-      case "rejoin":
-        if (current) {
-          reply(session, "already_in_game");
-          return;
-        }
-        // Players of a running game may still come back while the server drains.
-        if (ctx.stopping() && message.type !== "rejoin") {
-          reply(session, "restarting");
-          return;
-        }
-        // A full server keeps serving the players it has: only newcomers wait.
-        if (ctx.games.full && message.type !== "rejoin") {
-          ctx.metrics.refused.inc({ reason: "players" });
-          reply(session, "too_many_games");
-          return;
-        }
-        if (message.type === "play") {
-          const name = gameName(message.name, session.name);
-          const room = ctx.games.quickMatch(session.address, name);
-          // No game to join, and this address may open no other one.
-          if (!room && ctx.games.atGameLimit(session.address)) {
-            reply(session, "too_many_lobbies");
-            return;
-          }
-          enter(session, room, "too_many_games");
-        } else if (message.type === "create") {
-          const visibility = message.visibility ?? "private";
-          let name: string | null = null;
-          if (visibility === "public") {
-            // Without a name of their own, the player gets one that is always valid, as with play.
-            if (message.name === undefined) name = gameName(undefined, session.name);
-            else {
-              const checked = normalizeGameName(message.name);
-              if (!checked.ok) {
-                reply(session, "invalid_game_name", checked.error);
-                return;
-              }
-              name = checked.name;
-            }
-          }
-          if (ctx.games.atLobbyLimit(session.address)) {
-            reply(session, "too_many_lobbies");
-            return;
-          }
-          const room = ctx.games.create({ kind: "hosted", visibility, name }, session.address);
-          enter(session, room, "too_many_games");
-        } else if (message.type === "join")
-          enter(session, ctx.games.find(message.game), "not_found");
-        else rejoin(session, message.token, message.from);
+    play(session, message, current) {
+      if (!mayEnter(session, current, false)) return;
+      const name = gameName(message.name, session.name);
+      const room = ctx.games.quickMatch(session.address, name);
+      // No game to join, and this address may open no other one.
+      if (!room && ctx.games.atGameLimit(session.address)) {
+        reply(session, "too_many_lobbies");
         return;
-      case "configure": {
-        if (!current) {
-          reply(session, "not_in_game");
-          return;
-        }
-        // A host's form runs ahead of the answers: a refusal sends the settings that hold.
-        const refuse = (code: ErrorCode, text?: string): void => {
-          reply(session, code, text);
-          if (message.seq !== undefined) {
-            current.room.refusedConfigure(current.seat, message.seq, Date.now());
-          }
-        };
-        const seats = seatsFor(message.options, ctx.maps, ctx.maxBots, current.room.playerCount);
-        // A public game runs at the pace everyone expects (R-MODE-07), with the default rules (R-MODE-08).
-        const isPublic = current.room.settings.visibility === "public";
-        const fast = (message.options.speed ?? 1) !== 1 && isPublic;
-        const ruled = message.options.rules !== undefined && !isDefaultRules(message.options.rules);
-        if (seats === undefined || fast || (ruled && isPublic)) {
-          refuse("invalid_settings");
-          return;
-        }
-        let name: string | undefined;
-        if (message.name !== undefined && current.room.settings.visibility === "public") {
+      }
+      enter(session, room, "too_many_games");
+    },
+
+    create(session, message, current) {
+      if (!mayEnter(session, current, false)) return;
+      const visibility = message.visibility ?? "private";
+      let name: string | null = null;
+      if (visibility === "public") {
+        // Without a name of their own, the player gets one that is always valid, as with play.
+        if (message.name === undefined) name = gameName(undefined, session.name);
+        else {
           const checked = normalizeGameName(message.name);
           if (!checked.ok) {
-            refuse("invalid_game_name", checked.error);
+            reply(session, "invalid_game_name", checked.error);
             return;
           }
-          name = ctx.games.uniqueName(checked.name, current.room);
+          name = checked.name;
         }
-        // A quick game keeps filling in with the new map's bots.
-        const soloBots =
-          current.room.settings.soloBots > 0 ? (ctx.maps.get(message.options.map)?.bots ?? 0) : 0;
-        const bonuses = message.operatorBonuses;
-        const error = current.room.configure(
-          current.seat,
-          { ...message.options, capacity: seats, soloBots, ...(name !== undefined && { name }) },
-          Date.now(),
-          message.seq,
-          bonuses,
-        );
-        if (error) refuse(error);
-        else if (bonuses) ctx.logger.info("operator_bonuses", { game: current.room.id, bonuses });
+      }
+      if (ctx.games.atLobbyLimit(session.address)) {
+        reply(session, "too_many_lobbies");
         return;
       }
-      case "start": {
-        const error = current ? current.room.requestStart(current.seat, Date.now()) : "not_in_game";
-        if (error) reply(session, error);
-        return;
-      }
-      case "hold": {
-        const error = current ? current.room.hold(current.seat, Date.now()) : "not_in_game";
-        if (error) reply(session, error);
-        return;
-      }
-      case "active":
-        return;
-      case "kick": {
-        const error = current
-          ? current.room.kick(current.seat, message.player, Date.now())
-          : "not_in_game";
-        if (error) reply(session, error);
-        else ctx.games.sweep();
-        return;
-      }
-      case "report": {
-        if (!current) {
-          reply(session, "not_in_game");
-          return;
-        }
-        const target = current.room.seatOf(message.player);
-        // Players of one public address share one reference: a report of one of them names
-        // the reporter too. A LAN without a proxy, or a test on one machine, has only that one.
-        const sameAddress =
-          target?.address === session.address && !isPrivateAddress(session.address);
-        if (!target || target === current.seat || sameAddress) {
-          reply(session, "not_found");
-          return;
-        }
-        const now = Date.now();
-        const taken = ctx.moderation.report(
-          { game: current.room.id, reason: message.reason, player: target.id, name: target.name },
-          session.address,
-          target.address,
-          now,
-        );
-        if (!taken) {
-          reply(session, "too_many_reports");
-          return;
-        }
-        ctx.metrics.reports.inc({ reason: message.reason });
-        ctx.logger.info("player_reported", {
-          game: current.room.id,
-          player: target.id,
-          reason: message.reason,
-        });
-        session.peer.send(encodeServerMessage({ type: "reported", player: target.id }));
-        return;
-      }
-      case "leave":
-        if (!current) return;
-        current.room.leave(current.seat, Date.now());
-        session.room = undefined;
-        session.seat = undefined;
-        session.idleSince = Date.now();
-        session.peer.send(encodeServerMessage({ type: "ended", reason: "left" }));
-        ctx.games.sweep();
-        return;
-      case "hash":
-        current?.room.reportHash(current.seat, message.tick, message.hash);
-        return;
-      case "order":
-        current?.room.submit(current.seat, message.order);
-        return;
-    }
-  }
+      const room = ctx.games.create({ kind: "hosted", visibility, name }, session.address);
+      enter(session, room, "too_many_games");
+    },
 
-  function rejoin(session: Session, token: string, from: number): void {
-    const found = ctx.games.findSeat(token);
-    const error = found
-      ? found.room.rejoin(found.seat, session.peer, from, Date.now())
-      : "token_invalid";
-    if (error || !found) {
-      reply(session, error ?? "token_invalid");
-      return;
+    join(session, message, current) {
+      if (!mayEnter(session, current, false)) return;
+      enter(session, ctx.games.find(message.game), "not_found");
+    },
+
+    rejoin(session, message, current) {
+      if (!mayEnter(session, current, true)) return;
+      const found = ctx.games.findSeat(message.token);
+      const error = found
+        ? found.room.rejoin(found.seat, session.peer, message.from, ctx.clock.now())
+        : "token_invalid";
+      if (error || !found) {
+        reply(session, error ?? "token_invalid");
+        return;
+      }
+      session.room = found.room;
+      session.seat = found.seat;
+      session.idleSince = undefined;
+      ctx.metrics.rejoins.inc();
+      ctx.logger.info("player_rejoined", {
+        game: found.room.id,
+        player: found.seat.id,
+        from: message.from,
+      });
+    },
+
+    configure(session, message, current) {
+      if (!current) {
+        reply(session, "not_in_game");
+        return;
+      }
+      // A host's form runs ahead of the answers: a refusal sends the settings that hold.
+      const refuse = (code: ErrorCode, text?: string): void => {
+        reply(session, code, text);
+        if (message.seq !== undefined) {
+          current.room.refusedConfigure(current.seat, message.seq, ctx.clock.now());
+        }
+      };
+      const seats = seatsFor(message.options, ctx.maps, ctx.maxBots, current.room.playerCount);
+      // A public game runs at the pace everyone expects (R-MODE-07), with the default rules (R-MODE-08).
+      const isPublic = current.room.settings.visibility === "public";
+      const fast = (message.options.speed ?? 1) !== 1 && isPublic;
+      const ruled = message.options.rules !== undefined && !isDefaultRules(message.options.rules);
+      if (seats === undefined || fast || (ruled && isPublic)) {
+        refuse("invalid_settings");
+        return;
+      }
+      let name: string | undefined;
+      if (message.name !== undefined && current.room.settings.visibility === "public") {
+        const checked = normalizeGameName(message.name);
+        if (!checked.ok) {
+          refuse("invalid_game_name", checked.error);
+          return;
+        }
+        name = ctx.games.uniqueName(checked.name, current.room);
+      }
+      // A quick game keeps filling in with the new map's bots.
+      const soloBots =
+        current.room.settings.soloBots > 0 ? (ctx.maps.get(message.options.map)?.bots ?? 0) : 0;
+      const bonuses = message.operatorBonuses;
+      const error = current.room.configure(
+        current.seat,
+        { ...message.options, capacity: seats, soloBots, ...(name !== undefined && { name }) },
+        ctx.clock.now(),
+        message.seq,
+        bonuses,
+      );
+      if (error) refuse(error);
+      else if (bonuses) ctx.logger.info("operator_bonuses", { game: current.room.id, bonuses });
+    },
+
+    start(session, _message, current) {
+      replyIf(
+        session,
+        current ? current.room.requestStart(current.seat, ctx.clock.now()) : "not_in_game",
+      );
+    },
+
+    hold(session, _message, current) {
+      replyIf(session, current ? current.room.hold(current.seat, ctx.clock.now()) : "not_in_game");
+    },
+
+    // The touch before the handler is all it does.
+    active: () => undefined,
+
+    kick(session, message, current) {
+      const error = current
+        ? current.room.kick(current.seat, message.player, ctx.clock.now())
+        : "not_in_game";
+      if (!replyIf(session, error)) ctx.games.sweep();
+    },
+
+    report(session, message, current) {
+      if (!current) {
+        reply(session, "not_in_game");
+        return;
+      }
+      const target = current.room.seatOf(message.player);
+      // Players of one public address share one reference: a report of one of them names
+      // the reporter too. A LAN without a proxy, or a test on one machine, has only that one.
+      const sameAddress = target?.address === session.address && !isPrivateAddress(session.address);
+      if (!target || target === current.seat || sameAddress) {
+        reply(session, "not_found");
+        return;
+      }
+      const taken = ctx.moderation.report(
+        { game: current.room.id, reason: message.reason, player: target.id, name: target.name },
+        session.address,
+        target.address,
+        ctx.clock.now(),
+      );
+      if (!taken) {
+        reply(session, "too_many_reports");
+        return;
+      }
+      ctx.metrics.reports.inc({ reason: message.reason });
+      ctx.logger.info("player_reported", {
+        game: current.room.id,
+        player: target.id,
+        reason: message.reason,
+      });
+      session.peer.send(encodeServerMessage({ type: "reported", player: target.id }));
+    },
+
+    leave(session, _message, current) {
+      if (!current) return;
+      current.room.leave(current.seat, ctx.clock.now());
+      session.room = undefined;
+      session.seat = undefined;
+      session.idleSince = ctx.clock.now();
+      session.peer.send(encodeServerMessage({ type: "ended", reason: "left" }));
+      ctx.games.sweep();
+    },
+
+    hash(_session, message, current) {
+      current?.room.reportHash(current.seat, message.tick, message.hash);
+    },
+
+    order(_session, message, current) {
+      current?.room.submit(current.seat, message.order, ctx.clock.now());
+    },
+  };
+
+  function handle(session: Session, message: ClientMessage): void {
+    let current: Held | undefined;
+    // hello is the first message and has no seat to refresh; every other one follows it.
+    if (message.type !== "hello") {
+      if (session.name === undefined) {
+        reject(session, CloseCode.invalidMessage, "hello must come first", "invalid");
+        return;
+      }
+      current = seatOf(session);
+      if (current) current.room.touch(current.seat, ctx.clock.now());
     }
-    session.room = found.room;
-    session.seat = found.seat;
-    session.idleSince = undefined;
-    ctx.metrics.rejoins.inc();
-    ctx.logger.info("player_rejoined", { game: found.room.id, player: found.seat.id, from });
+    // `handlers[message.type]` takes exactly the message of that type.
+    const answer = handlers[message.type] as Handler<ClientMessage["type"]>;
+    answer(session, message, current);
   }
 
   return { handle, reject, seatOf };

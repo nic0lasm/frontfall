@@ -7,17 +7,20 @@ describe("jsonLogger", () => {
     const logger = jsonLogger((line) => lines.push(line));
     logger.info("game_started", { game: "abc", players: 3 });
     logger.warn("desync", { tick: 50 });
+    logger.error("uncaught_exception", { error: "boom" });
     expect(lines.every((line) => line.endsWith("\n"))).toBe(true);
-    const [first, second] = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    const [first, second, third] = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
     expect(first).toMatchObject({ level: "info", event: "game_started", game: "abc", players: 3 });
     expect(Number.isNaN(Date.parse(String(first?.time)))).toBe(false);
     expect(second).toMatchObject({ level: "warn", event: "desync", tick: 50 });
+    expect(third).toMatchObject({ level: "error", event: "uncaught_exception", error: "boom" });
   });
 
   it("can stay silent", () => {
     expect(() => {
       silentLogger.info("x");
       silentLogger.warn("y");
+      silentLogger.error("z");
     }).not.toThrow();
   });
 });

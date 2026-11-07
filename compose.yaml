@@ -25,6 +25,8 @@ services:
     # Running games get FRONTFALL_DRAIN_SECONDS (20 by default) to end after a stop.
     stop_grace_period: 30s
     restart: unless-stopped
+    # Bun has no heap cap: this bounds the server. About 300 MiB at the default limits
+    # (docs/capacity.md); 512m is the least to give it.
     mem_limit: 1g
 
 volumes:

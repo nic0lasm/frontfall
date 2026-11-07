@@ -7,7 +7,7 @@ import type {
   Turn,
 } from "@frontfall/engine";
 import type { MapManifest } from "@frontfall/protocol";
-import type { MapInfo } from "./maps.ts";
+import type { MapInfo } from "../maps.ts";
 import type { StartInfo } from "./session.ts";
 import type {
   ClickMode,
@@ -17,7 +17,7 @@ import type {
   GameSnapshot,
   GameUpdate,
   SoloOptions,
-} from "./solo-game.ts";
+} from "./game-runner.ts";
 
 /** What became of a click: the order it sent, or why it sent none. */
 export type ClickOutcome = Order["type"] | ClickRefusal;

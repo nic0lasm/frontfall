@@ -1,4 +1,4 @@
-import { fetchManifest, type MapInfo } from "../game/maps.ts";
+import { fetchManifest, type MapInfo } from "../maps.ts";
 
 /** The ground of a map as bakeTerrainColors makes it, with the heights the shader lights it from. */
 export interface BakedGround {

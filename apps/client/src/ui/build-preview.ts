@@ -1,8 +1,8 @@
-import type { ClickPreview } from "../game/solo-game.ts";
+import type { ClickPreview } from "../game/game-runner.ts";
 import { applyTranslations, t, type MessageKey } from "../i18n/index.ts";
 import type { Camera } from "../render/camera.ts";
 import { REFUSALS } from "./click-marks.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { formatCount } from "./format.ts";
 
 /** Room kept between the card and the edge of the screen, in CSS pixels. */

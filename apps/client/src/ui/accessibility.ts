@@ -1,8 +1,8 @@
+import { safeStorage } from "../storage.ts";
 import { applyTranslations } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { fullscreenButton } from "./fullscreen.ts";
 import { GRAPHICS_MODES, type GraphicsMode } from "./graphics.ts";
-import { safeStorage } from "./setup.ts";
 
 /** Interface sizes on offer, as a percentage of the normal one. */
 export const SCALES = [100, 125, 150] as const;
@@ -170,7 +170,7 @@ export function accessibilityPanel(): HTMLDetailsElement {
     ),
   );
   // The sound settings come with the audio code, apart from the first visit.
-  void import("../audio/controls.ts").then(
+  void import("./audio-controls.ts").then(
     ({ soundPanel }) => {
       soundControls.append(...soundPanel());
     },

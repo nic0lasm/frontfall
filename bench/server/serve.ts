@@ -1,6 +1,7 @@
 /**
- * Game server for `pnpm load -- --spawn-server`, run in a child process so its
- * CPU time and memory are measured apart from the simulated clients'.
+ * Game server for `bun run load -- --spawn-server` and the load test, run by
+ * Bun in a child process (spawn.ts) so its CPU time and memory are measured
+ * apart from the simulated clients'.
  */
 import { tmpdir } from "node:os";
 import { createGameServer } from "@frontfall/server";
@@ -103,7 +104,7 @@ process.on("message", (request: ServerRequest) => {
   process.send?.(stats);
 });
 
-server.http.listen(0, "127.0.0.1", () => {
-  const address = server.http.address();
-  process.send?.({ port: typeof address === "object" && address ? address.port : 0 });
+void server.listen(0, "127.0.0.1").then(({ port }) => {
+  const versions: Partial<Record<string, string>> = process.versions;
+  process.send?.({ port, bun: versions.bun ?? "" });
 });

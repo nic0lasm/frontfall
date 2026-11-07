@@ -1,6 +1,6 @@
-import type { ReplayView } from "../game/solo-game.ts";
+import type { ReplayView } from "../game/game-runner.ts";
 import { applyTranslations, t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { formatDuration } from "./format.ts";
 
 /**

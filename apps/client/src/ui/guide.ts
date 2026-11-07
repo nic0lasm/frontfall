@@ -1,6 +1,6 @@
 import "./guide.css";
 import { DEFAULT_BALANCE } from "@frontfall/engine";
-import { h, setText } from "./dom.ts";
+import { h, setText } from "../dom.ts";
 import { formatCount } from "./format.ts";
 import { tutorialText, type TutorialKey } from "./tutorial-text.ts";
 

@@ -1,0 +1,13 @@
+{
+  "bans": [
+    {
+      "target": "203.0.113.7",
+      "until": "2027-01-01T00:00:00.000Z",
+      "note": "insults"
+    },
+    {
+      "target": "Jm0pQ2xvd2Zy4kTe",
+      "until": null
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import type { ClickMode } from "../../game/solo-game.ts";
+import type { ClickMode } from "../../game/game-runner.ts";
 import { commandCode, isTextEntry } from "../../input/keyboard.ts";
 import { BUILD_MODES, offers } from "../build-modes.ts";
 

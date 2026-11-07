@@ -4,7 +4,7 @@ import {
   type SavedAchievements,
 } from "../achievements/account-sync.ts";
 import { getLanguage, onLanguageChange, type Language } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import "./account.css";
 
 type Provider = "discord" | "google";

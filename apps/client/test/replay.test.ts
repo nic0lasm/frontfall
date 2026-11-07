@@ -1,13 +1,13 @@
 import { TileKind } from "@frontfall/engine";
 import { describe, expect, it } from "vitest";
-import { generateMap, type MapData } from "../src/game/maps.ts";
+import { generateMap, type MapData } from "../src/maps.ts";
 import {
   readReplayFile,
   replayFile,
   replayFileName,
   sameReplayMap,
 } from "../src/game/replay-file.ts";
-import { SoloGame, type SoloOptions } from "../src/game/solo-game.ts";
+import { GameRunner, type SoloOptions } from "../src/game/game-runner.ts";
 
 const options: SoloOptions = {
   map: "skirmish",
@@ -23,9 +23,9 @@ function publishedMap(): MapData {
 }
 
 /** A solo game played for `ticks` ticks, with a start and one attack from the player. */
-function played(ticks: number, rules?: SoloOptions["rules"]): SoloGame {
+function played(ticks: number, rules?: SoloOptions["rules"]): GameRunner {
   const map = publishedMap();
-  const solo = new SoloGame({ ...options, rules }, map);
+  const solo = new GameRunner({ ...options, rules }, map);
   const land = map.kinds.findIndex((kind) => kind !== TileKind.Water);
   solo.step([{ type: "spawn", tile: land }]);
   while (solo.game.phase === "spawn") solo.step([]);
@@ -58,7 +58,7 @@ describe("replays (#50)", () => {
     if (!record) return;
     expect(record.ticks).toBe(400);
     expect(record.turns.map((turn) => turn.orders[0]?.order.type)).toEqual(["spawn", "attack"]);
-    const replay = new SoloGame({ ...options, seed: 1, bots: 0, record }, publishedMap());
+    const replay = new GameRunner({ ...options, seed: 1, bots: 0, record }, publishedMap());
     let update = replay.replay(150);
     expect(update.tick).toBe(150);
     expect(update.replay).toEqual({ ticks: 400, expected: record.hash });
@@ -79,7 +79,7 @@ describe("replays (#50)", () => {
     expect(record.rules).toEqual({ collapsingFronts: false, capitals: true, doctrines: false });
     expect(await readReplayFile(await replayFile(record), "dev")).toEqual(record);
     // The record wins over the options of the page that watches it.
-    const replay = new SoloGame(
+    const replay = new GameRunner(
       { ...options, rules: { collapsingFronts: false, capitals: false, doctrines: false }, record },
       publishedMap(),
     );
@@ -91,8 +91,8 @@ describe("replays (#50)", () => {
     const solo = played(250);
     const record = solo.record();
     if (!record) throw new Error("no record");
-    expect(new SoloGame({ ...options, record }, publishedMap()).record()).toBeUndefined();
-    expect(new SoloGame(options, generateMap(options.map)).record()).toBeUndefined();
+    expect(new GameRunner({ ...options, record }, publishedMap()).record()).toBeUndefined();
+    expect(new GameRunner(options, generateMap(options.map)).record()).toBeUndefined();
   });
 
   it("saves to a compressed file that reads back the same, on the same build only", async () => {

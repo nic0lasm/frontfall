@@ -1,5 +1,5 @@
 import { getLanguage, onLanguageChange, type Language } from "../i18n/index.ts";
-import { h } from "../ui/dom.ts";
+import { h } from "../dom.ts";
 import type { ViewCamera } from "./camera.ts";
 import { MinimapImage, rgbOf, viewPieces, type MinimapSource } from "./minimap-image.ts";
 

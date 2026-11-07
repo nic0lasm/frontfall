@@ -1,11 +1,15 @@
-import { embargoed, isAllied, logEvent } from "./diplomacy.ts";
-import { Disable, type Game, type Player } from "./game.ts";
+import { embargoed, embargoedByOrderSince, isAllied, logEvent } from "./diplomacy.ts";
+import { Disable } from "@frontfall/contracts";
+import type { Game, Player } from "./game.ts";
 import { mulDiv } from "./integer-math.ts";
+import { ANY_PHASE, defineOrder, refusalOf, tileError } from "./order-rules.ts";
 import { DrawUsage, derivedRandom } from "./random.ts";
 import { spawnSettings } from "./spawn.ts";
-import { StructureKind, isReady, structureAt } from "./structures.ts";
+import { StructureKind, structureAt, structureState } from "./structures.ts";
 import { TileKind } from "./terrain.ts";
-import { tradeGold } from "./trade.ts";
+import { sinkBoat } from "./boats.ts";
+import { writable } from "./state/lists.ts";
+import { takeTradeShip, tradeGold } from "./trade.ts";
 
 /** A warship on patrol (R-UNIT-04). */
 export interface Warship {
@@ -28,6 +32,20 @@ export interface Warship {
    */
   firedAt?: number;
   aim?: number;
+}
+
+/**
+ * Where a warship is in its life (R-UNIT-04), from what it already holds:
+ * sunk once its health is gone or its owner has fallen, idle once it has
+ * reached the end of its path (it draws its next point on its next move),
+ * patrolling while it sails. Nothing of it is stored; sunk ships leave the
+ * list at the end of the tick.
+ */
+export type WarshipState = "sunk" | "idle" | "patrolling";
+
+export function warshipState(game: Game, ship: Warship): WarshipState {
+  if (ship.health <= 0 || game.player(ship.player)?.alive !== true) return "sunk";
+  return ship.step >= ship.path.length ? "idle" : "patrolling";
 }
 
 /** Two players at war until `until` (R-UNIT-04): `a` is always the lower id. */
@@ -80,22 +98,32 @@ export function atWar(game: Game, a: number, b: number): boolean {
 
 /** Why `player` cannot buy a warship at the port on `port`, or undefined. */
 export function warshipError(game: Game, player: Player, port: number): string | undefined {
+  return refusalOf(warshipPlan(game, player, port));
+}
+
+/** A warship to buy: the water tile next to the port it starts on. */
+interface WarshipPlan {
+  readonly start: number;
+}
+
+function warshipPlan(game: Game, player: Player, port: number): WarshipError | WarshipPlan {
   if (game.phase !== "play") return WarshipError.Early;
   if (!game.allows(Disable.Warships)) return WarshipError.Disabled;
   const structure = structureAt(game, port);
   if (
     structure?.kind !== StructureKind.Port ||
     structure.player !== player.id ||
-    !isReady(game, structure)
+    structureState(game, structure) === "building"
   ) {
     return WarshipError.Port;
   }
-  if (shoreOf(game, port) < 0) return WarshipError.Shore;
+  const start = shoreOf(game, port);
+  if (start < 0) return WarshipError.Shore;
   let owned = 0;
   for (const ship of game.warships) if (ship.player === player.id) owned++;
   if (owned >= game.balance.warshipMax) return WarshipError.Max;
   if (player.gold < warshipCost(game, player.id)) return WarshipError.Gold;
-  return undefined;
+  return { start };
 }
 
 /** Why `player` cannot send warship `ship` to patrol around `tile`, or undefined. */
@@ -105,17 +133,61 @@ export function patrolError(
   ship: number,
   tile: number,
 ): string | undefined {
+  return refusalOf(patrolPlan(game, player, ship, tile));
+}
+
+/** A patrol to start: the ship, its new patrol tile and the way there. */
+interface PatrolPlan {
+  readonly warship: Warship;
+  readonly tile: number;
+  readonly path: Int32Array;
+}
+
+function patrolPlan(game: Game, player: Player, ship: number, tile: number): string | PatrolPlan {
   if (game.phase !== "play") return WarshipError.Early;
-  const warship = game.warships.find((w) => w.id === ship);
+  const warship = writable(game, "warships").find((w) => w.id === ship);
   if (warship?.player !== player.id) return WarshipError.Ship;
   if (!Number.isInteger(tile) || tile < 0 || tile >= game.terrain.topology.size) {
     return "the tile is outside the map";
   }
   if (game.terrain.kinds[tile] !== TileKind.Water) return WarshipError.Water;
-  return searchFor(game).path(warship.tile, tile, game.balance.boatRange)
-    ? undefined
-    : WarshipError.Reach;
+  const path = searchFor(game).path(warship.tile, tile, game.balance.boatRange);
+  return path ? { warship, tile, path } : WarshipError.Reach;
 }
+
+/** R-UNIT-04: `warship` buys a warship at a ready port of the player's; it starts on the port's water. */
+export const WARSHIP_ORDER = defineOrder("warship", {
+  phases: ANY_PHASE,
+  validate: (game, player, order) =>
+    tileError(game, order.port) ?? warshipPlan(game, player, order.port),
+  execute(game, player, { start }) {
+    player.gold -= warshipCost(game, player.id);
+    writable(game, "warships").push({
+      id: game.nextWarshipId++,
+      player: player.id,
+      tile: start,
+      health: game.balance.warshipHealth,
+      patrol: start,
+      path: EMPTY,
+      step: 0,
+      reloadAt: game.tick,
+    });
+  },
+});
+
+/** R-UNIT-04: `patrol` sends a warship of the player's to patrol around a water tile it can reach. */
+export const PATROL_ORDER = defineOrder("patrol", {
+  phases: ANY_PHASE,
+  validate: (game, player, order) =>
+    Number.isSafeInteger(order.ship)
+      ? patrolPlan(game, player, order.ship, order.tile)
+      : "invalid ship id",
+  execute(_game, _player, { warship, tile, path }) {
+    warship.patrol = tile;
+    warship.path = path;
+    warship.step = 0;
+  },
+});
 
 /**
  * Warships (R-UNIT-04). A `warship` order buys one at a ready port of the
@@ -134,48 +206,23 @@ export function installWarships(game: Game): void {
   const { balance, terrain } = game;
   const topology = terrain.topology;
   const search = searchFor(game);
-  const ships = game.warships;
+  const ships = writable(game, "warships");
+  const fights = writable(game, "fights");
 
-  game.onOrder((_, player, order) => {
-    if (order.type !== "warship") return false;
-    const start = shoreOf(game, order.port);
-    if (start < 0) return false;
-    player.gold -= warshipCost(game, player.id);
-    ships.push({
-      id: game.nextWarshipId++,
-      player: player.id,
-      tile: start,
-      health: balance.warshipHealth,
-      patrol: start,
-      path: EMPTY,
-      step: 0,
-      reloadAt: game.tick,
-    });
-    return true;
-  });
-
-  game.onOrder((_, player, order) => {
-    if (order.type !== "patrol") return false;
-    const ship = ships.find((w) => w.id === order.ship && w.player === player.id);
-    const path = ship && search.path(ship.tile, order.tile, balance.boatRange);
-    if (!ship || !path) return false;
-    ship.patrol = order.tile;
-    ship.path = path;
-    ship.step = 0;
-    return true;
-  });
+  game.onOrder(WARSHIP_ORDER);
+  game.onOrder(PATROL_ORDER);
 
   game.onTick(() => {
     const tick = game.tick;
     recordFights();
     let kept = 0;
     for (const ship of ships) {
-      if (ship.health > 0 && game.player(ship.player)?.alive) ships[kept++] = ship;
+      if (warshipState(game, ship) !== "sunk") ships[kept++] = ship;
     }
     ships.length = kept;
     // In age order: a warship sunk earlier in the tick does nothing more.
     for (const ship of ships) {
-      if (ship.health <= 0) continue;
+      if (warshipState(game, ship) === "sunk") continue;
       sail(ship);
       // A capture takes the turn of a shot.
       if (tick >= ship.reloadAt && (capture(ship) || fire(ship))) {
@@ -183,7 +230,7 @@ export function installWarships(game: Game): void {
       }
     }
     kept = 0;
-    for (const ship of ships) if (ship.health > 0) ships[kept++] = ship;
+    for (const ship of ships) if (warshipState(game, ship) !== "sunk") ships[kept++] = ship;
     ships.length = kept;
   });
 
@@ -194,21 +241,21 @@ export function installWarships(game: Game): void {
       if (x === y || x === 0 || y === 0) return;
       const a = Math.min(x, y);
       const b = Math.max(x, y);
-      const fight = game.fights.find((f) => f.a === a && f.b === b);
+      const fight = fights.find((f) => f.a === a && f.b === b);
       if (fight) fight.until = until;
-      else game.fights.push({ a, b, until });
+      else fights.push({ a, b, until });
     };
     for (const attack of game.attacks) if (attack.troops > 0) mark(attack.player, attack.target);
     for (const boat of game.boats) mark(boat.player, game.territory.ownerOf(boat.target));
     for (const missile of game.missiles) mark(missile.player, game.territory.ownerOf(missile.to));
     let kept = 0;
-    for (const fight of game.fights) if (game.tick < fight.until) game.fights[kept++] = fight;
-    game.fights.length = kept;
-    game.fights.sort((x, y) => x.a - y.a || x.b - y.b);
+    for (const fight of fights) if (game.tick < fight.until) fights[kept++] = fight;
+    fights.length = kept;
+    fights.sort((x, y) => x.a - y.a || x.b - y.b);
   }
 
   function sail(ship: Warship): void {
-    if (ship.step >= ship.path.length) {
+    if (warshipState(game, ship) === "idle") {
       const area = search.area(ship.patrol, patrolRadius(game));
       const draw = derivedRandom(game.seed, game.tick, ship.id, DrawUsage.WarshipPatrol);
       const target = area[draw % area.length] as number;
@@ -235,26 +282,15 @@ export function installWarships(game: Game): void {
         prize.player !== ship.player &&
         topology.distance(at, ship.tile) <= balance.warshipRange &&
         !isAllied(game, ship.player, prize.player) &&
-        embargoedSince(ship.player, prize.player) <= game.tick - balance.embargoNoticeTicks
+        embargoedByOrderSince(game, ship.player, prize.player) <=
+          game.tick - balance.embargoNoticeTicks
       );
     });
-    const prize = trade[index];
-    if (!prize) return false;
-    trade.splice(index, 1);
+    if (index < 0) return false;
+    const prize = takeTradeShip(game, index);
     owner.gold += tradeGold(prize.path.length);
     logEvent(game, { tick: game.tick, type: "captured", a: ship.player, b: prize.player });
     return true;
-  }
-
-  /** First tick of the oldest embargo between two players, or Infinity. */
-  function embargoedSince(a: number, b: number): number {
-    let since = Infinity;
-    for (const e of game.embargoes) {
-      if (e.until === 0 && ((e.from === a && e.to === b) || (e.from === b && e.to === a))) {
-        since = Math.min(since, e.since);
-      }
-    }
-    return since;
   }
 
   /** Fires at the closest enemy warship in range, else the closest enemy transport. Whether it fired. */
@@ -262,7 +298,7 @@ export function installWarships(game: Game): void {
     let best: Warship | undefined;
     let bestDistance = 0;
     for (const other of ships) {
-      if (other.health <= 0 || other.player === ship.player) continue;
+      if (other.player === ship.player || warshipState(game, other) === "sunk") continue;
       const distance = topology.distance(ship.tile, other.tile);
       if (distance > balance.warshipRange || !atWar(game, ship.player, other.player)) continue;
       if (!best || distance < bestDistance) {
@@ -296,7 +332,7 @@ export function installWarships(game: Game): void {
       ship.firedAt = game.tick;
       ship.aim = at;
     }
-    game.boats.splice(boat, 1);
+    sinkBoat(game, boat);
     return true;
   }
 }

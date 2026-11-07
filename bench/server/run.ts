@@ -1,7 +1,5 @@
-import { fork, type ChildProcess } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
-import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
   formatRejoin,
@@ -23,10 +21,10 @@ import {
   type MemorySample,
   type RampStep,
 } from "./report.ts";
-import type { ServerRequest, ServerStats } from "./serve.ts";
+import { SpawnedServer } from "./spawn.ts";
 
 const { values } = parseArgs({
-  // `pnpm load -- --games 2` forwards the separator too.
+  // `bun run load -- --games 2` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     games: { type: "string", default: "20" },
@@ -38,7 +36,6 @@ const { values } = parseArgs({
     "order-interval": { type: "string", default: "2000" },
     "map-tiles": { type: "string", default: String(4096 * 2048) },
     "client-procs": { type: "string", default: "1" },
-    "heap-mib": { type: "string" },
     "server-limits": { type: "boolean", default: false },
     "max-players": { type: "string" },
     "max-connections": { type: "string" },
@@ -66,8 +63,6 @@ function positive(name: string, raw: string): number {
 const players = Math.round(positive("players", values.players));
 const minutes = positive("minutes", values.minutes);
 const clientProcs = Math.round(positive("client-procs", values["client-procs"]));
-const heapMiB =
-  values["heap-mib"] === undefined ? undefined : positive("heap-mib", values["heap-mib"]);
 const stormSeconds =
   values["rejoin-storm"] === undefined
     ? undefined
@@ -97,77 +92,20 @@ if (slowPercent >= 100) fail("--slow-clients must leave some clients reading");
 if (steps.some((games, index) => index > 0 && games <= (steps[index - 1] ?? 0)))
   fail("--ramp takes increasing game counts, such as 50,100,200");
 
-/** The server child, answering one request at a time. */
-class SpawnedServer {
-  private queue: Promise<unknown> = Promise.resolve();
-
-  private constructor(
-    readonly url: string,
-    private readonly child: ChildProcess,
-  ) {}
-
-  /** Starts serve.ts in a child process and resolves once it listens. */
-  static async start(): Promise<SpawnedServer> {
-    const execArgv = ["--import", "tsx"];
-    // Like production, where the heap is capped.
-    if (heapMiB !== undefined) execArgv.push(`--max-old-space-size=${String(heapMiB)}`);
-    const child = fork(fileURLToPath(new URL("serve.ts", import.meta.url)), {
-      execArgv,
-      env: {
-        ...process.env,
-        LOAD_PLAYERS: String(players),
-        LOAD_SERVER_LIMITS: serverLimits ? "1" : "0",
-        LOAD_MAX_PLAYERS: maxPlayers === undefined ? "" : String(maxPlayers),
-        LOAD_MAX_CONNECTIONS: maxConnections === undefined ? "" : String(maxConnections),
-      },
-    });
-    const port = await new Promise<number>((resolve, reject) => {
-      child.once("message", (message: { port: number }) => {
-        resolve(message.port);
-      });
-      child.once("exit", (code) => {
-        reject(new Error(`server exited with ${String(code)}`));
-      });
-    });
-    return new SpawnedServer(`ws://127.0.0.1:${String(port)}/ws`, child);
-  }
-
-  request(what: Exclude<ServerRequest, "stop">): Promise<ServerStats> {
-    const reply = this.queue.then(
-      () =>
-        new Promise<ServerStats>((resolve) => {
-          this.child.once("message", resolve);
-          this.child.send(what);
-        }),
-    );
-    this.queue = reply;
-    return reply;
-  }
-
-  /** After the requests still queued, such as a memory sample. */
-  stop(): void {
-    void this.queue.then(() => {
-      if (this.child.connected) this.child.send("stop" satisfies ServerRequest);
-    });
-  }
-
-  kill(): void {
-    if (this.child.exitCode === null) this.child.kill();
-  }
-}
-
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 
-const server = values["spawn-server"] ? await SpawnedServer.start() : undefined;
+const server = values["spawn-server"]
+  ? await SpawnedServer.start({ players, serverLimits, maxPlayers, maxConnections })
+  : undefined;
 const url = server?.url ?? values.url;
 const mode = values.public ? "public" : "private";
 console.log(
-  `Node ${process.version}, ${String(cpus().length)} × ${cpus()[0]?.model ?? "unknown CPU"}, ${mib(totalmem())} MiB`,
+  `Clients on Node ${process.version}${server ? `, server on Bun ${server.bun}` : ""}, ${String(cpus().length)} × ${cpus()[0]?.model ?? "unknown CPU"}, ${mib(totalmem())} MiB`,
 );
 const games = steps.join(" → ");
 console.log(
-  `${games} ${mode} games × ${String(players)} players for ${String(minutes)} min${steps.length > 1 ? " per step" : ""} against ${url}, clients in ${String(clientProcs)} process${clientProcs > 1 ? "es" : ""}${heapMiB === undefined ? "" : `, server heap ${String(heapMiB)} MiB`}`,
+  `${games} ${mode} games × ${String(players)} players for ${String(minutes)} min${steps.length > 1 ? " per step" : ""} against ${url}, clients in ${String(clientProcs)} process${clientProcs > 1 ? "es" : ""}`,
 );
 
 const sessionOptions: SessionOptions = {
@@ -258,7 +196,7 @@ for (const [index, target] of steps.entries()) {
 }
 clearInterval(progress);
 clearInterval(sampler);
-server?.stop();
+void server?.stop();
 
 const final = results.at(-1);
 if (!final) throw new Error("no step ran");
@@ -296,7 +234,7 @@ if (values.json) {
         players,
         minutes,
         clientProcs,
-        heapMiB,
+        bun: server?.bun,
         mode,
         report: final.report,
         server: final.server,

@@ -41,6 +41,10 @@ describe("determinism rules for the engine (R-FAIR-02)", () => {
     expect(await errors("Math.random();\n", "packages/engine/test/x.test.ts")).toHaveLength(1);
   });
 
+  it("applies to the contracts the engine is built on", async () => {
+    expect(await errors("Math.random();\n", "packages/contracts/src/x.ts")).toHaveLength(1);
+  });
+
   it("allows exact integer maths", async () => {
     const code = "export const v = Math.imul(3, Math.floor(Math.abs(-2.5)) + Math.sqrt(16));\n";
     expect(await errors(code, "packages/engine/src/x.ts")).toEqual([]);

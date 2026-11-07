@@ -1,11 +1,11 @@
-import type { GameUpdate } from "../game/solo-game.ts";
+import type { GameUpdate } from "../game/game-runner.ts";
 import { applyTranslations, t, type MessageKey } from "../i18n/index.ts";
 import type { GameTracker } from "../usage.ts";
 import { CATALOGUE, badgeLevel } from "../achievements/catalog.ts";
 import type { Gain } from "../achievements/store.ts";
-import { badge } from "../achievements/badge.ts";
+import { badge } from "./achievement-badge.ts";
 import "./end-screen.css";
-import { h, present } from "./dom.ts";
+import { h, present } from "../dom.ts";
 import { feedbackBlock } from "./vote.ts";
 import { formatDuration, formatPercent } from "./format.ts";
 import type { StatsHistory } from "./screen/stats-history.ts";

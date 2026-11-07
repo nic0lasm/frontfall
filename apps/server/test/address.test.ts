@@ -1,4 +1,3 @@
-import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import {
   clientAddress,
@@ -7,9 +6,13 @@ import {
   isPrivateAddress,
   network,
 } from "../src/address.ts";
+import type { HttpRequest } from "../src/transport.ts";
 
-function request(remoteAddress: string, headers: Record<string, string> = {}): IncomingMessage {
-  return { socket: { remoteAddress }, headers } as unknown as IncomingMessage;
+function request(
+  peer: string,
+  headers: Record<string, string> = {},
+): Pick<HttpRequest, "peer" | "header"> {
+  return { peer, header: (name) => headers[name] };
 }
 
 describe("isPrivateAddress", () => {

@@ -1,4 +1,4 @@
-import type { GameUpdate } from "../../game/solo-game.ts";
+import type { GameUpdate } from "../../game/game-runner.ts";
 
 /** Seconds of game time between two samples. */
 export const SAMPLE_SECONDS = 5;

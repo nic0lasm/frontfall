@@ -1,8 +1,10 @@
 import { Disable } from "@frontfall/engine";
 import { describe, expect, it } from "vitest";
-import type { GameUpdate } from "../src/game/solo-game.ts";
+import type { GameUpdate } from "../src/game/game-runner.ts";
 import { gameKey, typingIn, type KeyState } from "../src/ui/screen/game-keys.ts";
 import { Orders } from "../src/ui/screen/orders.ts";
+import { falloutAt, landmarkNear, shipNear } from "../src/ui/screen/pointing.ts";
+import { canAct } from "../src/ui/screen/policy.ts";
 import { MISSILE_COLOR, sailing, ShipMotion } from "../src/ui/screen/ship-motion.ts";
 
 const idle: KeyState = {
@@ -242,7 +244,7 @@ describe("ship motion", () => {
 });
 
 describe("orders", () => {
-  function setup(update: Partial<GameUpdate> | undefined, held = false) {
+  function setup(update: Partial<GameUpdate> | undefined, held = false, canOrder = true) {
     const sent: unknown[] = [];
     const firstOrders: number[] = [];
     const orders = new Orders(
@@ -251,8 +253,7 @@ describe("orders", () => {
         sendOrder: (order) => sent.push(order),
       },
       {
-        latest: () => update as GameUpdate | undefined,
-        held: () => held,
+        act: () => ({ can: { canOrder }, paused: held, latest: update as GameUpdate | undefined }),
         ratio: () => 50,
         tracker: {
           firstOrder: (now: number) => firstOrders.push(now),
@@ -268,8 +269,12 @@ describe("orders", () => {
     players: [{ id: 1, troops: 101, gold: 1, workShare: 0 }],
   } as never;
 
-  it("sends nothing while the game is held or not started", () => {
-    for (const { orders, sent } of [setup(undefined), setup(playing, true)]) {
+  it("sends nothing while the game is held, watched from a record or not started", () => {
+    for (const { orders, sent } of [
+      setup(undefined),
+      setup(playing, true),
+      setup(playing, false, false),
+    ]) {
       expect(orders.click(3, "attack", 1)).toBe(false);
       expect(orders.diplomatic("ally", 2)).toBe(false);
       orders.retreat(1);
@@ -307,6 +312,15 @@ describe("orders", () => {
     expect(firstOrders).toEqual([]);
   });
 
+  it("takes a doctrine in the spawn phase only (R-DOCTRINE-01)", () => {
+    const spawn = setup({ phase: "spawn", players: [] });
+    spawn.orders.doctrine(2);
+    const play = setup(playing);
+    play.orders.doctrine(2);
+    expect(spawn.sent).toEqual([{ type: "doctrine", pick: 2 }]);
+    expect(play.sent).toEqual([]);
+  });
+
   it("puts troops to work, and gives soldiers only (R-ECO-07)", () => {
     const busy = {
       phase: "play",
@@ -336,5 +350,63 @@ describe("orders", () => {
       { type: "embargo", target: 2, on: 0 },
     ]);
     expect(firstOrders).toHaveLength(2);
+  });
+});
+
+describe("the policy of acting", () => {
+  const update = { phase: "play" } as GameUpdate;
+  const can = { canOrder: true };
+
+  it("lets the player act on a game that runs, in the phase asked if any", () => {
+    expect(canAct({ can, paused: false, latest: update })).toBe(true);
+    expect(canAct({ can, paused: false, latest: update }, "play")).toBe(true);
+    expect(canAct({ can, paused: false, latest: update }, "spawn")).toBe(false);
+  });
+
+  it("refuses before the first update, in a pause and while watching a record", () => {
+    expect(canAct({ can, paused: false, latest: undefined })).toBe(false);
+    expect(canAct({ can, paused: true, latest: update })).toBe(false);
+    expect(canAct({ can: { canOrder: false }, paused: false, latest: update })).toBe(false);
+  });
+
+  it("does not refuse a decided game: the end screen holds it (R-WIN-03)", () => {
+    expect(canAct({ can, paused: false, latest: { ...update, winner: 2 } })).toBe(true);
+  });
+});
+
+describe("what the pointer points at", () => {
+  // Ten pixels a tile, along one row.
+  const camera = { tileToScreen: (tile: number) => ({ x: tile * 10, y: 0 }) };
+  const ships = {
+    tradeShips: [{ id: 1, tile: 4 }],
+    boats: [{ id: 2, tile: 11 }],
+    warships: [{ id: 3, tile: 10 }],
+    fallout: [
+      { tile: 20, radius: 3, ticksLeft: 5 },
+      { tile: 21, radius: 3, ticksLeft: 9 },
+      { tile: 40, radius: 3, ticksLeft: 0 },
+    ],
+  } as unknown as GameUpdate;
+
+  it("finds the nearest ship within reach, the later kinds first when as near", () => {
+    expect(shipNear(camera, ships, 10)).toEqual({ ref: { kind: "warship", id: 3 }, tile: 10 });
+    expect(shipNear(camera, ships, 5)).toEqual({ ref: { kind: "trade", id: 1 }, tile: 4 });
+    expect(shipNear(camera, ships, 30)).toBeUndefined();
+    expect(shipNear(camera, undefined, 10)).toBeUndefined();
+  });
+
+  it("finds the landmark under the pointer, within the size of its mark", () => {
+    const landmarks = [{ tile: 50 }, { tile: 52 }] as never;
+    expect(landmarkNear(camera, landmarks, 51)).toEqual({ tile: 52 });
+    expect(landmarkNear(camera, landmarks, 49)).toEqual({ tile: 50 });
+    expect(landmarkNear(camera, landmarks, 60)).toBeUndefined();
+  });
+
+  it("finds the newest fallout that covers a tile, and none once it has settled", () => {
+    const within = (a: number, b: number, radius: number) => Math.abs(a - b) <= radius;
+    expect(falloutAt(ships, 22, within)).toBe(21);
+    expect(falloutAt(ships, 17, within)).toBe(20);
+    expect(falloutAt(ships, 40, within)).toBeUndefined();
+    expect(falloutAt(undefined, 20, within)).toBeUndefined();
   });
 });

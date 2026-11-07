@@ -1,6 +1,6 @@
-import type { GameUpdate, PlayerView } from "../game/solo-game.ts";
+import type { GameUpdate, PlayerView } from "../game/game-runner.ts";
 import { t, type MessageKey } from "../i18n/index.ts";
-import { h, setText, swatch } from "./dom.ts";
+import { h, setText, swatch } from "../dom.ts";
 import { icon, type IconName } from "./icons.ts";
 
 /** The doctrines (R-DOCTRINE) by code from 1: the icon and the name of each. */

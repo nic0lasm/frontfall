@@ -49,7 +49,7 @@ describe.each(maps)("map $definition.id", ({ definition, manifest, bytes, tiles,
   });
 
   it("loads in the engine with the topology of its manifest", () => {
-    // Load time is measured by `pnpm maps --check`, outside coverage instrumentation.
+    // Load time is measured by `bun run maps --check`, outside coverage instrumentation.
     expect(loadMap(bytes, manifest).topology.wrapsX).toBe(manifest.topology === "cylinder");
   });
 

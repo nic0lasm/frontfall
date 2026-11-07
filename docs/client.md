@@ -3,12 +3,81 @@
 The browser client lives in [`apps/client`](../apps/client). This document
 covers the conventions that are not obvious from the code.
 
+## Layers
+
+`apps/client/src` is divided into layers, and `tools/test/boundaries.test.ts`
+fails when a file imports a layer it may not (ADR 0013, ADR 0014). A layer may
+always import itself.
+
+| Layer                               | May import                                                        |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `app/` and `main.ts` (the app)      | anything                                                          |
+| `ui/` (with `ui/screen/`)           | game, render, input, audio, achievements, stats, root; net, types |
+| `game/`, `net/`, `render/`          | root                                                              |
+| `input/`                            | root; render, types                                               |
+| `audio/`, `achievements/`, `stats/` | root; game, types                                                 |
+| root files                          | root files and `i18n`                                             |
+
+Every layer may also import `i18n`, the translations, which imports root files
+only.
+
+Root files are the ones directly in `src/`: `build`, `palette`, `usage`,
+`release`, `compat`, `terrain`, `maps`, `webgl-support`, `dom` (the `h`
+element helper), `probe`, `storage` and `signals`. Browser storage is reached only
+through `storage.ts`, which answers `undefined` where touching it throws.
+The sound settings (`audio/settings.ts`) are the one exception: they read
+`localStorage` inside their own `try`, as importing `storage.ts` there would
+split it into a chunk of its own that the first visit loads too.
+A new folder in `src/` needs a line in the table in the test.
+
+The list of bot levels and the default rules live in `game/defaults.ts`, and
+`youOf(update)` in `game/selectors.ts` finds the player a screen plays.
+
+## The app shell
+
+`main.ts` only starts the page: it loads the accessibility settings and
+starts `App` (`app/app.ts`). The app holds the page's state, shows one
+screen for it and keeps the address bar in step (ADR 0013).
+
+```text
+ boot ──> menu ──> playing (solo, tutorial) ──> ended
+   │       │  ^         ^                         │
+   │       │  └─────────┼──── menu, from anywhere ┘
+   │       ├──> watching (a replay)
+   │       └──> lobby ──> playing (online) ──> ended ──> lobby (rematch)
+   └──> join (an invitation asks for a name) ──> lobby
+```
+
+- `app/state.ts` is the table: each state lists the events it answers,
+  and `next(state, event)` is a pure function with a unit test. The
+  profile, the achievements and the settings are panels of the menu, not
+  states; the tutorial is a solo game of its own.
+- `app/address.ts` writes each state's address, always a query string
+  relative to the page (ADR 0004): the setup for the menu and a solo game,
+  `?game=<id>` for a lobby the server named and an online game. The first
+  screen keeps the address the page was opened with (the sign-in reads its
+  `#signin=` link), and so do the join screen, the tutorial and a replay.
+  It also reads the address once, as the page opens: an invitation, `?online`,
+  the testing options (`?speed=`, `?minutes=`, `?gold=`, `?cityland=`).
+- The view goes in the address while the globe is on: `?view=globe`, or
+  `?view=map` once G switched back to the flat map; a reload comes back to
+  the view it left. Only an address with one of these turns the globe on:
+  nothing about the view is stored, so a page opened without it shows the
+  flat map alone, a game taken back included.
+- `app/screen-host.ts` shows one screen at a time and disposes the one
+  before first, so that a game gives its WebGL context back before the
+  next one asks for one. The page's `body` carries `data-screen` with the
+  state's name.
+- `app/online.ts` follows an online game from the lobby to its end,
+  `app/notices.ts` the notices over the screens, and `app/game-code.ts`
+  fetches the game screen's code ahead of a game.
+
 ## How a solo game runs
 
 ```text
  page                                    worker (game/sim.worker.ts)
  ----                                    ---------------------------
- Menu ── setup ──> GameScreen            SoloGame
+ Menu ── setup ──> GameScreen            GameRunner
                     │  click(tile, ratio) ──>  orderForClick ─> turn ──> Game
                     │                          bots decide inside the tick
                     │  <── update every tick:  changed tiles, players, attacks
@@ -23,8 +92,9 @@ covers the conventions that are not obvious from the code.
   shared: the page needs no cross-origin isolation headers.
 - The page sends clicks, not orders. The worker holds the game and decides
   what a click means: a start during the spawn phase, then an expansion or an
-  attack with the attack ratio. The same `GameSession` carries an online
-  game, where the orders go to the server instead (below).
+  attack with the attack ratio. The same `GameSession` interface carries an
+  online game, where the orders go to the server instead (below), and a
+  replay.
 - Bots and nations are installed in the engine (`installBots`,
   `installNations`) and decide during the tick, from the game state and its
   seed, so every client of an online game computes the same moves. Nations
@@ -39,13 +109,13 @@ covers the conventions that are not obvious from the code.
   `Renderer` (`render/renderer.ts`: player colours, changed tiles, ships, a
   frame for a camera view) and `Camera` (`render/camera.ts`: screen to tile
   and back, pan, zoom, focus, with east-west wrapping). `createRenderer`
-  returns the flat `MapView` today; the globe will implement the same
-  contract with its own camera. The issue that set them out named the
+  returns the flat `MapView` or the `GlobeView`, each with its own camera.
+  The issue that set them out named the
   renderer's calls `init`, `applyUpdates` and `frame`: they became the
   constructor, `markChanged` and `setShips`, and `render(view)`, because the
   page, not the renderer, holds the game state.
 - The menu lists the maps of `maps/index.json`, the World first, then small
-  generated test maps (`game/maps.ts`), reduced to their largest landmass. The
+  generated test maps (`maps.ts`), reduced to their largest landmass. The
   page downloads and checks a published map's manifest, so the worker does
   without the schema library; the worker downloads the terrain and checks it
   against the manifest (`loadMap` of the engine) before the game starts, then hands the page a copy
@@ -59,6 +129,80 @@ covers the conventions that are not obvious from the code.
 - `?view=globe` shows a map of the whole planet on a globe, and G switches
   between the globe and the flat map during the game. It is a prototype for
   v0.6, kept out of the menu; see [ADR 0005](adr/0005-globe-spike.md).
+
+## Sessions
+
+The screen talks to one `GameSession` (`game/session.ts`), whatever the
+mode, and `openSession` (`game/sessions.ts`) picks it: a `ReplaySession` for
+options with a record, an `OnlineSession` with a link to the server, a
+`SoloSession` otherwise. Each starts the worker the same way
+(`game/worker-session.ts`) and declares its `capabilities`, which the screen
+asks instead of checking the mode:
+
+| Capability    | Solo | Online                 | Replay |
+| ------------- | ---- | ---------------------- | ------ |
+| `canPause`    | yes  | no                     | yes    |
+| `canOrder`    | yes  | yes                    | no     |
+| `canSetSpeed` | yes  | no                     | yes    |
+| `recordable`  | yes  | yes                    | no     |
+| `relayed`     | no   | yes                    | no     |
+| `canHide`     | no   | yes                    | no     |
+| `canReport`   | no   | when the server allows | no     |
+| `guided`      | yes  | no                     | no     |
+
+What a mode cannot do its session ignores. The online session owns the
+`TurnPacer` and the `ServerLink`: it sends orders, hashes and snapshots to
+the server, and plays the server's turns through the pacer on a timer of its
+own, so a hidden tab keeps playing. Its clock and the worker are handed in,
+so `test/sessions.test.ts` runs every mode with a fake worker, a fake link
+and a clock moved by hand.
+
+## The game screen
+
+`ui/game-screen.ts` only wires the parts of a game together; each part is a
+module of `ui/screen/`:
+
+| Module            | What it does                                                                     |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `map-scene.ts`    | The renderer, its camera and the minimap                                         |
+| `input-host.ts`   | The pointer on the map: clicks as orders in the mode picked, long presses, hover |
+| `pointing.ts`     | The ship, the landmark or the fallout under the pointer                          |
+| `orders.ts`       | The orders the player gives, each when `canAct` allows                           |
+| `policy.ts`       | `canAct`: whether the player can act now, and in which phase                     |
+| `panel-host.ts`   | The HUD, the player menu, the doctrine cards, the pace, the labels               |
+| `dialog-host.ts`  | The pause, the tutorial's dialogs, the help, the end screen, leaving             |
+| `overlays.ts`     | The one dialog at a time and the pause that goes with it                         |
+| `outcome.ts`      | Peak land, statistics, achievements, the usage report, the end of the game       |
+| `feed-host.ts`    | The event feed and the player card, loaded when the game starts                  |
+| `guide-host.ts`   | The first steps and the tips                                                     |
+| `preview-host.ts` | What a build click would do, before it is made                                   |
+| `game-keys.ts`    | The shortcut of each key                                                         |
+| `ship-motion.ts`  | Headings, wakes and the last moments of the ships                                |
+
+`canAct` answers in one place what each order used to check on its own: no
+order before the first update, while a dialog holds the game, or while a
+record is watched, and diplomacy only in play. A decided game is not
+refused there: a solo game waits behind its end screen, which pauses it,
+and every game plays on once the player keeps watching (R-WIN-03).
+
+## Panels and signals
+
+The panels (`ui/screen/panel-host.ts`) keep the latest update, as this
+screen shows it (hidden players renamed, R-DIPLO-08), in one signal of
+`@preact/signals-core`. Each
+panel watches its own part of it through `select(signal, pick, equals)`
+(`signals.ts`), and runs only when that part changes: the marks beside the
+names with the relations (`relationMarks`), the doctrine cards with their
+seconds (`doctrineView`), the gold floats with a trade ship docking
+(`tradeGains`). The HUD and the player menu show figures that move every
+tick and take every update; the HUD still draws a few times a second. The
+watchers belong to the panels' `Effects` and stop with the screen. The
+worker and its messages are unchanged.
+
+Before the library came in, the whole build but the maps sent 848.4 kB with
+gzip and the game screen's chunk 35.8 kB; with it, 850.4 kB and 37.8 kB
+(`bun run perf:client`). That took the build over its budget of 850 kB, which
+the same commit raised to 852.5 kB ([performance.md](performance.md#budgets)).
 
 ## Replays
 
@@ -102,7 +246,7 @@ it started or ended for another reason, and why a request was refused.
 ```text
  page                                          worker
  ----                                          ------
- OnlineClient (net/online.ts) ── turns ──> GameScreen.pushTurns ─> SoloGame.playTurns
+ OnlineClient (net/online.ts) ── turns ──> OnlineSession.pushTurns ─> GameRunner.playTurns
       ^                                         │                       │
       └─── orders, hashes ── ServerLink <───────┴── click → order ──────┘
 ```
@@ -134,7 +278,7 @@ After every 50th tick the worker hashes the game state and the page reports
 it, so the server can tell a client out of step (`desync`). The worker keeps
 every turn with orders and every hash it sent; on a desync the notice offers
 "Download a report", a `DesyncReport` (docs/engine.md) that
-`pnpm sim -- --replay` plays again to find the first tick that differs. Games
+`bun run sim -- --replay` plays again to find the first tick that differs. Games
 on generated maps have no report. A ring shows under the pointer as soon as it
 presses the map, and becomes the answer to the click once the worker reads
 it. Until its turn comes back, an online order's ring pulses on its target. Once a game starts, the tab keeps its seat token in session storage and the
@@ -164,7 +308,7 @@ game this browser kept (#39), like a reload.
 
 A solo game is kept too. The worker sends a snapshot 15 seconds into the
 game, then every 30 seconds, and whenever the page goes to the background;
-the page keeps the last one in IndexedDB (`net/snapshot-store.ts`, key
+the page keeps the last one in IndexedDB (`game/snapshot-store.ts`, key
 `solo`) with the options the game started with. A reload goes straight back
 to it, paused; a page opened again offers it over the menu. The game is
 forgotten once it is decided, left from the menu, or replaced by another one.
@@ -205,6 +349,36 @@ The territory layer draws the whole map in one draw call (ADR 0003):
   front marches for as long as it lasts; once it stops, the stripes stand
   still until that last frame clears them, rather than keep the GPU busy for
   another second and a half.
+
+### The globe and the switch
+
+`?view=globe`, or the `?view=map` the address takes once G switched back,
+is still the only way to the globe (ADR 0005); the menu offers none. A game
+has one WebGL context (`createContext`, in `render/gl-context.ts`), which
+every renderer of the game draws on and which outlives them: G does not
+make a new one.
+
+- `MapScene` keeps a renderer per view. On the globe path, once the browser
+  is idle after the start, it makes the view that G shows next over the same
+  owners array and with the ground the first one baked (`bakedGround`), has
+  its shaders built and its textures sent (`warm`), and draws it once just
+  before a frame of the view shown, which covers it (`data-ready` on `#map`
+  says it is done). G then only swaps which renderer draws; while it waits,
+  the other renderer is told of every tile that changes hands, so showing
+  it sends only those.
+- The input holds one camera for the whole game, a `SwitchCamera`
+  (`render/switch-camera.ts`) that passes every call to the camera of the
+  view shown: a switch moves it to the other camera, over the same tile and
+  zoom, and the input stays as it is.
+- A renderer declares what it can do beyond the common contract in
+  `capabilities`: its kind, and its combat effects (`RendererEffects`), which
+  the flat map draws and the globe does not yet. The scene asks there
+  rather than calling hooks a renderer may lack.
+- `e2e/tests/globe.spec.ts` times six switches on the World map in Chromium
+  and fails when their median takes 500 ms or more from the key to the new
+  view drawn (M7-07, #66); the game's clock must still run after them. It
+  is tagged `@timing`: CI runs it alone, in the Performance job, rather than
+  in the sharded end-to-end runs, where other browsers share the machine.
 
 ## Build preview
 
@@ -349,7 +523,7 @@ online and never in a replay, like the guide.
 ## The tutorial
 
 The menu's "Tutorial · 5 min" starts a practice game of its own (`tutorial()`
-in `main.ts`), apart from the setup saved in the menu. It is meant to be
+in `app/app.ts`), apart from the setup saved in the menu. It is meant to be
 played once, in about five minutes, and to leave a player who knows the whole
 game and wants to play it:
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameUpdate } from "../src/game/solo-game.ts";
+import type { GameUpdate } from "../src/game/game-runner.ts";
 import { StatsRecorder } from "../src/ui/screen/stats-history.ts";
 
 function update(tick: number, tiles: [number, number], events: GameUpdate["events"] = []) {

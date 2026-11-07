@@ -1,0 +1,1 @@
+{"version":1,"groups":{"5354fa59003c":{"type":"exception","message":"Cannot read properties of undefined (reading <text>)","where":"game-screen-Ab12.js:1:2045","first":"2026-11-01","last":"2026-11-01","days":{"2026-11-01":1},"releases":{"1.0.0":1},"browsers":{"firefox":1},"devices":{"desktop":1},"screens":{"solo":1}}}}

@@ -15,8 +15,8 @@ const maps = new URL("../../apps/client/public/maps/", import.meta.url);
  * Golden replays (R-FAIR-01): scripted games on published maps whose hashes
  * every 50 ticks are pinned. They are played with today's DEFAULT_BALANCE, so
  * a change to any rule or balance value shows up as the first tick where the
- * game parts from the reference. `pnpm golden` writes them again when that
- * change is meant; `pnpm determinism` plays them in a browser too.
+ * game parts from the reference. `bun run golden` writes them again when that
+ * change is meant; `bun run determinism` plays them in a browser too.
  */
 describe("golden replays", () => {
   const files = readdirSync(replays).filter((file) => file.endsWith(".json"));
@@ -41,7 +41,7 @@ describe("golden replays", () => {
         mismatch,
         mismatch &&
           `${file} parts from its golden hashes at tick ${String(mismatch.tick)}; ` +
-            "if the change is meant to alter games, run pnpm golden and commit the replays",
+            "if the change is meant to alter games, run bun run golden and commit the replays",
       ).toBeUndefined();
       expect(result.ticks).toBe(report.ticks);
     }, 600_000);

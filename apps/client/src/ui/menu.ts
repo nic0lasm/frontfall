@@ -1,3 +1,4 @@
+import { DIFFICULTIES, defaultRules } from "../game/defaults.ts";
 import { accessibilityPanel } from "./accessibility.ts";
 import { CATALOGUE } from "../achievements/catalog.ts";
 import { REPLAY_EXTENSION } from "../game/replay-file.ts";
@@ -7,8 +8,8 @@ import {
   suggestedBots,
   thumbnailScale,
   type MapInfo,
-} from "../game/maps.ts";
-import { MAX_BOTS, type Difficulty } from "../game/solo-game.ts";
+} from "../maps.ts";
+import { MAX_BOTS } from "../game/game-runner.ts";
 import {
   LANGUAGES,
   applyTranslations,
@@ -20,22 +21,20 @@ import {
   type Language,
   type MessageKey,
 } from "../i18n/index.ts";
-import { MAX_GAME_NAME_LENGTH, PublicGame, normalizeGameName } from "@frontfall/protocol";
+import { MAX_GAME_NAME_LENGTH, type PublicGame, normalizeGameName } from "@frontfall/protocol";
+import type { WatchOptions } from "../net/public-games.ts";
 import type { OnlineEntry } from "../net/online.ts";
 import { MAP_COLORS, hexToRgb } from "../palette.ts";
 import { betaBadge } from "./beta.ts";
 import { achievementsPanel, earnedCount } from "./achievements.ts";
 import { feedbackLinks } from "./feedback.ts";
-import { h, present } from "./dom.ts";
+import { h, present } from "../dom.ts";
 import type { ProfileControl } from "./profile-panel.ts";
-import { defaultRules, rulesFieldset } from "./rules-fieldset.ts";
+import { rulesFieldset } from "./rules-fieldset.ts";
 import { MAX_NAME_LENGTH, TEAM_CHOICES, cleanName, type GameSetup } from "./setup.ts";
 
 /** Sent on the document once the profile is erased, so that what shows it can change. */
 const PROFILE_FORGOTTEN = "frontfall:profile-forgotten";
-const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
-/** How often the list of public games is fetched again while the menu shows. */
-const GAMES_REFRESH_MS = 3_000;
 
 /**
  * The main menu: name, map, bots, difficulty and nations, and one button to play.
@@ -58,6 +57,8 @@ export class Menu {
     onReplay: (file: File) => void,
     /** The profile kept on this device, loaded when the panel is opened. */
     profile: () => Promise<ProfileControl>,
+    /** Follows the public games and returns how to stop; the app wires it to the server. */
+    watchGames: (onGames: WatchOptions["onGames"]) => () => void,
   ) {
     this.setup = { ...initial };
 
@@ -345,6 +346,7 @@ export class Menu {
         onOnline(entry, { ...this.setup });
       },
       replayPicker(onReplay),
+      watchGames,
     );
     form.querySelector("#tutorial")?.addEventListener("click", onTutorial);
     form.addEventListener("submit", (event) => {
@@ -421,6 +423,7 @@ export class Menu {
     mapList: readonly MapInfo[],
     enter: (entry: OnlineEntry) => void,
     replay: HTMLElement,
+    watchGames: (onGames: WatchOptions["onGames"]) => () => void,
   ): HTMLElement {
     const gameName = h("input", {
       id: "online-game-name",
@@ -497,35 +500,7 @@ export class Menu {
         show(shown);
       }),
     );
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let etag: string | undefined;
-    const refresh = async (): Promise<void> => {
-      try {
-        const response = await fetch(new URL("api/games", location.href), {
-          headers: etag ? { "if-none-match": etag } : {},
-        });
-        // Unchanged since the last answer: nothing to redraw.
-        if (response.status !== 304) {
-          const body: unknown = response.ok ? await response.json() : undefined;
-          etag = response.headers.get("etag") ?? undefined;
-          // The menu may have closed while the request ran.
-          if (!stopped) show(publicGames(body));
-        }
-      } catch {
-        // No server next to the page, as in a static preview: the buttons stay.
-      }
-      if (!stopped) {
-        timer = setTimeout(() => {
-          void refresh();
-        }, GAMES_REFRESH_MS);
-      }
-    };
-    void refresh();
-    this.cleanups.push(() => {
-      stopped = true;
-      clearTimeout(timer);
-    });
+    this.cleanups.push(watchGames(show));
     const quick = button("online-play", "online.quick", () => ({
       type: "play",
       name: defaultName(),
@@ -630,16 +605,6 @@ export class Menu {
     );
     return element;
   }
-}
-
-/** The games of a `/api/games` answer, leaving out anything malformed. */
-export function publicGames(body: unknown): PublicGame[] {
-  const games = (body as { games?: unknown } | undefined)?.games;
-  if (!Array.isArray(games)) return [];
-  return games.flatMap((game) => {
-    const parsed = PublicGame.safeParse(game);
-    return parsed.success ? [parsed.data] : [];
-  });
 }
 
 declare const __FRONTFALL_THUMBNAILS__: Record<string, PrebuiltThumbnail> | undefined;

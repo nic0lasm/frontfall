@@ -1,4 +1,4 @@
-import { DEFAULT_BALANCE, type Balance } from "./balance.ts";
+import { DEFAULT_BALANCE, digestGate, type Balance } from "./balance.ts";
 import {
   BOT_DIFFICULTIES,
   installBots,
@@ -12,22 +12,25 @@ import {
   MAX_TEAMS,
   NO_RULES,
   OPERATOR_BONUS_ALL,
-  type Game,
-  type OperatorBonuses,
   type GameRules,
   type Order,
-  type PlayerSetup,
   type Turn,
-} from "./game.ts";
+} from "@frontfall/contracts";
+import type { Game, PlayerSetup } from "./game.ts";
+import type { OperatorBonuses } from "./modes.ts";
 import type { Terrain } from "./terrain.ts";
 
-/** Version of the report format below; a reader refuses any other. */
-export const DESYNC_REPORT_VERSION = 2;
+/**
+ * Version of the report format below; a reader refuses any other. Version 3
+ * came with the regular state hash (ADR 0008): the hashes of a report of
+ * version 2 no longer match a replay, and its build does not say so.
+ */
+export const DESYNC_REPORT_VERSION = 3;
 
 /**
  * Everything needed to play a game again, tick for tick, and the state
  * hashes one client saw along the way. A client writes it when its hash
- * disagrees with the other players' (R-FAIR-01); `pnpm sim --replay` reads it
+ * disagrees with the other players' (R-FAIR-01); `bun run sim --replay` reads it
  * back. Plain JSON: hashes are unsigned 32-bit integers, tiles are indices.
  */
 export interface DesyncReport {
@@ -169,7 +172,7 @@ export function readGame(report: Record<string, unknown>): RecordedGame {
   for (const key of Object.keys(DEFAULT_BALANCE) as (keyof Balance)[]) {
     const expected = DEFAULT_BALANCE[key];
     // Records from before capital mode or landmarks leave their values out: they take the defaults.
-    if ((key.startsWith("capital") || key.startsWith("landmark")) && balance[key] === undefined) {
+    if (digestGate(key) !== undefined && balance[key] === undefined) {
       balance[key] = expected;
     }
     // Records from before light missiles left fallout play on as they were played.

@@ -1,5 +1,17 @@
+import {
+  DISABLE_ALL,
+  Disable,
+  MAX_TEAMS,
+  NO_RULES,
+  OPERATOR_BONUS_ALL,
+  OperatorBonus,
+  type GameRules,
+  type Order,
+  type OrderType,
+  type Turn,
+} from "@frontfall/contracts";
 import type { Attack } from "./attacks.ts";
-import { DEFAULT_BALANCE, type Balance } from "./balance.ts";
+import { DEFAULT_BALANCE, checkBalance, digestBalance, type Balance } from "./balance.ts";
 import type { Boat } from "./boats.ts";
 import type {
   Alliance,
@@ -9,51 +21,39 @@ import type {
   RequestCooldown,
 } from "./diplomacy.ts";
 import type { Fallout, Missile, MissileEvent } from "./missiles.ts";
-import { orderError } from "./orders.ts";
+import type { QuickCooldown } from "./quick-messages.ts";
+import { eraseRule, planOrder, type OrderRule } from "./order-rules.ts";
+import { NO_OPERATOR, OPERATOR_FACTOR, leftOut, ruleBits, type OperatorBonuses } from "./modes.ts";
 import { Random } from "./random.ts";
-import type { SnapshotReader, SnapshotWriter } from "./snapshot-bytes.ts";
+import { FNV_OFFSET, mix, mixUnit } from "./state/fnv.ts";
+import { writeState } from "./state/layout.ts";
+import { newLists } from "./state/lists.ts";
+import type { PartKey, PersistedPart } from "./state/parts.ts";
+import { StateHasher } from "./state/writer.ts";
 import type { Structure } from "./structures.ts";
 import type { Terrain } from "./terrain.ts";
 import type { TradeShip } from "./trade.ts";
 import type { Fight, Warship } from "./warships.ts";
 import { MAX_PLAYER_ID, TerritoryMap } from "./territory/territory-map.ts";
 
-/** An order from a player, as relayed by the server in a turn. */
-export type Order =
-  | { type: "spawn"; tile: number }
-  | { type: "attack"; target: number; troops: number }
-  | { type: "retreat"; attack: number }
-  | { type: "embark"; target: number; troops: number }
-  /** `structure` is a StructureKind code. */
-  | { type: "build"; structure: number; tile: number }
-  | { type: "demolish"; tile: number }
-  /** `target` is a player id. */
-  | { type: "ally"; target: number }
-  | { type: "betray"; target: number }
-  /** `on`: 1 starts an embargo on player `target`, 0 lifts it. */
-  | { type: "embargo"; target: number; on: number }
-  /** Buys a warship at the player's port on tile `port`. */
-  | { type: "warship"; port: number }
-  /** Sends warship `ship` to patrol around water tile `tile`. */
-  | { type: "patrol"; ship: number; tile: number }
-  /** Launches a missile of `size` (a MissileSize code) at tile `target`. */
-  | { type: "missile"; target: number; size: number }
-  /** Sends player `target` troops and gold (R-DIPLO-06); either may be 0. */
-  | { type: "gift"; target: number; troops: number; gold: number }
-  /** Sends player `target` the preset quick message `phrase` (R-DIPLO-07). */
-  | { type: "quick"; target: number; phrase: number }
-  /** Puts `share` % of the troops at home to work (R-ECO-07). */
-  | { type: "work"; share: number }
-  /** Pays the price of a tribute to `target` for a truce (R-DIPLO-10). */
-  | { type: "tribute"; target: number }
-  /** Picks the doctrine `pick` (a Doctrine code) during the spawn phase (R-DOCTRINE-01). */
-  | { type: "doctrine"; pick: number };
-
-/** Every order accepted during one tick, in the order the server accepted them (R-FAIR-03). */
-export interface Turn {
-  tick: number;
-  orders: readonly { player: number; order: Order }[];
-}
+// Shared with the protocol through the contracts, or kept in ./modes.ts; exported here as before.
+export {
+  DISABLE_ALL,
+  Disable,
+  MAX_TEAMS,
+  NO_OPERATOR,
+  NO_RULES,
+  OPERATOR_BONUS_ALL,
+  OPERATOR_FACTOR,
+  OperatorBonus,
+  leftOut,
+  ruleBits,
+  type GameRules,
+  type OperatorBonuses,
+  type Order,
+  type PersistedPart,
+  type Turn,
+};
 
 export interface PlayerSetup {
   /** 1 to MAX_PLAYER_ID; 0 is the neutral owner. */
@@ -85,83 +85,20 @@ export interface GameSetup {
   operator?: OperatorBonuses;
 }
 
-/**
- * What the operator of a server may give themselves in their private games,
- * to test (R-MODE-09), one bit each.
- */
-export const OperatorBonus = {
-  /** Twice the gold from troops, workers and the base income. */
-  Gold: 1 << 0,
-  /** Twice the population cap and twice the troop growth. */
-  Troops: 1 << 1,
-  /** Structures at half their price. */
-  Building: 1 << 2,
-  /** Land twice as costly to take from them. */
-  Defense: 1 << 3,
-} as const;
-/**
- * How much each operator's bonus does (R-MODE-09): twice the gold, troops and
- * defense, half the price. Not a balance value: it never applies to a game
- * anyone but the operator plays to win, and the balance digest stays as it was.
- */
-export const OPERATOR_FACTOR = 2;
-/** Every `OperatorBonus` bit. */
-export const OPERATOR_BONUS_ALL = 0xf;
-
-export interface OperatorBonuses {
-  /** The player who has the bonuses. */
-  readonly player: number;
-  /** `OperatorBonus` bits; 0 for none. */
-  readonly bonuses: number;
-}
-
-/** No operator's bonus at all. */
-export const NO_OPERATOR: OperatorBonuses = { player: 0, bonuses: 0 };
-
-/** Special rules a game can be played with (R-MODE-08), all off unless the setup turns them on. */
-export interface GameRules {
-  /** Capital mode (R-CAP): taking a player's capital conquers them. */
-  readonly capitals: boolean;
-  /** R-ATTACK-10: outnumbered fronts give way by stretches. */
-  readonly collapsingFronts: boolean;
-  /** R-DOCTRINE: each player picks one of three doctrines at the start. */
-  readonly doctrines: boolean;
-}
-
-/** A game with no special rule. */
-export const NO_RULES: GameRules = { capitals: false, collapsingFronts: false, doctrines: false };
-
-/** Marks the special rules in the state hash. */
-const RULES_TAG = 0x72756c65;
-/** Marks the operator's bonuses in the state hash (R-MODE-09). */
+/** Marks the operator's bonuses in the setup digest (R-MODE-09). */
 const OPERATOR_TAG = 0x6f706572;
 
-/** One bit per special rule that is on, for the state hash and the setup digest; 0 with none. */
-export function ruleBits(rules: GameRules): number {
-  return (rules.capitals ? 1 : 0) | (rules.collapsingFronts ? 2 : 0) | (rules.doctrines ? 4 : 0);
-}
-
 /**
- * What a private game can leave out (R-MODE-03), one bit each: a structure
- * by its StructureKind code (bit `1 << kind`), and warships. A palace has no
- * bit of its own and goes with the cities, a mosque with the air defenses: ask `disableBit` for a kind's bit.
+ * A player's ledger. Unlike the entity lists, which only their owner module
+ * writes (ADR 0010), it is shared: growth, income, attacks, ships, missiles,
+ * gifts, tribute, trade and capitals all add to or take from `troops` and
+ * `gold`, each under its own rule. The other fields belong to one rule each
+ * and are written by it only, and by the snapshot loader: `alive` and
+ * `goldRemainder` by the economy, `start` by the spawn phase and
+ * `traitorUntil` by diplomacy. What a single rule keeps about a player, such
+ * as their work share, doctrine or capital, is in that rule's part, read
+ * with its accessor (`workShareOf`, `doctrineOf`, `capitalOf`).
  */
-export const Disable = {
-  City: 1 << 0,
-  Fort: 1 << 1,
-  Port: 1 << 2,
-  Silo: 1 << 3,
-  AirDefense: 1 << 4,
-  Warships: 1 << 5,
-} as const;
-/** Every `Disable` bit. */
-export const DISABLE_ALL = 0x3f;
-
-/** What a game leaves out once its implications are added: warships are launched from ports (R-MODE-03). */
-export function leftOut(disabled: number): number {
-  return disabled & Disable.Port ? disabled | Disable.Warships : disabled;
-}
-
 export interface Player {
   readonly id: number;
   readonly name: string;
@@ -169,8 +106,6 @@ export interface Player {
   gold: number;
   /** Fraction of a gold coin earned but not yet paid, in units of the economy's divisor. */
   goldRemainder: number;
-  /** Share of the troops at home, in %, who work rather than fight (R-ECO-07). */
-  workShare: number;
   alive: boolean;
   /** Start tile, once picked or placed during the spawn phase. */
   start: number | undefined;
@@ -180,49 +115,15 @@ export interface Player {
   readonly home: number | undefined;
   /** Team from 1, or 0 in a free-for-all (R-MODE-02). */
   readonly team: number;
-  /** Doctrine picked in the spawn phase (R-DOCTRINE-01), a Doctrine code; 0, the balanced one, without a pick or without doctrines. */
-  doctrine: number;
-  /** Tile of the player's capital in capital mode (R-CAP-01); undefined before play or without one. */
-  capital: number | undefined;
 }
 
 export type Phase = "spawn" | "play";
 
-/** A capital that fell (R-CAP-03) or was razed (R-CAP-04). */
-export interface CapitalFall {
-  readonly tick: number;
-  /** Player whose capital it was. */
-  readonly player: number;
-  /** Player who took it; 0 when it was razed and moved. */
-  readonly by: number;
-  /** Tile the capital stood on. */
-  readonly tile: number;
-}
-
-/** Most teams a game can have (R-MODE-02). */
-export const MAX_TEAMS = 4;
-
-/**
- * Carries out one order that passed validation. Returns false when the order
- * is not for this handler, or cannot be carried out after all.
- */
-export type OrderHandler = (game: Game, player: Player, order: Order) => boolean;
-
 /** Runs once per tick, after the orders of that tick, in registration order. */
 export type TickSystem = (game: Game) => void;
 
-/** Told of an order once a handler has carried it out. */
+/** Told of an order once its rule has carried it out. */
 export type OrderObserver = (game: Game, player: Player, order: Order) => void;
-
-/**
- * State a rule keeps outside the game's own fields, which a snapshot must
- * carry too (docs/engine.md). `load` reads what `save` wrote, into a game
- * just created with the same setup and rules.
- */
-export interface PersistedPart {
-  save(out: SnapshotWriter): void;
-  load(from: SnapshotReader): void;
-}
 
 /**
  * The whole state of one game and the loop that advances it. Given the same
@@ -236,16 +137,16 @@ export class Game {
   readonly seed: number;
   readonly balance: Balance;
   /** Attacks under way, oldest first. Owned by the attack rules; read only elsewhere. */
-  readonly attacks: Attack[] = [];
+  readonly attacks: readonly Readonly<Attack>[];
   nextAttackId = 1;
   /** Transport ships at sea, oldest first. Owned by the boat rules; read only elsewhere. */
-  readonly boats: Boat[] = [];
+  readonly boats: readonly Readonly<Boat>[];
   nextBoatId = 1;
   /** Structures on the map, oldest first. Owned by the structure rules; read only elsewhere. */
-  readonly structures: Structure[] = [];
+  readonly structures: readonly Readonly<Structure>[];
   nextStructureId = 1;
   /** Trade ships at sea, oldest first. Owned by the trade rules; read only elsewhere. */
-  readonly tradeShips: TradeShip[] = [];
+  readonly tradeShips: readonly Readonly<TradeShip>[];
   /**
    * What a computer player's difficulty does to its population, in percent:
    * its starting troops, its cap, its growth and its gold (R-BOT-04, R-BOT-29). Set again by whoever installs the
@@ -266,40 +167,41 @@ export class Game {
   readonly cityStates = new Set<number>();
   nextTradeShipId = 1;
   /** Warships, oldest first. Owned by the warship rules; read only elsewhere. */
-  readonly warships: Warship[] = [];
+  readonly warships: readonly Readonly<Warship>[];
   nextWarshipId = 1;
   /** Missiles in flight, oldest first. Owned by the missile rules; read only elsewhere. */
-  readonly missiles: Missile[] = [];
+  readonly missiles: readonly Readonly<Missile>[];
   nextMissileId = 1;
   /** Fallout of heavy missiles still on the land, oldest first (R-UNIT-06). */
-  readonly fallout: Fallout[] = [];
+  readonly fallout: readonly Readonly<Fallout>[];
   /**
    * First tick each tile is free of fallout again; 0 if it never had any.
-   * It follows from `fallout`, which the state hash covers.
+   * Above the tick, it follows from `fallout` and the terrain, which the
+   * state hash covers: snapshots keep it, the hash leaves it out.
    */
   readonly falloutUntil: Uint32Array;
   /** Fights between players, remembered for B-WAR-MEMORY, by ascending pair of ids. */
-  readonly fights: Fight[] = [];
+  readonly fights: readonly Readonly<Fight>[];
   /** Alliances by ascending pair of ids. Owned by the diplomacy rules; read only elsewhere. */
-  readonly alliances: Alliance[] = [];
+  readonly alliances: readonly Readonly<Alliance>[];
   /** Alliance requests waiting for an answer, oldest first. */
-  readonly allianceRequests: AllianceRequest[] = [];
+  readonly allianceRequests: readonly Readonly<AllianceRequest>[];
   /** Players who may not ask a given player again yet, oldest first. */
-  readonly requestCooldowns: RequestCooldown[] = [];
+  readonly requestCooldowns: readonly Readonly<RequestCooldown>[];
   /** Embargoes, oldest first (R-DIPLO-05). */
-  readonly embargoes: Embargo[] = [];
+  readonly embargoes: readonly Readonly<Embargo>[];
   /** Players waiting to send another quick message (R-DIPLO-07), by player id. */
-  readonly quickCooldowns: { readonly player: number; readonly until: number }[] = [];
+  readonly quickCooldowns: readonly Readonly<QuickCooldown>[];
   /**
    * What happened between players, oldest first, for interfaces to read and
    * empty. No rule reads it back, so it is not part of the state hash.
    */
-  readonly diplomacyEvents: DiplomacyEvent[] = [];
+  readonly diplomacyEvents: readonly Readonly<DiplomacyEvent>[];
   /**
    * How each missile ended, oldest first, for interfaces to read and empty.
    * No rule reads it back, so it is not part of the state hash.
    */
-  readonly missileEvents: MissileEvent[] = [];
+  readonly missileEvents: readonly Readonly<MissileEvent>[];
   /** Number of teams, 0 in a free-for-all (R-MODE-02). */
   readonly teams: number;
   /** `Disable` bits of what this game leaves out (R-MODE-03). */
@@ -308,8 +210,6 @@ export class Game {
   readonly rules: GameRules;
   /** The operator's test bonuses (R-MODE-09); `NO_OPERATOR` in nearly every game. */
   readonly operator: OperatorBonuses;
-  /** Capitals taken or razed, oldest first (R-CAP-03, R-CAP-04). Owned by the capital rules. */
-  readonly capitalFalls: CapitalFall[] = [];
   /**
    * Winner once the game is decided (R-WIN), and the tick it happened. In a
    * team game, the member of the winning team with the most land.
@@ -320,16 +220,34 @@ export class Game {
   decidedAt: number | undefined;
   private readonly playersById = new Map<number, Player>();
   private readonly sortedPlayers: readonly Player[];
-  private readonly handlers: OrderHandler[] = [];
+  private readonly orderRules = new Map<OrderType, OrderRule>();
   private readonly systems: TickSystem[] = [];
   private readonly observers: OrderObserver[] = [];
   private readonly persisted: { readonly name: string; readonly part: PersistedPart }[] = [];
+  /** The parts registered with `addPart`, by the slot of their key. */
+  private readonly parts: (PersistedPart | undefined)[] = [];
   private currentTick = 0;
   private setup: number | undefined;
   /** The balance values, folded once into the state hash: clients that disagree on them part at once. */
   private readonly balanceDigest: number;
 
   constructor(setup: GameSetup) {
+    const lists = newLists(this);
+    this.attacks = lists.attacks;
+    this.boats = lists.boats;
+    this.structures = lists.structures;
+    this.tradeShips = lists.tradeShips;
+    this.warships = lists.warships;
+    this.missiles = lists.missiles;
+    this.fallout = lists.fallout;
+    this.fights = lists.fights;
+    this.alliances = lists.alliances;
+    this.allianceRequests = lists.allianceRequests;
+    this.requestCooldowns = lists.requestCooldowns;
+    this.embargoes = lists.embargoes;
+    this.quickCooldowns = lists.quickCooldowns;
+    this.diplomacyEvents = lists.diplomacyEvents;
+    this.missileEvents = lists.missileEvents;
     this.terrain = setup.terrain;
     this.random = new Random(setup.seed);
     this.seed = setup.seed >>> 0;
@@ -353,14 +271,11 @@ export class Game {
         troops: 0,
         gold: 0,
         goldRemainder: 0,
-        workShare: 0,
         alive: true,
         start: undefined,
         traitorUntil: 0,
         home,
         team: 0,
-        doctrine: 0,
-        capital: undefined,
       });
       highest = Math.max(highest, id);
     }
@@ -432,186 +347,32 @@ export class Game {
   /**
    * 32-bit FNV-1a hash of the whole game state. Two clients that ran the same
    * turns must report the same hash for the same tick (R-FAIR-01).
+   *
+   * It is regular (ADR 0008): the tick, then the setup every client shares
+   * (the balance digest, teams, what the game leaves out, its special rules,
+   * the operator's bonuses, and each player's id, start set by the map and
+   * team), then the state in the order of a snapshot, through the same
+   * writer: every list behind its length, every path in full, and each rule
+   * part behind its name. A rule the game does not play with registers no
+   * part, so its state is not in the hash at all.
    */
   hash(): number {
-    // Every value goes through `mix` and `mixWord` below, in the order and
-    // with the bytes it always had: the hash of a state must never change.
-    // The running hash stays in a local rather than a variable captured by
-    // closures, which the loop over every tile of the map reads and writes
-    // far faster, and no array is built per entity.
-    let hash = 0x811c9dc5;
-    hash = mix(hash, this.currentTick);
-    hash = mixWord(hash, this.balanceDigest);
-    for (const word of this.random.state()) hash = mix(hash, word);
-    const owners = this.territory.owners;
-    for (let tile = 0; tile < owners.length; tile++) {
-      hash = Math.imul(hash ^ (owners[tile] as number), 0x01000193);
-    }
+    const out = new StateHasher();
+    out.uint(this.currentTick);
+    out.word(this.balanceDigest);
+    out.uint(this.teams);
+    out.uint(this.disabled);
+    out.uint(ruleBits(this.rules));
+    out.uint(this.operator.player);
+    out.uint(this.operator.bonuses);
     for (const p of this.sortedPlayers) {
-      hash = mix(hash, p.id);
-      hash = mix(hash, p.troops);
-      hash = mix(hash, p.gold);
-      hash = mix(hash, p.goldRemainder);
-      hash = mix(hash, p.workShare);
-      hash = mix(hash, p.alive ? 1 : 0);
-      hash = mix(hash, p.start ?? -1);
-      hash = mix(hash, p.traitorUntil);
+      out.uint(p.id);
       // The map's nations come from its manifest, which the terrain's hash does not cover.
-      hash = mix(hash, p.home ?? -1);
+      out.int(p.home ?? -1);
+      out.uint(p.team);
     }
-    hash = mix(hash, this.nextAttackId);
-    for (const a of this.attacks) {
-      hash = mix(hash, a.id);
-      hash = mix(hash, a.player);
-      hash = mix(hash, a.target);
-      hash = mix(hash, a.aim);
-      hash = mix(hash, a.troops);
-      // Games without collapsing fronts hash as they did before the rule existed.
-      if (this.rules.collapsingFronts) hash = mix(hash, a.pressure);
-    }
-    hash = mix(hash, this.nextBoatId);
-    for (const b of this.boats) {
-      hash = mix(hash, b.id);
-      hash = mix(hash, b.player);
-      hash = mix(hash, b.target);
-      hash = mix(hash, b.troops);
-      hash = mix(hash, b.step);
-      hash = mix(hash, b.path.length);
-      for (const tile of b.path) hash = mix(hash, tile);
-    }
-    hash = mix(hash, this.nextStructureId);
-    for (const s of this.structures) {
-      hash = mix(hash, s.id);
-      hash = mix(hash, s.player);
-      hash = mix(hash, s.kind);
-      hash = mix(hash, s.tile);
-      hash = mix(hash, s.readyAt);
-      hash = mix(hash, s.reloadAt);
-    }
-    hash = mix(hash, this.alliances.length);
-    for (const a of this.alliances) {
-      hash = mix(hash, a.a);
-      hash = mix(hash, a.b);
-      hash = mix(hash, a.until);
-      hash = mix(hash, a.renewA ? 1 : 0);
-      hash = mix(hash, a.renewB ? 1 : 0);
-      // Alliances and truces hash as alliances did before truces existed.
-      if (a.truce) hash = mix(hash, 1);
-    }
-    hash = mix(hash, this.allianceRequests.length);
-    for (const r of this.allianceRequests) {
-      hash = mix(hash, r.from);
-      hash = mix(hash, r.to);
-      hash = mix(hash, r.expiresAt);
-    }
-    hash = mix(hash, this.requestCooldowns.length);
-    for (const c of this.requestCooldowns) {
-      hash = mix(hash, c.from);
-      hash = mix(hash, c.to);
-      hash = mix(hash, c.until);
-    }
-    hash = mix(hash, this.nextTradeShipId);
-    hash = mix(hash, this.tradeShips.length);
-    for (const t of this.tradeShips) {
-      hash = mix(hash, t.id);
-      hash = mix(hash, t.player);
-      hash = mix(hash, t.port);
-      hash = mix(hash, t.from);
-      hash = mix(hash, t.to);
-      hash = mix(hash, t.step);
-      hash = mix(hash, t.path.length);
-      // The ends of its route, which the route cache outside the state chose.
-      hash = mix(hash, t.path[0] ?? -1);
-      hash = mix(hash, t.path[t.path.length - 1] ?? -1);
-    }
-    hash = mix(hash, this.nextWarshipId);
-    for (const w of this.warships) {
-      hash = mix(hash, w.id);
-      hash = mix(hash, w.player);
-      hash = mix(hash, w.tile);
-      hash = mix(hash, w.health);
-      hash = mix(hash, w.patrol);
-      hash = mix(hash, w.step);
-      hash = mix(hash, w.path.length);
-      hash = mix(hash, w.reloadAt);
-    }
-    hash = mix(hash, this.nextMissileId);
-    hash = mix(hash, this.missiles.length);
-    for (const m of this.missiles) {
-      hash = mix(hash, m.id);
-      hash = mix(hash, m.player);
-      hash = mix(hash, m.size);
-      hash = mix(hash, m.from);
-      hash = mix(hash, m.to);
-      hash = mix(hash, m.launchedAt);
-      hash = mix(hash, m.arrivesAt);
-      hash = mix(hash, m.tried.length);
-      for (const id of m.tried) hash = mix(hash, id);
-    }
-    hash = mix(hash, this.fallout.length);
-    for (const f of this.fallout) {
-      hash = mix(hash, f.tile);
-      hash = mix(hash, f.radius);
-      hash = mix(hash, f.until);
-    }
-    hash = mix(hash, this.fights.length);
-    for (const f of this.fights) {
-      hash = mix(hash, f.a);
-      hash = mix(hash, f.b);
-      hash = mix(hash, f.until);
-    }
-    hash = mix(hash, this.embargoes.length);
-    for (const e of this.embargoes) {
-      hash = mix(hash, e.from);
-      hash = mix(hash, e.to);
-      hash = mix(hash, e.since);
-      // Embargoes by order hash as they did before the automatic ones existed.
-      if (e.until !== 0) hash = mix(hash, e.until);
-    }
-    hash = mix(hash, this.winner ?? 0);
-    // Free-for-all games hash as they did before teams existed.
-    if (this.teams > 0) {
-      hash = mix(hash, this.teams);
-      for (const p of this.sortedPlayers) hash = mix(hash, p.team);
-      hash = mix(hash, this.winningTeam ?? 0);
-    }
-    // So do games that leave nothing out, and games without quick messages.
-    if (this.disabled !== 0) hash = mix(hash, this.disabled);
-    // And games with no special rule.
-    if (ruleBits(this.rules) !== 0) {
-      // Tagged, so that no value of `disabled` before it reads the same.
-      hash = mix(hash, RULES_TAG);
-      hash = mix(hash, ruleBits(this.rules));
-    }
-    // And games without the operator's gold bonus.
-    if (this.operator.bonuses !== 0) {
-      hash = mix(hash, OPERATOR_TAG);
-      hash = mix(hash, this.operator.player);
-      hash = mix(hash, this.operator.bonuses);
-    }
-    for (const c of this.quickCooldowns) {
-      if (this.currentTick < c.until) {
-        hash = mix(hash, c.player);
-        hash = mix(hash, c.until);
-      }
-    }
-    hash = mix(hash, this.decidedAt ?? -1);
-    // Games without capitals hash as they did before the mode existed.
-    if (this.rules.capitals) {
-      for (const p of this.sortedPlayers) hash = mix(hash, p.capital ?? -1);
-      hash = mix(hash, this.capitalFalls.length);
-      for (const f of this.capitalFalls) {
-        hash = mix(hash, f.tick);
-        hash = mix(hash, f.player);
-        hash = mix(hash, f.by);
-        hash = mix(hash, f.tile);
-      }
-    }
-    // And games without doctrines.
-    if (this.rules.doctrines) {
-      for (const p of this.sortedPlayers) hash = mix(hash, p.doctrine);
-    }
-    return hash >>> 0;
+    writeState(this, out);
+    return out.value;
   }
 
   /**
@@ -626,7 +387,23 @@ export class Game {
     this.persisted.push({ name, part });
   }
 
-  /** Parts registered with `persist`, in registration order. */
+  /**
+   * Registers the part a rule owns under its key (`partKey`), for `part` to
+   * find it: once per game, by the rule's install function, and only in a
+   * game that plays with the rule. Saved and hashed like any part.
+   */
+  addPart<P extends PersistedPart>(key: PartKey<P>, part: P): P {
+    this.persist(key.name, part);
+    this.parts[key.slot] = part;
+    return part;
+  }
+
+  /** The part registered under `key`, or undefined when the game does not play with its rule. */
+  part<P extends PersistedPart>(key: PartKey<P>): P | undefined {
+    return this.parts[key.slot] as P | undefined;
+  }
+
+  /** Parts registered with `persist` and `addPart`, in registration order. */
   persistedParts(): readonly { readonly name: string; readonly part: PersistedPart }[] {
     return this.persisted;
   }
@@ -649,36 +426,27 @@ export class Game {
   }
 
   private digestSetup(): number {
-    let hash = 0x811c9dc5;
-    const mix = (value: number): void => {
-      for (const word of [value >>> 0, Math.floor(value / 2 ** 32) >>> 0]) {
-        for (let shift = 0; shift < 32; shift += 8) {
-          hash = Math.imul(hash ^ ((word >>> shift) & 0xff), 0x01000193);
-        }
-      }
-    };
-    mix(this.seed);
-    mix(this.balanceDigest);
+    let hash = FNV_OFFSET;
+    hash = mix(hash, this.seed);
+    hash = mix(hash, this.balanceDigest);
     const { topology, kinds } = this.terrain;
-    mix(topology.width);
-    mix(topology.height);
-    for (let tile = 0; tile < kinds.length; tile++) {
-      hash = Math.imul(hash ^ (kinds[tile] as number), 0x01000193);
-    }
+    hash = mix(hash, topology.width);
+    hash = mix(hash, topology.height);
+    for (let tile = 0; tile < kinds.length; tile++) hash = mixUnit(hash, kinds[tile] as number);
     for (const p of this.sortedPlayers) {
-      mix(p.id);
-      mix(p.home ?? -1);
-      mix(p.team);
-      mix(p.name.length);
-      for (let i = 0; i < p.name.length; i++) mix(p.name.charCodeAt(i));
+      hash = mix(hash, p.id);
+      hash = mix(hash, p.home ?? -1);
+      hash = mix(hash, p.team);
+      hash = mix(hash, p.name.length);
+      for (let i = 0; i < p.name.length; i++) hash = mix(hash, p.name.charCodeAt(i));
     }
-    mix(this.teams);
-    mix(this.disabled);
-    if (ruleBits(this.rules) !== 0) mix(ruleBits(this.rules));
+    hash = mix(hash, this.teams);
+    hash = mix(hash, this.disabled);
+    if (ruleBits(this.rules) !== 0) hash = mix(hash, ruleBits(this.rules));
     if (this.operator.bonuses !== 0) {
-      mix(OPERATOR_TAG);
-      mix(this.operator.player);
-      mix(this.operator.bonuses);
+      hash = mix(hash, OPERATOR_TAG);
+      hash = mix(hash, this.operator.player);
+      hash = mix(hash, this.operator.bonuses);
     }
     return hash >>> 0;
   }
@@ -688,13 +456,21 @@ export class Game {
     return player === this.operator.player && (this.operator.bonuses & bonus) !== 0;
   }
 
-  /** Valid orders are offered to handlers in turn until one carries them out. */
-  onOrder(handler: OrderHandler): void {
-    this.handlers.push(handler);
+  /** Registers the rule of one kind of order (`defineOrder`): one rule per type. */
+  onOrder<T extends OrderType, P extends object>(rule: OrderRule<T, P>): void {
+    if (this.orderRules.has(rule.type)) {
+      throw new RangeError(`orders of type ${rule.type} already have a rule`);
+    }
+    this.orderRules.set(rule.type, eraseRule(rule));
+  }
+
+  /** Whether a rule for orders of `type` is registered. */
+  hasOrderRule(type: OrderType): boolean {
+    return this.orderRules.has(type);
   }
 
   /**
-   * Observers hear of every order carried out, after its handler: computer
+   * Observers hear of every order carried out, after its rule: computer
    * players remember what was done to them (R-BOT-20). An observer must not
    * apply orders itself.
    */
@@ -709,13 +485,18 @@ export class Game {
   /**
    * Carries out one order now, if it is valid: the path of every order of a
    * turn, and of orders that computer players decide during a tick (R-BOT-03).
-   * Orders of eliminated or unknown players are ignored. Returns whether the
-   * order was carried out.
+   * Orders of eliminated or unknown players, and orders of a type without a
+   * rule, are ignored. Returns whether the order was carried out, which is
+   * whether `orderError` found nothing against it.
    */
   apply(playerId: number, order: Order): boolean {
     const player = this.playersById.get(playerId);
-    if (!player?.alive || orderError(this, player, order) !== undefined) return false;
-    if (!this.handlers.some((handle) => handle(this, player, order))) return false;
+    if (!player?.alive) return false;
+    const rule = this.orderRules.get(order.type);
+    if (!rule) return false;
+    const plan = planOrder(this, player, order, rule);
+    if (typeof plan === "string") return false;
+    rule.execute(this, player, plan);
     for (const observe of this.observers) observe(this, player, order);
     return true;
   }
@@ -735,171 +516,4 @@ export class Game {
     this.currentTick++;
     return applied;
   }
-}
-
-/** One FNV-1a round per byte of a 32-bit word, lowest byte first. */
-function mixWord(hash: number, word: number): number {
-  hash = Math.imul(hash ^ (word & 0xff), 0x01000193);
-  hash = Math.imul(hash ^ ((word >>> 8) & 0xff), 0x01000193);
-  hash = Math.imul(hash ^ ((word >>> 16) & 0xff), 0x01000193);
-  return Math.imul(hash ^ (word >>> 24), 0x01000193);
-}
-
-/** Feeds a value as two 32-bit halves, low then high, so counts above 2^32 are not truncated. */
-function mix(hash: number, value: number): number {
-  return mixWord(mixWord(hash, value >>> 0), Math.floor(value / 2 ** 32) >>> 0);
-}
-
-/**
- * FNV-1a over the balance values, by key name, so the order fields were
- * written in does not matter. The values of a special rule count only in a
- * game played with it, so other games hash as they did before it existed.
- */
-function digestBalance(balance: Balance, rules: GameRules, landmarks: boolean): number {
-  let digest = 0x811c9dc5;
-  const record = balance as unknown as Record<string, number | readonly number[]>;
-  for (const key of Object.keys(record).sort()) {
-    if (!rules.capitals && key.startsWith("capital")) continue;
-    // Likewise landmarks (R-LAND) count only on a map that has some.
-    if (!landmarks && key.startsWith("landmark")) continue;
-    for (let i = 0; i < key.length; i++) digest = Math.imul(digest ^ key.charCodeAt(i), 0x01000193);
-    const value = record[key];
-    for (const number of typeof value === "number" ? [value] : (value ?? [])) {
-      // Halves, like the state hash: balance values are safe integers.
-      for (const word of [number >>> 0, Math.floor(number / 2 ** 32) >>> 0]) {
-        for (let shift = 0; shift < 32; shift += 8) {
-          digest = Math.imul(digest ^ ((word >>> shift) & 0xff), 0x01000193);
-        }
-      }
-    }
-  }
-  return digest >>> 0;
-}
-
-/** Refuses balance values the rules cannot run with, before the first tick rather than during one. */
-function checkBalance(balance: Balance): void {
-  const atLeastOne: (keyof Balance)[] = [
-    "ticksPerSecond",
-    "attackSpeedDivisor",
-    "encircleMaxTiles",
-    "collapseBuildupTicks",
-    "collapseDepth",
-    "boatSpeed",
-    "boatMax",
-    "boatRange",
-    "tradeRange",
-    "growthDivisor",
-    "tradeIntervalTicks",
-    "tradeOdds",
-    "warshipPatrol",
-    "warshipReloadTicks",
-    "warshipDamage",
-    "warshipHealth",
-    "missileSpeed",
-    "allianceRequestTicks",
-    "allianceTicks",
-    "maxDurationTicks",
-  ];
-  for (const key of atLeastOne) {
-    const value = balance[key];
-    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
-      throw new RangeError(`balance ${key} must be a positive integer`);
-    }
-  }
-  // Two structures on one tile would make demolition ambiguous; a cheaper next structure, or a negative cost, would print gold.
-  if (!Number.isSafeInteger(balance.buildSpacing) || balance.buildSpacing < 1) {
-    throw new RangeError("balance buildSpacing must be a positive integer");
-  }
-  for (const key of [
-    "cityCost",
-    "fortCost",
-    "portCost",
-    "buildTicks",
-    "tradeMax",
-    "costMax",
-    "fortCostMax",
-    "airDefenseCostMax",
-    "popBase",
-    "popLand",
-    "popPerCity",
-    "growthBase",
-    "workGoldPercent",
-    "warshipCost",
-    "warshipMax",
-    "warshipRange",
-    "warMemoryTicks",
-    "embargoNoticeTicks",
-    "embargoAutoTicks",
-    "tributeTruceTicks",
-    "tributeBase",
-    "tributePerTile",
-    "tributeLeadPercent",
-    "siloCost",
-    "airDefenseCost",
-    "longBuildTicks",
-    "siloReloadTicks",
-    "missileCost",
-    "heavyMissileCost",
-    "missileRadius",
-    "heavyMissileRadius",
-    "falloutTicks",
-    "lightFalloutTicks",
-    "falloutCostPercent",
-    "missileTroopsPercent",
-    "heavyMissileTroopsPercent",
-    "airDefenseRadius",
-    "airDefenseReloadTicks",
-    "allianceRenewTicks",
-    "allianceCooldownTicks",
-    "traitorTicks",
-    "traitorDefensePercent",
-    "collapseOddsTenths",
-    "collapseCostPercent",
-    "cityLand",
-    "goldBase",
-    "attackPacePercent",
-    "attackPaceOddsTenths",
-    "capitalRadius",
-    "capitalStrengthPercent",
-    "capitalAlert",
-    "capitalGraceTicks",
-    "capitalGarrisonPercent",
-    "landmarkGoldPercent",
-    "landmarkGrowthPercent",
-    "landmarkFortressRadius",
-    "landmarkFortressPercent",
-    "landmarkTradePercent",
-    "landmarkShieldRadius",
-  ] as const) {
-    if (!Number.isSafeInteger(balance[key]) || balance[key] < 0) {
-      throw new RangeError(`balance ${key} must be a non-negative integer`);
-    }
-  }
-  if (
-    !Number.isSafeInteger(balance.workMaxPercent) ||
-    balance.workMaxPercent < 0 ||
-    balance.workMaxPercent > 100
-  ) {
-    throw new RangeError("balance workMaxPercent must be from 0 to 100");
-  }
-  for (const key of ["capitalSpoilsPercent", "capitalRazePercent"] as const) {
-    if (!Number.isSafeInteger(balance[key]) || balance[key] < 0 || balance[key] > 100) {
-      throw new RangeError(`balance ${key} must be from 0 to 100`);
-    }
-  }
-  for (const key of ["landmarkShieldChancePercent", "landmarkAssaultPercent"] as const) {
-    if (!Number.isSafeInteger(balance[key]) || balance[key] < 0 || balance[key] > 100) {
-      throw new RangeError(`balance ${key} must be from 0 to 100`);
-    }
-  }
-  const chance = balance.airDefenseChancePercent;
-  if (!Number.isSafeInteger(chance) || chance < 0 || chance > 100) {
-    throw new RangeError("balance airDefenseChancePercent must be from 0 to 100");
-  }
-  if (!Number.isSafeInteger(balance.costGrowthPercent) || balance.costGrowthPercent < 100) {
-    throw new RangeError("balance costGrowthPercent must be 100 or more");
-  }
-  // Ship routes keep their distances in 16 bits.
-  if (balance.boatRange > 0xffff) throw new RangeError("balance boatRange is above 65535");
-  if (balance.tradeRange > 0xffff) throw new RangeError("balance tradeRange is above 65535");
 }

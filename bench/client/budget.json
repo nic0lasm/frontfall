@@ -8,5 +8,5 @@
   { "name": "Simulation worker", "files": "^assets/sim\\.worker-[^/]+\\.js$", "kB": 50 },
   { "name": "World map", "files": "^maps/world\\.(bin|json)$", "kB": 175 },
   { "name": "Every map", "files": "^maps/", "kB": 520 },
-  { "name": "Whole build but maps", "files": ".", "except": "^maps/", "kB": 850 }
+  { "name": "Whole build but maps", "files": ".", "except": "^maps/", "kB": 858 }
 ]

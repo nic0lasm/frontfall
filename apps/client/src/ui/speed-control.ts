@@ -1,6 +1,6 @@
 import { GAME_SPEEDS } from "@frontfall/protocol";
 import { t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
+import { h } from "../dom.ts";
 import { formatSpeed } from "./format.ts";
 
 /**

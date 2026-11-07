@@ -1,13 +1,14 @@
+import { youOf } from "../../game/selectors.ts";
 import { soldiersOf } from "../../game/attack-preview.ts";
 import type { GameSession } from "../../game/session.ts";
-import type { ClickMode, GameUpdate } from "../../game/solo-game.ts";
+import type { ClickMode, GameUpdate } from "../../game/game-runner.ts";
 import type { GameTracker } from "../../usage.ts";
+import { canAct, type ActState } from "./policy.ts";
 
 /** What decides whether the player can give orders now. */
 export interface OrderState {
-  readonly latest: () => GameUpdate | undefined;
-  /** The game is paused, or a record is being watched. */
-  readonly held: () => boolean;
+  /** The state the policy reads (canAct). */
+  readonly act: () => ActState;
   /** The attack ratio picked in the HUD, in percent. */
   readonly ratio: () => number;
   /** Reports the game; none for a replay. */
@@ -15,9 +16,9 @@ export interface OrderState {
 }
 
 /**
- * The orders the player gives from the screen: none while the game is
- * paused, watched from a record or won, and diplomacy only once play has
- * begun. Each method says nothing of what the game makes of the order.
+ * The orders the player gives from the screen, each when canAct allows it:
+ * diplomacy only once play has begun, a doctrine only in the spawn phase.
+ * Each method says nothing of what the game makes of the order.
  */
 export class Orders {
   constructor(
@@ -27,15 +28,14 @@ export class Orders {
 
   /** Whether a click on the map would go out now. */
   get clickable(): boolean {
-    const update = this.state.latest();
-    return update !== undefined && !this.state.held();
+    return canAct(this.state.act());
   }
 
   /** A click on the map, which the game reads by its mode; whether it went out. */
   click(tile: number, mode: ClickMode, reach: number, seen?: number): boolean {
-    const update = this.state.latest();
-    if (!update || !this.clickable) return false;
-    this.ordered(update);
+    const state = this.state.act();
+    if (!canAct(state)) return false;
+    this.ordered(state.latest);
     this.session.click(tile, this.state.ratio(), mode, reach, seen);
     return true;
   }
@@ -60,7 +60,7 @@ export class Orders {
   gift(target: number, what: "troops" | "gold"): void {
     const update = this.playing();
     if (!update) return;
-    const you = update.players.find((p) => p.id === update.you);
+    const you = youOf(update);
     const held = you ? (what === "troops" ? soldiersOf(you) : you.gold) : 0;
     const amount = Math.floor((held * this.state.ratio()) / 100);
     if (amount < 1) return;
@@ -76,15 +76,13 @@ export class Orders {
 
   /** Puts a share of the troops at home to work (R-ECO-07); allowed before play starts too. */
   work(share: number): void {
-    const update = this.state.latest();
-    if (!update || this.state.held()) return;
+    if (!canAct(this.state.act())) return;
     this.session.sendOrder({ type: "work", share });
   }
 
   /** Picks a doctrine (R-DOCTRINE-01); only the spawn phase takes it. */
   doctrine(pick: number): void {
-    const update = this.state.latest();
-    if (!update || this.state.held() || update.phase !== "spawn") return;
+    if (!canAct(this.state.act(), "spawn")) return;
     this.session.sendOrder({ type: "doctrine", pick });
   }
 
@@ -101,7 +99,7 @@ export class Orders {
   retaliate(tile: number, troops: number): void {
     const update = this.playing();
     if (!update) return;
-    const you = update.players.find((p) => p.id === update.you);
+    const you = youOf(update);
     if (!you) return;
     const send = Math.min(troops, Math.floor((soldiersOf(you) * this.state.ratio()) / 100));
     if (send < 1) return;
@@ -110,19 +108,16 @@ export class Orders {
   }
 
   retreat(attack: number): void {
-    const update = this.state.latest();
-    if (!update || this.state.held()) return;
-    this.ordered(update);
+    const state = this.state.act();
+    if (!canAct(state)) return;
+    this.ordered(state.latest);
     this.session.sendOrder({ type: "retreat", attack });
   }
 
   /** The game as it stands while play goes on and the player can act, or none. */
   private playing(): GameUpdate | undefined {
-    const update = this.state.latest();
-    if (!update || this.state.held() || update.phase !== "play") {
-      return undefined;
-    }
-    return update;
+    const state = this.state.act();
+    return canAct(state, "play") ? state.latest : undefined;
   }
 
   /** Notes the player's first order once play has begun, for the usage report. */

@@ -1,5 +1,5 @@
 import type { MapManifest } from "@frontfall/protocol";
-import { fetchMapData, type MapInfo } from "../game/maps.ts";
+import { fetchMapData, type MapInfo } from "../maps.ts";
 import type { GroundReply } from "./prebaked-ground.ts";
 import { bakeTerrainColors } from "./terrain-colors.ts";
 

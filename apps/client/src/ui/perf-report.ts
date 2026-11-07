@@ -1,7 +1,7 @@
 import { RELEASE } from "../release.ts";
 import { t } from "../i18n/index.ts";
-import { h } from "./dom.ts";
-import { probe } from "./probe.ts";
+import { h } from "../dom.ts";
+import { probe } from "../probe.ts";
 import type { GraphicsProfile } from "./graphics.ts";
 
 /** What a game reports of its smoothness: the device, the profile and how frames fare. */

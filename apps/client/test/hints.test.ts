@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GameUpdate } from "../src/game/solo-game.ts";
+import type { GameUpdate } from "../src/game/game-runner.ts";
 import { due, hintsTexts } from "../src/ui/hints.ts";
 import { hintsSeen, markHint, turnHintsOff } from "../src/ui/guide-state.ts";
 

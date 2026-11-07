@@ -1,6 +1,6 @@
 import { offers } from "../src/ui/hud.ts";
 import { describe, expect, it } from "vitest";
-import { GENERATED_MAPS as maps } from "../src/game/maps.ts";
+import { GENERATED_MAPS as maps } from "../src/maps.ts";
 import {
   cleanName,
   defaultSetup,

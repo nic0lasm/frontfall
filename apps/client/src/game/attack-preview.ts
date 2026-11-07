@@ -1,3 +1,4 @@
+import { youOf } from "./selectors.ts";
 import { DEFAULT_BALANCE, type Balance } from "@frontfall/engine";
 import type { GameUpdate, PlayerView } from "./game-view.ts";
 
@@ -34,7 +35,7 @@ export function attackPreview(
   ratio: number,
   balance: Balance = DEFAULT_BALANCE,
 ): AttackPreview | undefined {
-  const you = update.players.find((player) => player.id === update.you);
+  const you = youOf(update);
   if (!you?.alive || update.phase !== "play") return undefined;
   if (target === you.id) return undefined;
   const { allies, teammates, traitors } = update.diplomacy;
