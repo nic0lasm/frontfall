@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import {
   tributeError,
+  capitalFalls,
   createGame,
+  doctrineOf,
   goldIncome,
   DEFAULT_BALANCE,
   type GameRules,
@@ -402,7 +404,9 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
       name: p.name,
       kind: kind.kind,
       ...(kind.difficulty ? { difficulty: kind.difficulty } : {}),
-      ...(setup.doctrineHumans && kind.kind === "human" ? { doctrine: p.doctrine } : {}),
+      ...(setup.doctrineHumans && kind.kind === "human"
+        ? { doctrine: doctrineOf(game, p.id) }
+        : {}),
       team: p.team,
       landmass: start < 0 ? -1 : terrain.landmassOf(start),
       coastal:
@@ -426,7 +430,7 @@ export function playBalanceGame(setup: BalanceSetup): GameReport {
     minutes,
     missileBurst,
     leaderSharePercent: (leaderNow().tiles * 100) / ownable,
-    capitalFalls: game.capitalFalls
+    capitalFalls: capitalFalls(game)
       .filter((fall) => fall.by !== 0)
       .map(({ tick, player, by }) => ({ minute: playMinutes(tick), player, by })),
     combat: combat.report(),

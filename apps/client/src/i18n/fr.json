@@ -265,6 +265,8 @@
   "click.shore": "Ce port n’a pas d’eau libre à côté pour un navire de guerre.",
   "click.allyNear": "Trop près d’un allié : le souffle toucherait ses terres.",
   "click.disabled": "Absent de cette partie.",
+  "click.startTaken": "Un autre joueur tient déjà cette terre : partez d’une terre libre.",
+  "click.startNear": "Trop près du départ d’un autre joueur : choisissez une case plus loin.",
   "click.warships": "Vous avez déjà autant de navires de guerre que permis.",
   "click.noShip": "Vous n’avez pas encore de navire de guerre : cliquez sur un de vos ports pour en acheter un, puis sur l’eau pour l’y envoyer.",
   "click.noWarship": "Aucun de vos navires de guerre ne peut y aller : choisissez une eau reliée par la mer à l’un d’eux, et pas trop loin.",

@@ -6,38 +6,52 @@
   "license": "MIT",
   "author": "Nicolas Maigre",
   "type": "module",
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "bun@1.4.4",
   "engines": {
-    "node": ">=24"
+    "node": ">=24",
+    "bun": ">=1.4.4"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools",
+    "e2e",
+    "bench"
+  ],
+  "trustedDependencies": [
+    "esbuild"
+  ],
+  "overrides": {
+    "minimatch": ">=11.0.1"
   },
   "scripts": {
     "prepare": "husky",
-    "dev": "pnpm --parallel --filter @frontfall/server --filter @frontfall/client dev",
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "bun run --filter @frontfall/server --filter @frontfall/client dev",
+    "build": "bun run --filter \"*\" build",
+    "typecheck": "bun run --filter \"*\" typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "pnpm --filter @frontfall/e2e test",
+    "test:e2e": "bun run --filter @frontfall/e2e test",
     "clean-room": "node tools/src/clean-room-cli.ts",
     "provenance": "node tools/src/provenance-cli.ts",
-    "bench": "pnpm --filter @frontfall/bench engine",
-    "bench:render": "pnpm --filter @frontfall/bench render",
-    "perf:engine": "pnpm --filter @frontfall/bench gate",
-    "perf:client": "pnpm --filter @frontfall/bench client",
-    "maps": "pnpm --filter @frontfall/tools maps",
-    "announce": "pnpm --filter @frontfall/tools announce",
-    "playtest-report": "pnpm --filter @frontfall/tools playtest-report",
-    "usage:report": "pnpm --filter @frontfall/tools usage:report",
-    "sim": "pnpm --filter @frontfall/bench sim",
-    "balance": "pnpm --filter @frontfall/bench balance",
-    "balance:doctrines": "pnpm --filter @frontfall/bench balance:doctrines",
-    "campaign": "pnpm --filter @frontfall/bench campaign",
-    "determinism": "pnpm --filter @frontfall/bench determinism",
-    "golden": "pnpm --filter @frontfall/bench golden",
-    "load": "pnpm --filter @frontfall/bench load"
+    "bench": "bun run --filter @frontfall/bench engine",
+    "bench:render": "bun run --filter @frontfall/bench render",
+    "perf:engine": "bun run --filter @frontfall/bench gate",
+    "perf:client": "bun run --filter @frontfall/bench client",
+    "maps": "bun run --filter @frontfall/tools maps",
+    "announce": "bun run --filter @frontfall/tools announce",
+    "playtest-report": "bun run --filter @frontfall/tools playtest-report",
+    "usage:report": "bun run --filter @frontfall/tools usage:report",
+    "sim": "bun run --filter @frontfall/bench sim",
+    "balance": "bun run --filter @frontfall/bench balance",
+    "balance:doctrines": "bun run --filter @frontfall/bench balance:doctrines",
+    "campaign": "bun run --filter @frontfall/bench campaign",
+    "determinism": "bun run --filter @frontfall/bench determinism",
+    "golden": "bun run --filter @frontfall/bench golden",
+    "load": "bun run --filter @frontfall/bench load"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

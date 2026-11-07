@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { checkAddedLine, checkCommit, parseAddedLines, type Violation } from "./provenance.ts";
 
-const usage = "usage: pnpm provenance --range <git revision range>";
+const usage = "usage: bun run provenance --range <git revision range>";
 
 const { values } = parseArgs({ options: { range: { type: "string" } } });
 if (!values.range) {

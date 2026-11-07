@@ -42,7 +42,7 @@ describe("operator's bonuses (R-MODE-09)", () => {
     const plain = newGame();
     const bonus = newGame({ player: 1, bonuses: OperatorBonus.Gold });
     // Troops alone: the same in both games, so only the income differs.
-    for (const { game } of [plain, bonus]) player(game, 1).workShare = 0;
+    for (const { game } of [plain, bonus]) game.apply(1, { type: "work", share: 0 });
     plain.run(1);
     bonus.run(1);
     expect(player(plain.game, 1).gold).toBeGreaterThan(0);

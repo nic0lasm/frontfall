@@ -3,12 +3,12 @@ import { resolve } from "node:path";
 import { readTotal, usageReport } from "./usage-report.ts";
 
 // Prints what a server's /api/stats says about how the game is played.
-// Usage: pnpm usage:report https://nclsmgr.com/frontfall/api/stats
-//        pnpm usage:report stats.json
+// Usage: bun run usage:report https://nclsmgr.com/frontfall/api/stats
+//        bun run usage:report stats.json
 
 const source = process.argv[2];
 if (!source) {
-  console.error("usage: pnpm usage:report <address of /api/stats | file.json>");
+  console.error("usage: bun run usage:report <address of /api/stats | file.json>");
   process.exit(2);
 }
 const text = URL.canParse(source)

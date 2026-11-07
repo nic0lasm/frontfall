@@ -138,12 +138,12 @@ Each release of Frontfall checks this setup: CI builds the image, starts it with
 
 ## Announce public games on Discord
 
-A small script polls your server and posts to a Discord channel when a public game opens, with a link to join it. Create a webhook in the channel's settings (Integrations, Webhooks), then run it on any machine that reaches the server, from a checkout of the repository with its packages installed (`pnpm install`):
+A small script polls your server and posts to a Discord channel when a public game opens, with a link to join it. Create a webhook in the channel's settings (Integrations, Webhooks), then run it on any machine that reaches the server, from a checkout of the repository with its packages installed (`bun install`):
 
 ```sh
 FRONTFALL_URL=https://example.org/frontfall/ \
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/… \
-pnpm announce
+bun run announce
 ```
 
 `ANNOUNCE_SECONDS` sets how often it asks, 30 by default. It posts the game's name, its host's name and map, and the seats taken, all of which `/api/games` already shows to anyone, and mentions nobody. The games already open when it starts are not announced, and a game is never announced twice. It also posts when a running public game ends, without a winner, since the server never learns who won. A game that leaves the list while the server restarts or stops is not taken for one that ended: the script compares `startedAt` in `/api/status` before and after each list, and posts no end while the list is full, as running games come after the open ones. A game that ends during a restart is never announced as ended; one the server keeps across it (`FRONTFALL_DATA`) is, once it ends or nobody comes back to it. The script expects its address to reach one server, without a cache in front of `/api/games`: two servers behind one address, or a proxy that serves an old list while the server restarts, could make a game look ended. It reports each round where `/api/status` gives no `startedAt`, as an older server does, and posts no ends then. Keep the webhook's address secret: anyone who has it can post in the channel.

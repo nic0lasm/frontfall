@@ -77,7 +77,7 @@ export function installCityStates(game: Game, ids: readonly number[]): void {
     const ratios = cityRatios(state.id);
     const cheapest = cheapestTile(balance);
     const above = (percent: number): number =>
-      Math.max(0, Math.min(state.troops - percentOf(cap, percent), soldiers(state)));
+      Math.max(0, Math.min(state.troops - percentOf(cap, percent), soldiers(game, state)));
     const attack = (tile: number): boolean => {
       const troops = above(ratios.reserve);
       if (troops < cheapest) return false;

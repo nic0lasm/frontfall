@@ -1,5 +1,6 @@
 import type { Game, Player } from "./game.ts";
 import { isqrt, mulDiv } from "./integer-math.ts";
+import { defineOrder, tileError } from "./order-rules.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
 
 /** Side of the map the spawn values of balance.md are set for: about the square root of 2^19 tiles. */
@@ -43,6 +44,30 @@ function scaledSettings(game: Game): SpawnSettings {
 /** Random draws allowed when placing a player who did not pick, before giving up on spacing. */
 const PLACEMENT_ATTEMPTS = 1000;
 
+/** Refusals of a spawn order besides the tile's own, so that interfaces can tell them apart. */
+export const SpawnError = {
+  Over: "the spawn phase is over",
+  /** R-SPAWN-02: another player holds the tile. */
+  Taken: "the tile belongs to another player",
+  /** R-SPAWN-02: closer than the spawn distance to another player's start. */
+  Near: "too close to another start",
+} as const;
+
+/**
+ * R-SPAWN-01: a player picks a start tile during the spawn phase, or moves
+ * it. A tile another player holds, or one too close to another start
+ * (R-SPAWN-02), is refused.
+ */
+export const SPAWN_ORDER = defineOrder("spawn", {
+  phases: ["spawn"],
+  wrongPhase: SpawnError.Over,
+  validate: (game, player, order) =>
+    tileError(game, order.tile) ?? startError(game, player, order.tile) ?? order,
+  execute(game, player, order) {
+    place(game, player, order.tile);
+  },
+});
+
 /**
  * The spawn phase (R-SPAWN-01 to R-SPAWN-05). Players pick a start tile, and
  * may pick again until the phase ends; whoever has not picked by then is
@@ -50,11 +75,7 @@ const PLACEMENT_ATTEMPTS = 1000;
  * player's start is kept in `player.start`.
  */
 export function installSpawn(game: Game): void {
-  game.onOrder((_, player, order) => {
-    if (order.type !== "spawn" || !isValidStart(game, player, order.tile)) return false;
-    place(game, player, order.tile);
-    return true;
-  });
+  game.onOrder(SPAWN_ORDER);
 
   game.onTick(() => {
     // The system runs before the tick counter moves: this is the last tick of the phase.
@@ -78,15 +99,24 @@ function isValidStart(
   tile: number,
   minDistance = spawnSettings(game).distance,
 ): boolean {
-  if (!game.terrain.isOwnable(tile)) return false;
+  return game.terrain.isOwnable(tile) && startError(game, player, tile, minDistance) === undefined;
+}
+
+/** Why an ownable tile is no start for `player` (R-SPAWN-02), or undefined. */
+function startError(
+  game: Game,
+  player: Player,
+  tile: number,
+  minDistance = spawnSettings(game).distance,
+): string | undefined {
   const owner = game.territory.ownerOf(tile);
-  if (owner !== NEUTRAL && owner !== player.id) return false;
+  if (owner !== NEUTRAL && owner !== player.id) return SpawnError.Taken;
   const topology = game.terrain.topology;
   for (const other of game.players()) {
     if (other === player || other.start === undefined) continue;
-    if (topology.distance(other.start, tile) < minDistance) return false;
+    if (topology.distance(other.start, tile) < minDistance) return SpawnError.Near;
   }
-  return true;
+  return undefined;
 }
 
 /** R-SPAWN-04: the tiles around the start, and the starting troops. Moving the start releases the old area. */

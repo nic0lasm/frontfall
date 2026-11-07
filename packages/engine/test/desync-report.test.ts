@@ -70,6 +70,7 @@ describe("desync reports", () => {
     const broken = (patch: Record<string, unknown>) => () =>
       readDesyncReport({ ...JSON.parse(JSON.stringify(report)), ...patch });
     expect(broken({ version: 1 })).toThrow(/unsupported report version 1/);
+    expect(broken({ version: 2 })).toThrow(/unsupported report version 2/);
     expect(broken({ seed: 1.5 })).toThrow(DesyncReportError);
     expect(broken({ balance: { ...DEFAULT_BALANCE, popLand: "40" } })).toThrow(/popLand/);
     const before: Record<string, unknown> = { ...DEFAULT_BALANCE, popPerTile: 40 };

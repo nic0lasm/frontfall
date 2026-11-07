@@ -5,6 +5,7 @@ Frontfall is written from scratch. It relies on these open source projects:
 | Project                                | Used for                    | License    |
 | -------------------------------------- | --------------------------- | ---------- |
 | [Three.js](https://threejs.org/)       | Rendering                   | MIT        |
+| [Bun](https://bun.sh/)                 | Install and scripts         | MIT        |
 | [ws](https://github.com/websockets/ws) | WebSocket server            | MIT        |
 | [zod](https://zod.dev/)                | Message validation          | MIT        |
 | [Vite](https://vite.dev/)              | Client build and dev server | MIT        |

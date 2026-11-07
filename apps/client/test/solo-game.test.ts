@@ -1,4 +1,11 @@
-import { TileKind } from "@frontfall/engine";
+import {
+  TileKind,
+  spawnSettings,
+  workShareOf,
+  type Alliance,
+  type Attack,
+  type Structure,
+} from "@frontfall/engine";
 import { describe, expect, it } from "vitest";
 import { GENERATED_MAPS, generateMap } from "../src/game/maps.ts";
 import { HUMAN_ID, SoloGame, type SoloOptions } from "../src/game/solo-game.ts";
@@ -154,10 +161,10 @@ describe("SoloGame", () => {
     solo.game.winner = 2;
     const you = update.players.find((player) => player.id === update.you);
     expect(you?.alive).toBe(true);
-    const share = solo.game.player(update.you)?.workShare ?? 0;
+    const share = workShareOf(solo.game, update.you);
     const wanted = share === 10 ? 20 : 10;
     solo.step([{ type: "work", share: wanted }]);
-    expect(solo.game.player(update.you)?.workShare).toBe(wanted);
+    expect(workShareOf(solo.game, update.you)).toBe(wanted);
   }, 60_000);
 });
 
@@ -202,14 +209,14 @@ describe("SoloGame incoming attacks", () => {
     let update = solo.step([{ type: "spawn", tile: firstLand(options.map) }]);
     while (update.phase === "spawn") update = solo.step([]);
     expect(update.incoming).toEqual([]);
-    const { attacks } = solo.game;
+    // The engine's lists are its rules' to write: the test writes this one itself.
+    const attacks = solo.game.attacks as Attack[];
     attacks.push({
       id: 9001,
       player: 2,
       target: HUMAN_ID,
       aim: 0,
       troops: 77,
-      pressure: 0,
     });
     attacks.push({
       id: 9002,
@@ -217,7 +224,6 @@ describe("SoloGame incoming attacks", () => {
       target: 2,
       aim: 0,
       troops: 5,
-      pressure: 0,
     });
     const { width, height } = solo.game.terrain.topology;
     update = gameUpdate(solo.game, HUMAN_ID, labelSpace(width, height));
@@ -487,8 +493,10 @@ describe("SoloGame clicks", () => {
     expect(solo.orderForClick(land, 30, "port")).toEqual(port);
 
     // Next to a structure, every coast in reach is too close: the refusal says so.
-    // (Stepping would end the game: the player holds all the land.)
-    solo.game.structures.push({
+    // (Stepping would end the game: the player holds all the land.) The
+    // engine's lists are its rules' to write: the test writes this one itself.
+    const structures = solo.game.structures as Structure[];
+    structures.push({
       id: 99,
       player: HUMAN_ID,
       kind: 0,
@@ -497,7 +505,7 @@ describe("SoloGame clicks", () => {
       reloadAt: 0,
     });
     expect(solo.orderForClick(sea, 30, "port")).toEqual({ refused: "crowded" });
-    solo.game.structures.pop();
+    structures.pop();
 
     // Without the gold, the closest coast says so.
     human.gold = 0;
@@ -656,20 +664,23 @@ describe("SoloGame clicks", () => {
     if (!human) throw new Error("no human");
     human.gold = 1_000_000;
     expect(solo.orderForClick(land, 30, "silo")).toEqual({ refused: "disabled" });
-    // Gifts go to allies only (R-DIPLO-06).
-    solo.game.alliances.push({
+    // Gifts go to allies only (R-DIPLO-06). The test makes the alliance itself.
+    const alliances = solo.game.alliances as Alliance[];
+    alliances.push({
       a: HUMAN_ID,
       b: 2,
       until: 1_000_000,
       renewA: false,
       renewB: false,
-      truce: false,
     });
+    // Not a truce: the engine's truces part follows the alliances slot for slot.
+    const truces = solo.game.persistedParts().find((entry) => entry.name === "truces")?.part;
+    (truces as unknown as { push(value: number): void }).push(0);
     update = solo.step([{ type: "gift", target: 2, troops: 0, gold: 400_000 }]);
     expect(solo.game.player(2)?.gold).toBeGreaterThanOrEqual(400_000);
     expect(update.events).toContainEqual({ type: "gift", a: HUMAN_ID, b: 2 });
     expect(update.diplomacy.atWar).toEqual([]);
-    solo.game.alliances.length = 0;
+    alliances.length = 0;
     update = solo.step([{ type: "embargo", target: 2, on: 1 }]);
     expect(update.diplomacy.atWar).toEqual([2]);
     expect(solo.game.disabled).toBe(8);
@@ -912,5 +923,29 @@ describe("SoloGame online", () => {
 
   it("refuses a turn out of step with the game", () => {
     expect(() => newGame(online).playTurns([{ tick: 3, orders: [] }])).toThrow(RangeError);
+  });
+});
+
+describe("SoloGame start clicks (R-SPAWN-02)", () => {
+  it("refuses a start on another player's land, or too close to their start, with its reason", () => {
+    const solo = newGame(options);
+    const { game } = solo;
+    const { topology } = game.terrain;
+    const land = Array.from({ length: topology.size }, (_, tile) => tile).filter((tile) =>
+      game.terrain.isOwnable(tile),
+    );
+    const other = land[0] as number;
+    // Another player picks first; the click is the human's.
+    expect(game.player(HUMAN_ID + 1)).toBeDefined();
+    expect(game.apply(HUMAN_ID + 1, { type: "spawn", tile: other })).toBe(true);
+    const { distance } = spawnSettings(game);
+    const near = land.find(
+      (tile) => game.territory.ownerOf(tile) === 0 && topology.distance(tile, other) < distance,
+    );
+    const far = land.find((tile) => topology.distance(tile, other) >= distance);
+    if (near === undefined || far === undefined) throw new Error("no tile to click");
+    expect(solo.orderForClick(other, 30)).toEqual({ refused: "startTaken" });
+    expect(solo.orderForClick(near, 30)).toEqual({ refused: "startNear" });
+    expect(solo.orderForClick(far, 30)).toEqual({ order: { type: "spawn", tile: far } });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { captureCost, installAttacks } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
-import { installEconomy, soldiers, workers } from "../src/economy.ts";
+import { installEconomy, soldiers, workShareOf, workers } from "../src/economy.ts";
 import { Game, type Order, type Player } from "../src/game.ts";
 import { GiftError, giftError } from "../src/gifts.ts";
 import { orderError } from "../src/orders.ts";
@@ -65,12 +65,12 @@ function newGame(overrides: Partial<Balance> = {}) {
 
 describe("work share (R-ECO-07)", () => {
   it("starts at nothing and splits the troops at home once set", () => {
-    const { ada, work } = newGame();
+    const { game, ada, work } = newGame();
     ada.troops = 1000;
-    expect([workers(ada), soldiers(ada)]).toEqual([0, 1000]);
+    expect([workers(game, ada), soldiers(game, ada)]).toEqual([0, 1000]);
     work(30);
-    expect(ada.workShare).toBe(30);
-    expect([workers(ada), soldiers(ada)]).toEqual([300, 700]);
+    expect(workShareOf(game, ada.id)).toBe(30);
+    expect([workers(game, ada), soldiers(game, ada)]).toEqual([300, 700]);
   });
 
   it("refuses a share outside 0 to B-WORK-MAX", () => {
@@ -134,6 +134,6 @@ describe("work share (R-ECO-07)", () => {
     ada.troops = 1000;
     work(25);
     const loaded = loadSnapshot(saveSnapshot(game, "test"), "test", create);
-    expect(loaded.ok && loaded.game.player(1)?.workShare).toBe(25);
+    expect(loaded.ok && workShareOf(loaded.game, 1)).toBe(25);
   });
 });

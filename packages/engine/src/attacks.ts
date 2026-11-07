@@ -1,12 +1,18 @@
 import { doctrinePercent, withDoctrine } from "./doctrines.ts";
 import type { Balance } from "./balance.ts";
-import { OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
+import { OperatorBonus } from "@frontfall/contracts";
+import type { Game, Player } from "./game.ts";
+import { OPERATOR_FACTOR } from "./modes.ts";
 import { detPow, divFloor, isqrt, mulDiv, percentOf } from "./integer-math.ts";
-import { isAllied, isTraitor, logEvent } from "./diplomacy.ts";
+import { DiplomacyError, isAllied, isTraitor, logEvent } from "./diplomacy.ts";
 import { soldiers } from "./economy.ts";
-import { capitalsStand, guardedByCapital } from "./capitals.ts";
+import { capitalOf, capitalsStand, guardedByCapital } from "./capitals.ts";
 import { LandmarkEffect, guardedByLandmark, heldLandmarks } from "./landmarks.ts";
+import { PLAY_PHASE, defineOrder, tileError, type Refusal } from "./order-rules.ts";
 import { spawnSettings } from "./spawn.ts";
+import { uint } from "./state/codec.ts";
+import { writable } from "./state/lists.ts";
+import { SlotValues, partKey } from "./state/parts.ts";
 import { fortRadius, fortified, isReady, StructureKind } from "./structures.ts";
 import { TileKind } from "./terrain.ts";
 import { BoundedFloodFill } from "./territory/bounded-flood-fill.ts";
@@ -21,12 +27,134 @@ export interface Attack {
   /** Tile the player aimed at; the front advances towards it first. */
   aim: number;
   troops: number;
-  /**
-   * Ticks in a row this attack has overwhelmed the front it pushes on
-   * (R-ATTACK-10); always 0 in a game without collapsing fronts.
-   */
-  pressure: number;
 }
+
+/**
+ * R-ATTACK-10: ticks in a row each attack has overwhelmed the front it
+ * pushes on, by the attack's place in `game.attacks`; only in a game with
+ * collapsing fronts. Read for every attack every tick, so kept dense.
+ */
+const PRESSURE = partKey<SlotValues>("fronts");
+
+/** Ticks in a row `attack` has overwhelmed its front (R-ATTACK-10); always 0 in a game without collapsing fronts. */
+export function pressureOf(game: Game, attack: Readonly<Attack>): number {
+  const pressure = game.part(PRESSURE);
+  const slot = pressure ? game.attacks.indexOf(attack) : -1;
+  return pressure && slot >= 0 ? pressure.get(slot) : 0;
+}
+
+/** R-SPAWN-05: nobody attacks, nor lands, during the spawn phase. */
+export const ATTACK_EARLY = "attacks start after the spawn phase";
+
+/** Refusals of attack and retreat orders besides those of `targetError`, so that interfaces can tell them apart. */
+export const AttackError = {
+  Early: ATTACK_EARLY,
+  /** The owner of the target tile is out of the game. */
+  Fallen: "the target is out of the game",
+  /** R-ATTACK-09: no land of the target touches the player's. */
+  Border: "no border with the target: only ships reach it",
+  /** R-ATTACK-06: no attack of the player's with troops left has the id. */
+  Retreat: "no attack of yours under way with this id",
+} as const;
+
+/**
+ * Why `player` cannot send `troops` against the owner of `target`, by land or
+ * by sea, or undefined. The phase is checked before.
+ */
+export function targetError(
+  game: Game,
+  player: Player,
+  target: number,
+  troops: number,
+): Refusal | undefined {
+  const error = tileError(game, target);
+  if (error) return error;
+  if (!Number.isSafeInteger(troops) || troops < 1) return "invalid troop count";
+  // R-ECO-07: workers stay at home.
+  if (troops > soldiers(game, player)) return "not enough troops";
+  if (game.territory.ownerOf(target) === player.id) return "the target is already owned";
+  // R-DIPLO-02: an ally is attacked only after betraying them.
+  if (isAllied(game, player.id, game.territory.ownerOf(target))) return DiplomacyError.Ally;
+  return undefined;
+}
+
+/** Scratch space of `touches`, which never runs inside another call of itself. */
+const touchAround = new Int32Array(4);
+
+/** Whether any land of `target` touches the player's territory. */
+function touches(game: Game, player: number, target: number): boolean {
+  const { territory } = game;
+  const topology = game.terrain.topology;
+  const owners = territory.owners;
+  const borders = territory.borderCount(player);
+  for (let i = 0; i < borders; i++) {
+    const count = topology.neighborsInto(territory.borderTile(player, i), touchAround);
+    for (let j = 0; j < count; j++) {
+      const tile = touchAround[j] as number;
+      if (owners[tile] === target && game.terrain.isOwnable(tile)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * R-ATTACK-01, R-ATTACK-09: `attack` sends troops against the owner of a
+ * tile, joining the player's attack on them if one is under way. A target
+ * that fell, or one without a border shared with the player (only ships
+ * reach it), is refused.
+ */
+export const ATTACK_ORDER = defineOrder("attack", {
+  phases: PLAY_PHASE,
+  wrongPhase: ATTACK_EARLY,
+  validate(game, player, order) {
+    const error = targetError(game, player, order.target, order.troops);
+    if (error) return error;
+    const target = game.territory.ownerOf(order.target);
+    if (target !== NEUTRAL && !game.player(target)?.alive) return AttackError.Fallen;
+    // R-ATTACK-09: without a shared border, only ships can reach the target.
+    if (!touches(game, player.id, target)) return AttackError.Border;
+    return { aim: order.target, troops: order.troops, target };
+  },
+  execute(game, player, { aim, troops, target }) {
+    const attacks = writable(game, "attacks");
+    const existing = attacks.find((a) => a.player === player.id && a.target === target);
+    const attack = existing ?? {
+      id: game.nextAttackId,
+      player: player.id,
+      target,
+      aim,
+      troops: 0,
+    };
+    player.troops -= troops;
+    attack.troops += troops;
+    attack.aim = aim;
+    if (!existing) {
+      attacks.push(attack);
+      game.part(PRESSURE)?.push(0);
+      game.nextAttackId++;
+    }
+  },
+});
+
+/**
+ * R-ATTACK-06: a player calls back one of their own attacks, losing part of
+ * its troops. An attack that is not theirs, or has no troops left, is refused.
+ */
+export const RETREAT_ORDER = defineOrder("retreat", {
+  phases: PLAY_PHASE,
+  wrongPhase: ATTACK_EARLY,
+  validate(game, player, order) {
+    if (!Number.isSafeInteger(order.attack) || order.attack < 1) return "invalid attack id";
+    const attack = writable(game, "attacks").find(
+      (a) => a.id === order.attack && a.player === player.id,
+    );
+    return attack && attack.troops > 0 ? { attack } : AttackError.Retreat;
+  },
+  execute(game, player, { attack }) {
+    player.troops += attack.troops - percentOf(attack.troops, game.balance.retreatPenaltyPercent);
+    attack.troops = 0;
+  },
+});
 
 /**
  * Expansion and attacks (R-ATTACK-01 to R-ATTACK-07). Troops leave the player
@@ -37,7 +165,7 @@ export interface Attack {
 export function installAttacks(game: Game): void {
   const { territory, terrain, balance } = game;
   const topology = terrain.topology;
-  const attacks = game.attacks;
+  const attacks = writable(game, "attacks");
   // Read directly in the loops below, past the checks of ownerOf().
   const owners = territory.owners;
 
@@ -62,6 +190,9 @@ export function installAttacks(game: Game): void {
   const frontLengths: number[] = [];
   const overwhelming: boolean[] = [];
   const collapsing = game.rules.collapsingFronts;
+  const pressure = collapsing
+    ? game.addPart(PRESSURE, new SlotValues(game, () => game.attacks, uint))
+    : undefined;
   const collapseFill = new BoundedFloodFill(topology);
   const nearForts: number[] = [];
   const attacksOf = new Map<number, number[]>();
@@ -227,73 +358,36 @@ export function installAttacks(game: Game): void {
     }
   }
 
-  /** Whether any land of `target` touches the player's territory. */
-  function touches(player: number, target: number): boolean {
-    const borders = territory.borderCount(player);
-    for (let i = 0; i < borders; i++) {
-      const count = topology.neighborsInto(territory.borderTile(player, i), around);
-      for (let j = 0; j < count; j++) {
-        const tile = around[j] as number;
-        if (owners[tile] === target && game.terrain.isOwnable(tile)) return true;
-      }
-    }
-    return false;
-  }
-
   const tileCost = (tile: number, defender: Player | undefined, attack: Attack): number =>
     captureCost(game, tile, defender, attack.player, attack.troops);
 
-  // R-ATTACK-06: a player calls back one of their own attacks, losing part of its troops.
-  game.onOrder((_, player, order) => {
-    if (order.type !== "retreat") return false;
-    const attack = attacks.find((a) => a.id === order.attack && a.player === player.id);
-    if (!attack || attack.troops <= 0) return false;
-    player.troops += attack.troops - percentOf(attack.troops, balance.retreatPenaltyPercent);
-    attack.troops = 0;
-    return true;
-  });
-
-  game.onOrder((_, player, order) => {
-    if (order.type !== "attack") return false;
-    const target = territory.ownerOf(order.target);
-    if (target !== NEUTRAL && !game.player(target)?.alive) return false;
-    const existing = attacks.find((a) => a.player === player.id && a.target === target);
-    const attack = existing ?? {
-      id: game.nextAttackId,
-      player: player.id,
-      target,
-      aim: order.target,
-      troops: 0,
-      pressure: 0,
-    };
-    // R-ATTACK-09: without a shared border, only ships can reach the target.
-    if (!touches(player.id, target)) return false;
-    player.troops -= order.troops;
-    attack.troops += order.troops;
-    attack.aim = order.target;
-    if (!existing) {
-      attacks.push(attack);
-      game.nextAttackId++;
-    }
-    return true;
-  });
+  game.onOrder(RETREAT_ORDER);
+  game.onOrder(ATTACK_ORDER);
 
   game.onTick(() => {
     if (game.phase !== "play") return;
     cancelOpposingAttacks(attacks);
     planFronts();
     for (let a = 0; a < attacks.length; a++) {
-      advance(attacks[a] as Attack, fronts[a] as number[], overwhelming[a] === true);
+      advance(a, attacks[a] as Attack, fronts[a] as number[], overwhelming[a] === true);
     }
     // Troops of a finished attack went back to its player in finish(); a fallen player's are lost.
     for (let i = attacks.length - 1; i >= 0; i--) {
       const attack = attacks[i] as Attack;
-      if (attack.troops <= 0 || !game.player(attack.player)?.alive) attacks.splice(i, 1);
+      if (attack.troops <= 0 || !game.player(attack.player)?.alive) {
+        attacks.splice(i, 1);
+        pressure?.remove(i);
+      }
     }
   });
 
-  /** Takes the tiles planned for this tick; an attack that cannot go on is marked done. */
-  function advance(attack: Attack, tiles: readonly number[], overwhelms: boolean): void {
+  /** Takes the tiles planned for this tick for the attack at `slot`; an attack that cannot go on is marked done. */
+  function advance(
+    slot: number,
+    attack: Attack,
+    tiles: readonly number[],
+    overwhelms: boolean,
+  ): void {
     const attacker = game.player(attack.player);
     const defender = attack.target === NEUTRAL ? undefined : game.player(attack.target);
     if (!attacker?.alive || attack.troops <= 0) return;
@@ -315,10 +409,10 @@ export function installAttacks(game: Game): void {
       territory.setOwner(tile, attack.player);
       captured.push(tile);
     }
-    if (collapsing && defender) {
-      attack.pressure = overwhelms && captured.length > 0 ? attack.pressure + 1 : 0;
-      if (attack.pressure >= balance.collapseBuildupTicks) {
-        attack.pressure = 0;
+    if (pressure && defender) {
+      const ticks = overwhelms && captured.length > 0 ? pressure.get(slot) + 1 : 0;
+      pressure.set(slot, ticks >= balance.collapseBuildupTicks ? 0 : ticks);
+      if (ticks >= balance.collapseBuildupTicks) {
         collapse(attack, defender);
       }
     }
@@ -564,7 +658,7 @@ export function captureCost(
   if (!defender) {
     cost = mulDiv(weight, bot ? balance.botNeutralSharePercent : balance.neutralSharePercent, 100);
   } else {
-    const defending = soldiers(defender);
+    const defending = soldiers(game, defender);
     const tiles = territory.tileCount(defender.id);
     const odds = Math.min(
       balance.oddsMaxPercent / 100,
@@ -605,8 +699,8 @@ export function captureCost(
   if (isTraitor(game, defender)) cost = mulDiv(cost, balance.traitorDefensePercent, 100);
   let troops = wholeTroops(tile, cost);
   // R-CAP-02: the capital itself holds a share of its owner's whole army.
-  if (capitalsStand(game) && defender.capital === tile) {
-    troops += percentOf(soldiers(defender), balance.capitalGarrisonPercent);
+  if (capitalsStand(game) && capitalOf(game, defender.id) === tile) {
+    troops += percentOf(soldiers(game, defender), balance.capitalGarrisonPercent);
   }
   return troops;
 }
@@ -623,7 +717,7 @@ export function defenderLoss(game: Game, tile: number, defender: Player): number
 /** A defender's soldiers spread over their land, which the fronts weigh an attack against (R-ECO-07). */
 export function defensePerTile(game: Game, defender: Player): number {
   const tiles = game.territory.tileCount(defender.id);
-  return tiles === 0 ? 0 : divFloor(soldiers(defender), tiles);
+  return tiles === 0 ? 0 : divFloor(soldiers(game, defender), tiles);
 }
 
 /** A defender's troops, workers included, spread over their land: what they lose with each tile taken. */

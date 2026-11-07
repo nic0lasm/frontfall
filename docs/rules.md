@@ -178,7 +178,7 @@ A special rule (`R-MODE-08`), on by default since the balance pass measured it (
 - **R-DOCTRINE-03** Choices stay private during the spawn phase; once play starts, every player sees every doctrine, on the leaderboard and in the end screen.
 - **R-DOCTRINE-04** A nation picks its doctrine on the first tick of the spawn phase, from the game's random generator: easy nations draw evenly among the three; the others lean toward the merchant on a coast, the bastion when another nation is close and the conqueror otherwise, so that none is drawn less than a fifth or more than two fifths of the time. Bots and city-states play the balanced doctrine.
 - **R-DOCTRINE-05** A doctrine changes figures of the rules only, never what a rule does: nothing in a doctrine skips a price, a cap or a cost for anyone else, and the victory share, the price of free land and the opening are the same for all.
-- **R-DOCTRINE-06** The balance pass plays the same human-like player once per doctrine, in turn on every seat, over many games (`pnpm balance:doctrines`). No doctrine may hold more than 1.5 times its fair share of the land or of the victories, and none less than 0.6 times, over 1,000 games.
+- **R-DOCTRINE-06** The balance pass plays the same human-like player once per doctrine, in turn on every seat, over many games (`bun run balance:doctrines`). No doctrine may hold more than 1.5 times its fair share of the land or of the victories, and none less than 0.6 times, over 1,000 games.
 
 ### Landmarks
 

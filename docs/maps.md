@@ -34,12 +34,12 @@ nations, not yet checked in played games; playtests will adjust them.
 ## Building the maps
 
 ```sh
-pnpm maps            # downloads the sources once, then rebuilds every map
-pnpm maps --check    # same, but fails if a map changed without a new version
+bun run maps            # downloads the sources once, then rebuilds every map
+bun run maps --check    # same, but fails if a map changed without a new version
 ```
 
 The generated files are committed in `apps/client/public/maps/`, so the game,
-the tests and the container build never need the network. `pnpm maps`
+the tests and the container build never need the network. `bun run maps`
 rebuilds them byte for byte: two runs on two machines give the same files,
 and CI checks it on every change to the generator or to a map definition.
 Thumbnails are the one exception: their compressed bytes depend on the zlib
@@ -225,7 +225,7 @@ The generator ([`city.ts`](../tools/src/mapgen/city.ts)) then:
    and the towns around it, each at its town hall. Paris seats the inner
    suburbs too: with the arrondissements alone, the outskirts were free to
    take, and a player starting there won 10 games out of 12 against normal
-   nations (`pnpm balance -- --map paris --bots normal:4 --nations normal
+   nations (`bun run balance -- --map paris --bots normal:4 --nations normal
 --average`). With 37 nations and hills from 48 m, it wins 8 of 24, about
    what it wins on World. Lyon seats 19 nations: with 18 it won 11 of 24, with
    19 and hills from 225 m, 5 of 24.
@@ -236,13 +236,13 @@ The manifest credits both rasters, and the about page and
 ## Versions and checks
 
 [`tools/mapgen/published.json`](../tools/mapgen/published.json) records the
-SHA-256 of every published version of every map. `pnpm maps` adds the new
-versions it builds; `pnpm maps --check` fails when a definition builds bytes
+SHA-256 of every published version of every map. `bun run maps` adds the new
+versions it builds; `bun run maps --check` fails when a definition builds bytes
 that differ from what its version was published with. Changing a threshold,
 the generator or a source therefore needs a new `version` in the definitions
 it affects.
 
-`pnpm maps --check` also measures how long the engine takes to load each map
+`bun run maps --check` also measures how long the engine takes to load each map
 and fails above 100 ms. CI runs it whenever `tools/mapgen`,
 `tools/src/mapgen` or the map files change, then checks that the rebuilt
 files are identical to the committed ones.
@@ -258,7 +258,7 @@ the Panama and Suez canals, thumbnails under 40 kB.
 
 1. Add a definition in `tools/mapgen/definitions/<id>.json`, starting from
    `europe.json` for a region.
-2. Run `pnpm maps` and look at `apps/client/public/maps/<id>.png`.
+2. Run `bun run maps` and look at `apps/client/public/maps/<id>.png`.
 3. Commit the definition, the generated files and `published.json`, and add
    the map to the table above.
 

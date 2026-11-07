@@ -2,10 +2,18 @@ import { describe, expect, it } from "vitest";
 import { captureCost } from "../src/attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "../src/balance.ts";
 import { installBots, installNations } from "../src/bots/index.ts";
-import { capitalAim, capitalRadius, capitalThreat, guardedByCapital } from "../src/capitals.ts";
+import {
+  capitalAim,
+  capitalFalls,
+  capitalOf,
+  capitalRadius,
+  capitalThreat,
+  guardedByCapital,
+} from "../src/capitals.ts";
 import { createGame } from "../src/create-game.ts";
 import type { Game, Order, Player } from "../src/game.ts";
 import { loadSnapshot, saveSnapshot } from "../src/snapshot.ts";
+import type { PlayerValues } from "../src/state/parts.ts";
 import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
@@ -65,16 +73,16 @@ describe("capital mode", () => {
   it("makes each player's start tile their capital when play starts (R-CAP-01)", () => {
     const game = newGame();
     run(game, [{ player: 1, order: spawn(ADA) }]);
-    expect(player(game, 1).capital).toBeUndefined();
+    expect(capitalOf(game, 1)).toBeUndefined();
     const played = started();
-    expect(player(played, 1).capital).toBe(ADA);
-    expect(player(played, 2).capital).toBe(BEA);
+    expect(capitalOf(played, 1)).toBe(ADA);
+    expect(capitalOf(played, 2)).toBe(BEA);
   });
 
   it("gives no capital to anyone in a game without the rule", () => {
     const game = started(false);
     expect(game.rules.capitals).toBe(false);
-    expect(player(game, 1).capital).toBeUndefined();
+    expect(capitalOf(game, 1)).toBeUndefined();
     expect(capitalThreat(game, 1)).toBe(NEUTRAL);
     expect(capitalAim(game, BEA)).toBe(BEA);
   });
@@ -114,7 +122,7 @@ describe("capital mode", () => {
     expect(bea.gold).toBeGreaterThanOrEqual(250);
     expect(bea.gold).toBeLessThan(500);
     expect(bea.troops).toBeGreaterThanOrEqual(900);
-    expect(game.capitalFalls).toEqual([{ tick: game.tick - 1, player: 1, by: 2, tile: ADA }]);
+    expect(capitalFalls(game)).toEqual([{ tick: game.tick - 1, player: 1, by: 2, tile: ADA }]);
     expect(game.diplomacyEvents.slice(-2)).toMatchObject([
       { type: "capital", a: 2, b: 1 },
       { type: "eliminated", a: 2, b: 1, gold: 250 },
@@ -130,10 +138,10 @@ describe("capital mode", () => {
     run(game);
     expect(ada.alive).toBe(true);
     expect(ada.troops).toBeLessThan(600);
-    const moved = ada.capital as number;
+    const moved = capitalOf(game, 1) as number;
     expect(game.territory.ownerOf(moved)).toBe(1);
     expect(grid.squaredDistance(moved, ADA)).toBe(1);
-    expect(game.capitalFalls.at(-1)).toMatchObject({ player: 1, by: NEUTRAL, tile: ADA });
+    expect(capitalFalls(game).at(-1)).toMatchObject({ player: 1, by: NEUTRAL, tile: ADA });
   });
 
   it("only moves a capital taken before the grace is over (R-CAP-06)", () => {
@@ -147,8 +155,8 @@ describe("capital mode", () => {
     game.territory.setOwner(ADA, 2);
     run(game);
     expect(player(game, 1).alive).toBe(true);
-    expect(game.capitalFalls).toEqual([]);
-    expect(grid.squaredDistance(player(game, 1).capital as number, ADA)).toBe(1);
+    expect(capitalFalls(game)).toEqual([]);
+    expect(grid.squaredDistance(capitalOf(game, 1) as number, ADA)).toBe(1);
     expect(capitalThreat(game, 1)).toBe(NEUTRAL);
   });
 
@@ -174,12 +182,14 @@ describe("capital mode", () => {
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
     expect(loaded.game.hash()).toBe(game.hash());
-    expect(player(loaded.game, 1).capital).toBe(player(game, 1).capital);
-    expect(loaded.game.capitalFalls).toEqual(game.capitalFalls);
+    expect(capitalOf(loaded.game, 1)).toBe(capitalOf(game, 1));
+    expect(capitalFalls(loaded.game)).toEqual(capitalFalls(game));
     // The rule is part of the setup: a game without it does not take the snapshot.
     expect(loadSnapshot(bytes, "test", () => newGame(false)).ok).toBe(false);
     const other = started();
-    player(other, 1).capital = BEA;
+    // The capitals part keeps them by player id.
+    const capitals = other.persistedParts().find((p) => p.name === "capitals")?.part;
+    (capitals as PlayerValues).set(1, BEA);
     expect(other.hash()).not.toBe(started().hash());
   });
 
@@ -228,6 +238,6 @@ describe("computer players in capital mode (R-BOT-17)", () => {
     }
     expect(aimed).toBe(true);
     expect(game.winner).toBe(2);
-    expect(game.capitalFalls).toContainEqual(expect.objectContaining({ player: 1, by: 2 }));
+    expect(capitalFalls(game)).toContainEqual(expect.objectContaining({ player: 1, by: 2 }));
   });
 });

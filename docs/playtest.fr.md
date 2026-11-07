@@ -47,8 +47,8 @@ Tout le reste est le bienvenu, mais ce sont ces trois réponses que le bilan com
 Le seul chiffre qui compte est le nombre de parties jouées jusqu'au bout. Le jeu le compte déjà, sans nom ni cookie (voir [privacy.md](privacy.md)) : une partie est **terminée** quand elle s'achève sur l'écran de fin, gagnée ou perdue, et **abandonnée** quand le joueur retourne au menu, ferme l'onglet ou perd la connexion. Depuis le dépôt :
 
 ```sh
-pnpm playtest-report 2026-11-04   # parties comptées à partir de ce jour (UTC)
-pnpm playtest-report              # depuis le début du comptage
+bun run playtest-report 2026-11-04   # parties comptées à partir de ce jour (UTC)
+bun run playtest-report              # depuis le début du comptage
 ```
 
 La commande lit `https://nclsmgr.com/frontfall/api/stats` (`FRONTFALL_URL` pour un autre serveur) et affiche, par mode, les parties jouées, terminées et abandonnées, la part terminée, les parties quittées en moins de deux minutes et les pouces. Avant le playtest de la 1.0, toutes versions confondues, 28 parties sur 54 étaient terminées (52 %) : 26 sur 44 en solo, 1 sur 8 en privé. Un bon résultat pour la 1.0 : plus de 60 % des parties solo terminées, sans hausse des parties quittées en moins de deux minutes.

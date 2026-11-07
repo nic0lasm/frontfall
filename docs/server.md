@@ -328,7 +328,7 @@ admin GET 'errors?days=30'      # everything kept
 }
 ```
 
-`where` names a file of the release's build: `pnpm build` at that release's tag gives the same file, and the line and column point into it. The `client_error` lines of the log carry the same `group`. `errors` on `/status` and in `/api/stats` count the reports by kind only.
+`where` names a file of the release's build: `bun run build` at that release's tag gives the same file, and the line and column point into it. The `client_error` lines of the log carry the same `group`. `errors` on `/status` and in `/api/stats` count the reports by kind only.
 
 ## Usage counts
 

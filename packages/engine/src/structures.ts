@@ -1,7 +1,11 @@
 import { withDoctrine } from "./doctrines.ts";
-import { Disable, OPERATOR_FACTOR, OperatorBonus, type Game, type Player } from "./game.ts";
+import { Disable, OperatorBonus } from "@frontfall/contracts";
+import type { Game, Player } from "./game.ts";
+import { OPERATOR_FACTOR } from "./modes.ts";
 import { divFloor, mulDiv } from "./integer-math.ts";
+import { PLAY_PHASE, defineOrder, tileError } from "./order-rules.ts";
 import { spawnSettings } from "./spawn.ts";
+import { writable } from "./state/lists.ts";
 import { NEUTRAL } from "./territory/territory-map.ts";
 
 /** What a structure is (R-BUILD). The number is its code in build orders: never renumber. */
@@ -49,11 +53,34 @@ export function isStructureKind(kind: number): kind is StructureKind {
   return Number.isInteger(kind) && kind >= 0 && kind <= HIGHEST_KIND;
 }
 
-export function isReady(game: Game, structure: Structure): boolean {
+export function isReady(game: Game, structure: Readonly<Structure>): boolean {
   return game.tick >= structure.readyAt;
 }
 
-export function structureAt(game: Game, tile: number): Structure | undefined {
+/**
+ * Where a structure is in its life, from the ticks it already holds: being
+ * built until `readyAt` (R-BUILD-01), then reloading until `reloadAt` after a
+ * silo launched or an air defense stopped a missile (R-BUILD-04, R-BUILD-05),
+ * and active otherwise. Nothing of it is stored. A structure on land gone
+ * back to nobody, or demolished, is no longer in the list.
+ */
+export type StructureState = "building" | "reloading" | "active";
+
+export function structureState(game: Game, structure: Readonly<Structure>): StructureState {
+  if (!isReady(game, structure)) return "building";
+  return game.tick < structure.reloadAt ? "reloading" : "active";
+}
+
+/**
+ * R-BUILD-04, R-BUILD-05: a silo that launched, or an air defense that
+ * stopped a missile, reloads for `ticks` from now. The missile rules call it;
+ * the structures are this module's to change (ADR 0010).
+ */
+export function startReload(game: Game, structure: Readonly<Structure>, ticks: number): void {
+  (structure as Structure).reloadAt = game.tick + ticks;
+}
+
+export function structureAt(game: Game, tile: number): Readonly<Structure> | undefined {
   return game.structures.find((structure) => structure.tile === tile);
 }
 
@@ -277,11 +304,11 @@ interface FortCache {
   readonly game: Game;
   readonly tick: number;
   readonly length: number;
-  readonly last: Structure | undefined;
+  readonly last: Readonly<Structure> | undefined;
   readonly nextId: number;
   readonly handovers: number;
   readonly radius: number;
-  readonly byPlayer: (Structure[] | undefined)[];
+  readonly byPlayer: (Readonly<Structure>[] | undefined)[];
 }
 
 // One game at a time: a game only finds its own forts here, and others rebuild them.
@@ -313,7 +340,7 @@ function readyForts(game: Game): FortCache {
   ) {
     return cache;
   }
-  const byPlayer: (Structure[] | undefined)[] = [];
+  const byPlayer: (Readonly<Structure>[] | undefined)[] = [];
   for (const structure of structures) {
     if (structure.kind !== StructureKind.Fort || !isReady(game, structure)) continue;
     const forts = byPlayer[structure.player];
@@ -333,6 +360,49 @@ function readyForts(game: Game): FortCache {
   return fortCache;
 }
 
+/** R-BUILD-01: `build` pays for a structure on one of the player's tiles; it works B-BUILD-TIME later. */
+export const BUILD_ORDER = defineOrder("build", {
+  phases: PLAY_PHASE,
+  wrongPhase: BuildError.Early,
+  validate(game, player, order) {
+    const kind = order.structure;
+    if (!isStructureKind(kind)) return "unknown structure";
+    return (
+      tileError(game, order.tile) ??
+      placementError(game, player, kind, order.tile) ?? {
+        kind,
+        tile: order.tile,
+      }
+    );
+  },
+  execute(game, player, { kind, tile }) {
+    player.gold -= structureCost(game, player.id, kind);
+    writable(game, "structures").push({
+      id: game.nextStructureId++,
+      player: player.id,
+      kind,
+      tile,
+      readyAt: game.tick + buildTime(game, kind),
+      reloadAt: 0,
+    });
+  },
+});
+
+/** R-BUILD-06: `demolish` removes one of the player's structures, with no refund. */
+export const DEMOLISH_ORDER = defineOrder("demolish", {
+  phases: PLAY_PHASE,
+  wrongPhase: BuildError.Early,
+  validate(game, player, order) {
+    const error = tileError(game, order.tile);
+    if (error) return error;
+    const index = game.structures.findIndex((s) => s.tile === order.tile && s.player === player.id);
+    return index < 0 ? "no structure of yours on the tile" : { index };
+  },
+  execute(game, _player, { index }) {
+    writable(game, "structures").splice(index, 1);
+  },
+});
+
 /**
  * Structures (R-BUILD-01, R-BUILD-03, R-BUILD-06, R-BUILD-07). A build order
  * takes the gold at once and the structure works B-BUILD-TIME later; a
@@ -341,29 +411,10 @@ function readyForts(game: Game): FortCache {
  * tile. Structures live in `game.structures`, oldest first.
  */
 export function installStructures(game: Game): void {
-  const structures = game.structures;
+  const structures = writable(game, "structures");
 
-  game.onOrder((_, player, order) => {
-    if (order.type !== "build" || !isStructureKind(order.structure)) return false;
-    player.gold -= structureCost(game, player.id, order.structure);
-    structures.push({
-      id: game.nextStructureId++,
-      player: player.id,
-      kind: order.structure,
-      tile: order.tile,
-      readyAt: game.tick + buildTime(game, order.structure),
-      reloadAt: 0,
-    });
-    return true;
-  });
-
-  game.onOrder((_, player, order) => {
-    if (order.type !== "demolish") return false;
-    const index = structures.findIndex((s) => s.tile === order.tile && s.player === player.id);
-    if (index < 0) return false;
-    structures.splice(index, 1);
-    return true;
-  });
+  game.onOrder(BUILD_ORDER);
+  game.onOrder(DEMOLISH_ORDER);
 
   game.onTick(() => {
     let kept = 0;

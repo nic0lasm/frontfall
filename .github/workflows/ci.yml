@@ -23,16 +23,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       # Known advisories in the dependencies warn without failing: a fix may wait for upstream.
       - name: Audit the dependencies
         run: |
-          if pnpm audit > "$RUNNER_TEMP/audit.txt" 2>&1; then
+          if bun audit > "$RUNNER_TEMP/audit.txt" 2>&1; then
             echo "No known advisory in the dependencies." >> "$GITHUB_STEP_SUMMARY"
           else
             {
@@ -41,14 +36,14 @@ jobs:
               cat "$RUNNER_TEMP/audit.txt"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            echo "::warning title=Dependency audit::pnpm audit reports advisories, listed in the job summary"
+            echo "::warning title=Dependency audit::bun audit reports advisories, listed in the job summary"
           fi
-      - run: pnpm format:check
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm build
+      - run: bun run format:check
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run build
       # A full game on a World-sized map, failing if the tick misses its budget (docs/performance.md).
-      - run: pnpm sim -- --width 2048 --height 1024 --players 16 --ticks 3000 --interval 10 --budget 30
+      - run: bun run sim -- --width 2048 --height 1024 --players 16 --ticks 3000 --interval 10 --budget 30
 
   unit:
     name: Unit tests (${{ matrix.shard }}/6)
@@ -64,16 +59,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       # A sixth of the tests cannot reach the thresholds on their own: they are held to them
       # once the reports are merged.
       - run: >-
-          pnpm exec vitest run --coverage --shard=${{ matrix.shard }}/6
+          bun run vitest run --coverage --shard=${{ matrix.shard }}/6
           --reporter=blob --outputFile=.vitest-reports/blob-${{ matrix.shard }}.json
           --coverage.thresholds.lines=0 --coverage.thresholds.functions=0
           --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
@@ -93,19 +83,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: unit-report-*
           path: .vitest-reports
           merge-multiple: true
       # The thresholds of vitest.config.ts apply to the whole suite, as before.
-      - run: pnpm exec vitest run --merge-reports=.vitest-reports --coverage
+      - run: bun run vitest run --merge-reports=.vitest-reports --coverage
 
   e2e:
     name: End-to-end (${{ matrix.shard }}/6)
@@ -121,17 +106,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - uses: ./.github/actions/browsers
-      - run: pnpm build
+      - run: bun run build
       # The built game at / and behind a proxy that serves it under /frontfall/,
       # at / in Firefox, which needs a display for WebGL, and in WebKit.
-      - run: xvfb-run --auto-servernum pnpm test:e2e --shard=${{ matrix.shard }}/6
+      - run: xvfb-run --auto-servernum bun run test:e2e --shard=${{ matrix.shard }}/6
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -161,19 +141,16 @@ jobs:
         env:
           FRONTFALL_IMAGE: frontfall:ci
         run: docker compose up --detach --wait
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --filter @frontfall/e2e
+          filter: "@frontfall/e2e"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-      - run: pnpm --filter @frontfall/e2e exec playwright install chromium
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('bun.lock') }}
+      - run: bunx --cwd e2e --no-install playwright install chromium
       # The menu, solo games, a private game between two pages, and the server's own pages.
-      - run: pnpm test:e2e tests/server-pages.spec.ts tests/solo-game.spec.ts tests/walking-skeleton.spec.ts
+      - run: bun run test:e2e tests/server-pages.spec.ts tests/solo-game.spec.ts tests/walking-skeleton.spec.ts
         env:
           E2E_BASE_URL: http://127.0.0.1:8080/
       # Stopped, the server writes its usage counts to the volume, and reads them back on start.
@@ -203,17 +180,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - uses: ./.github/actions/browsers
-      # Ten thousand ticks of bots on World, twice in Node and once in a Chromium, a Firefox
-      # and a WebKit worker, then the golden replays in the three browsers: every run must
+      # Ten thousand ticks of bots on World, twice in Node, once in Bun and once in a Chromium,
+      # a Firefox and a WebKit worker, then the golden replays in the three browsers: every run must
       # reach the same state hashes (R-FAIR-01).
-      - run: pnpm determinism
+      - run: bun run determinism
 
   performance:
     name: Performance
@@ -224,21 +196,16 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-      - run: pnpm --filter @frontfall/e2e exec playwright install chromium
-      - run: pnpm build
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('bun.lock') }}
+      - run: bunx --cwd e2e --no-install playwright install chromium
+      - run: bun run build
       # Download sizes against bench/client/budget.json, failing when over; then load
       # times and frame rate in headless Chromium, reported only (docs/performance.md).
-      - run: pnpm perf:client -- --trend
+      - run: bun run perf:client -- --trend
       # The reference game on this commit and on the commit it branched from, alternated on
       # this runner; fails when the engine got slower or its tick p95 is over 30 ms.
       # A commit between the base and this one may accept a slowdown with a
@@ -250,16 +217,20 @@ jobs:
         run: |
           # A pull request is checked out as its merge commit, whose first parent is the base.
           if [ "$EVENT" = pull_request ]; then base=$(git rev-parse HEAD^1); else base=$(git merge-base HEAD origin/main || true); fi
-          if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ] || git diff --quiet "$base" HEAD -- packages/engine; then
+          if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ] || git diff --quiet "$base" HEAD -- packages/engine packages/contracts; then
             echo "No base to compare with, or the same engine as on $base: absolute budget only."
-            pnpm perf:engine
+            bun run perf:engine
             exit
           fi
           accepted=$(git log --format=%B "$base..HEAD" | sed -n 's/^Performance-Accepted: *//p' | head -n 1)
           git worktree add --detach "$RUNNER_TEMP/base" "$base"
+          # A base that already uses Bun needs its own dependencies; before that its engine had none.
+          if [ -f "$RUNNER_TEMP/base/bun.lock" ]; then
+            (cd "$RUNNER_TEMP/base" && bun install --frozen-lockfile)
+          fi
           args=(--base "$RUNNER_TEMP/base" --base-label "${base:0:7}")
           if [ -n "$accepted" ]; then args+=(--accept "$accepted"); fi
-          pnpm perf:engine -- "${args[@]}"
+          bun run perf:engine -- "${args[@]}"
 
   provenance:
     name: Provenance check
@@ -270,7 +241,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - run: corepack enable
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -300,12 +270,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - run: corepack enable
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       # Fetched outside the workspace on every run: the reference never enters the repository or an image.
       - run: git clone --quiet --depth 1 "$REFERENCE" "$RUNNER_TEMP/reference"
       - name: Compare with the reference codebase
@@ -313,9 +278,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE_SHA" ]; then
-            pnpm clean-room --reference "$RUNNER_TEMP/reference" --base "$BASE_SHA"
+            bun run clean-room --reference "$RUNNER_TEMP/reference" --base "$BASE_SHA"
           else
-            pnpm clean-room --reference "$RUNNER_TEMP/reference"
+            bun run clean-room --reference "$RUNNER_TEMP/reference"
           fi
       - if: always()
         run: rm -rf "$RUNNER_TEMP/reference"

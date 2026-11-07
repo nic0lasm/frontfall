@@ -13,7 +13,7 @@ import { REFERENCE } from "./reference.ts";
  * slower by the rule in decide.ts or when its tick p95 is over --budget.
  */
 const { values } = parseArgs({
-  // `pnpm perf:engine -- --base dir` forwards the separator too.
+  // `bun run perf:engine -- --base dir` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     // A checkout of the commit to compare with, such as a git worktree of the merge base.

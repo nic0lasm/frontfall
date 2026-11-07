@@ -1,3 +1,4 @@
+import { DIFFICULTIES, DISABLE_ALL, OPERATOR_BONUS_ALL, TICK_RATE } from "@frontfall/contracts";
 import { z } from "zod";
 import {
   DecodeError,
@@ -17,8 +18,8 @@ import { Order, PlayerNumber, type Turn } from "./orders.ts";
  */
 export const PROTOCOL_VERSION = 29;
 
-/** Ticks per second of the simulation at speed 1. The server closes one turn per tick. */
-export const TICK_RATE = 10;
+// Ticks per second at speed 1, from the contracts: the server closes one turn per tick.
+export { TICK_RATE };
 
 /**
  * Paces a game can run at (R-MODE-07): ticks per beat of the clock, a beat
@@ -81,7 +82,7 @@ const tick = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const stateHash = z.number().int().min(0).max(0xffffffff);
 
 /** How hard the bots play. Every client runs them at the level the game was set to. */
-export const Difficulty = z.enum(["easy", "normal", "hard"]);
+export const Difficulty = z.enum(DIFFICULTIES);
 export type Difficulty = z.infer<typeof Difficulty>;
 
 /** Teams of a game (R-MODE-02): 0 for a free-for-all, or 2 to 4. */
@@ -89,7 +90,7 @@ export const Teams = z.union([z.literal(0), z.literal(2), z.literal(3), z.litera
 export type Teams = z.infer<typeof Teams>;
 
 /** What a private game leaves out (R-MODE-03): the engine's `Disable` bits, 0 for nothing. */
-export const Disabled = z.number().int().min(0).max(0x3f);
+export const Disabled = z.number().int().min(0).max(DISABLE_ALL);
 
 /**
  * Special rules of a game (R-MODE-08), the engine's `GameRules`: each one is
@@ -123,7 +124,7 @@ export function isDefaultRules(rules: GameRules): boolean {
 }
 
 /** The operator's test bonuses (R-MODE-09): the engine's `OperatorBonus` bits, 0 for none. */
-export const OperatorBonusBits = z.number().int().min(0).max(0xf);
+export const OperatorBonusBits = z.number().int().min(0).max(OPERATOR_BONUS_ALL);
 
 /** Who has the operator's bonuses in a game (R-MODE-09), and which. */
 export const OperatorBonuses = z

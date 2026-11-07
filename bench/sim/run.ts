@@ -6,7 +6,7 @@ import { replay } from "./replay.ts";
 import { Simulation } from "./simulation.ts";
 
 const { values } = parseArgs({
-  // `pnpm sim -- --players 8` forwards the separator too.
+  // `bun run sim -- --players 8` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     // A published map by id (apps/client/public/maps), instead of a generated one.

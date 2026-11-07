@@ -617,7 +617,7 @@ function showConnection(state: ConnectionStatus, retryInMs?: number): void {
 
 /**
  * The game no longer matches the other players': say so, and offer the
- * report that lets a developer replay it (`pnpm sim -- --replay`).
+ * report that lets a developer replay it (`bun run sim -- --replay`).
  */
 function showDesync(tick: number): void {
   showNotice("online.desync");

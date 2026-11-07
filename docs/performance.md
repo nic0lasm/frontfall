@@ -13,27 +13,27 @@ Every budget names the scenario it is measured on and how to measure it.
 Those marked **CI** fail the build when they are missed; the others are
 checked by hand on the machines below until CI can measure them.
 
-| Area                              | Budget                                   | Scenario                                                                 | Measure with                               | Enforced                 |
-| --------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------ | ------------------------ |
-| Simulation tick, full lobby       | p95 ≤ 30 ms                              | Reference game: 64 normal bots on World, 3,000 ticks                     | `pnpm perf:engine`                         | **CI**                   |
-| Simulation tick, against `main`   | Not slower: a 10 % slowdown fails        | Reference game, alternated with the merge base                           | `pnpm perf:engine -- --base <checkout>`    | **CI**                   |
-| Simulation tick, scripted attacks | p95 ≤ 30 ms                              | 16 scripted players, generated 2048 × 1024, 3,000 ticks                  | `pnpm sim -- … --budget 30`                | **CI**                   |
-| Simulation tick, largest map      | p95 ≤ 30 ms                              | Synthetic expansion on 4096 × 2048                                       | `pnpm bench`                               | Exit status, run by hand |
-| Simulation memory, largest map    | ≤ 96 MiB of typed arrays                 | Synthetic expansion on 4096 × 2048                                       | `pnpm bench` (Engine memory column)        | By hand                  |
-| Allocation per tick               | None in the hot loops once warm          | Synthetic expansion                                                      | `pnpm bench` (heap growth per scenario)    | By hand                  |
-| Download, first visit             | ≤ 275 kB sent                            | Page, code, styles, English texts and Latin font of the production build | `pnpm perf:client`                         | **CI**                   |
-| Download, simulation worker       | ≤ 50 kB sent                             | Production build                                                         | `pnpm perf:client`                         | **CI**                   |
-| Download, World map               | ≤ 175 kB sent                            | Production build                                                         | `pnpm perf:client`                         | **CI**                   |
-| Download, every map               | ≤ 520 kB sent                            | Production build                                                         | `pnpm perf:client`                         | **CI**                   |
-| Download, whole build but maps    | ≤ 850 kB sent                            | Production build, icons and preview image included                       | `pnpm perf:client`                         | **CI**                   |
-| Load, menu and game screen        | Trend only                               | Solo game on World with 63 bots, headless Chromium                       | `pnpm perf:client -- --trend`              | Reported in CI           |
-| Frame rate in a game              | Trend only                               | Same game, camera panning, software rendering                            | `pnpm perf:client -- --trend`              | Reported in CI           |
-| Frame time, desktop GPU           | ≤ 16.7 ms (60 fps)                       | Same game, or `bench:render` on a laptop                                 | `pnpm bench:render -- --gpu`, then by hand | By hand                  |
-| Frame time, mid-range phone       | ≤ 33 ms (30 fps)                         | `bench:render` page opened on the phone                                  | `pnpm bench:render -- --serve`             | By hand                  |
-| Draw calls for map and units      | ≤ 10                                     | Synthetic renderer, 10,000 units                                         | `pnpm bench:render`                        | By hand                  |
-| Territory upload per tick         | ≤ 1 MiB typical, full map only on resync | Synthetic renderer                                                       | `pnpm bench:render`                        | By hand                  |
-| GPU memory for map and units      | ≤ 64 MiB at 4096 × 2048                  | Synthetic renderer                                                       | `pnpm bench:render`                        | By hand                  |
-| Main-thread CPU to issue a frame  | ≤ 2 ms                                   | Synthetic renderer                                                       | `pnpm bench:render`                        | By hand                  |
+| Area                              | Budget                                   | Scenario                                                                 | Measure with                                  | Enforced                 |
+| --------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------- | ------------------------ |
+| Simulation tick, full lobby       | p95 ≤ 30 ms                              | Reference game: 64 normal bots on World, 3,000 ticks                     | `bun run perf:engine`                         | **CI**                   |
+| Simulation tick, against `main`   | Not slower: a 10 % slowdown fails        | Reference game, alternated with the merge base                           | `bun run perf:engine -- --base <checkout>`    | **CI**                   |
+| Simulation tick, scripted attacks | p95 ≤ 30 ms                              | 16 scripted players, generated 2048 × 1024, 3,000 ticks                  | `bun run sim -- … --budget 30`                | **CI**                   |
+| Simulation tick, largest map      | p95 ≤ 30 ms                              | Synthetic expansion on 4096 × 2048                                       | `bun run bench`                               | Exit status, run by hand |
+| Simulation memory, largest map    | ≤ 96 MiB of typed arrays                 | Synthetic expansion on 4096 × 2048                                       | `bun run bench` (Engine memory column)        | By hand                  |
+| Allocation per tick               | None in the hot loops once warm          | Synthetic expansion                                                      | `bun run bench` (heap growth per scenario)    | By hand                  |
+| Download, first visit             | ≤ 275 kB sent                            | Page, code, styles, English texts and Latin font of the production build | `bun run perf:client`                         | **CI**                   |
+| Download, simulation worker       | ≤ 50 kB sent                             | Production build                                                         | `bun run perf:client`                         | **CI**                   |
+| Download, World map               | ≤ 175 kB sent                            | Production build                                                         | `bun run perf:client`                         | **CI**                   |
+| Download, every map               | ≤ 520 kB sent                            | Production build                                                         | `bun run perf:client`                         | **CI**                   |
+| Download, whole build but maps    | ≤ 850 kB sent                            | Production build, icons and preview image included                       | `bun run perf:client`                         | **CI**                   |
+| Load, menu and game screen        | Trend only                               | Solo game on World with 63 bots, headless Chromium                       | `bun run perf:client -- --trend`              | Reported in CI           |
+| Frame rate in a game              | Trend only                               | Same game, camera panning, software rendering                            | `bun run perf:client -- --trend`              | Reported in CI           |
+| Frame time, desktop GPU           | ≤ 16.7 ms (60 fps)                       | Same game, or `bench:render` on a laptop                                 | `bun run bench:render -- --gpu`, then by hand | By hand                  |
+| Frame time, mid-range phone       | ≤ 33 ms (30 fps)                         | `bench:render` page opened on the phone                                  | `bun run bench:render -- --serve`             | By hand                  |
+| Draw calls for map and units      | ≤ 10                                     | Synthetic renderer, 10,000 units                                         | `bun run bench:render`                        | By hand                  |
+| Territory upload per tick         | ≤ 1 MiB typical, full map only on resync | Synthetic renderer                                                       | `bun run bench:render`                        | By hand                  |
+| GPU memory for map and units      | ≤ 64 MiB at 4096 × 2048                  | Synthetic renderer                                                       | `bun run bench:render`                        | By hand                  |
+| Main-thread CPU to issue a frame  | ≤ 2 ms                                   | Synthetic renderer                                                       | `bun run bench:render`                        | By hand                  |
 
 Why these numbers:
 
@@ -56,33 +56,33 @@ Why these numbers:
 
 ### Reference machines
 
-| Machine                      | Used for                                        | Notes                                                          |
-| ---------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
-| GitHub `ubuntu-24.04` runner | Every CI budget, and the comparison with `main` | 4 vCPU, shared: absolute times vary by run, ratios do not      |
-| 4-core Intel Xeon, 2.1 GHz   | The results below                               | Cloud VM, 16 GB                                                |
-| MacBook Air, Apple M4        | Desktop frame time                              | Chrome on the GPU, `pnpm bench:render -- --gpu`; results below |
-| A mid-range phone            | Phone frame time                                | To do: `pnpm bench:render -- --serve` on the same network      |
+| Machine                      | Used for                                        | Notes                                                             |
+| ---------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| GitHub `ubuntu-24.04` runner | Every CI budget, and the comparison with `main` | 4 vCPU, shared: absolute times vary by run, ratios do not         |
+| 4-core Intel Xeon, 2.1 GHz   | The results below                               | Cloud VM, 16 GB                                                   |
+| MacBook Air, Apple M4        | Desktop frame time                              | Chrome on the GPU, `bun run bench:render -- --gpu`; results below |
+| A mid-range phone            | Phone frame time                                | To do: `bun run bench:render -- --serve` on the same network      |
 
 ## Running the benchmarks
 
 ```sh
-pnpm bench                      # simulation scenarios, about a minute
-pnpm bench -- --quick           # a tenth of the ticks, for a quick check
-pnpm bench -- --scenario reference --json results.json
+bun run bench                      # simulation scenarios, about a minute
+bun run bench -- --quick           # a tenth of the ticks, for a quick check
+bun run bench -- --scenario reference --json results.json
 
-pnpm perf:engine                # reference game, budget only, about a minute
-pnpm perf:engine -- --base ../frontfall-main   # alternated with another checkout
-pnpm perf:client                # download sizes of the production build
-pnpm perf:client -- --trend     # and load times and frame rate in Chromium
+bun run perf:engine                # reference game, budget only, about a minute
+bun run perf:engine -- --base ../frontfall-main   # alternated with another checkout
+bun run perf:client                # download sizes of the production build
+bun run perf:client -- --trend     # and load times and frame rate in Chromium
 
-pnpm bench:render               # renderer in headless Chromium (software GL)
-pnpm bench:render -- --gpu      # same, on the machine's GPU
-pnpm bench:render -- --serve    # serves the page on port 5180 to open by hand,
+bun run bench:render               # renderer in headless Chromium (software GL)
+bun run bench:render -- --gpu      # same, on the machine's GPU
+bun run bench:render -- --serve    # serves the page on port 5180 to open by hand,
                                 # for example on a phone on the same network
 ```
 
-`pnpm bench` exits with a non-zero status when a scenario misses the tick
-budget. `pnpm bench:render` needs a Chromium build: it uses Playwright's
+`bun run bench` exits with a non-zero status when a scenario misses the tick
+budget. `bun run bench:render` needs a Chromium build: it uses Playwright's
 browser if one is installed, or the one named by `CHROMIUM_PATH`.
 
 Both use the same seeded workload, so two runs simulate exactly the same
@@ -171,12 +171,12 @@ for CI: once a commit is on `main` it is deployed whatever the gate said,
 which is why branches are fast-forwarded onto `main` only after their run is
 green (CONTRIBUTING).
 
-`pnpm perf:engine -- --base <checkout> --slowdown 10` slows this checkout's
+`bun run perf:engine -- --base <checkout> --slowdown 10` slows this checkout's
 ticks down by 10 % with a busy wait, to check that the gate still catches it.
 
 ### Client
 
-`pnpm perf:client` measures the production build in `apps/client/dist`
+`bun run perf:client` measures the production build in `apps/client/dist`
 against [`bench/client/budget.json`](../bench/client/budget.json), the way
 the game server sends it, and fails when a group is over. Sizes do not depend
 on the machine, so this check cannot be flaky.
@@ -290,7 +290,7 @@ uploaded.
 ## Results
 
 Measured on 2026-10-23 with Node 22.22.0 on a 4-core Intel Xeon at 2.10 GHz
-(cloud VM, 16 GB), with `pnpm bench` and `pnpm bench:render`.
+(cloud VM, 16 GB), with `bun run bench` and `bun run bench:render`.
 
 ### Simulation
 
@@ -422,7 +422,7 @@ the DevTools profiler, over 200 updates at ticks 607-808 and 1807-2008.
 
 Measured on 2026-10-24 on a MacBook Air with an Apple M4, in Google Chrome
 (ANGLE on Metal, maximum texture size 16,384), with
-`CHROMIUM_PATH=".../Google Chrome" pnpm bench:render -- --gpu`.
+`CHROMIUM_PATH=".../Google Chrome" bun run bench:render -- --gpu`.
 
 | Map       | Viewport |  Units | Draw calls | Static frame p50 / p95 | Frame with a tick p50 / p95 | Full upload frame | First frame | GPU memory |
 | --------- | -------- | -----: | ---------: | ---------------------- | --------------------------- | ----------------: | ----------: | ---------: |
@@ -469,7 +469,7 @@ minutes of play (the last window of 120 frames).
 ### Server load, after the pace change
 
 Since 0.9.1 a normal game runs three beats in four, so turns are 100 or 200 ms apart.
-`pnpm load` measures lateness from the nearest beat (up to two). Measured on 2026-11-03,
+`bun run load` measures lateness from the nearest beat (up to two). Measured on 2026-11-03,
 Xeon at 2.1 GHz, heap 512 MiB, 16 players a game, 2 minutes a step:
 
 | Games | Players | Server CPU | RSS     | Loop delay p99 | Turn pass |
@@ -485,7 +485,7 @@ No turn was lost. The reference game takes 4.0 ms a tick (p95 6.8 ms) on this ma
 
 A heavy missile's fallout used to send the whole ground texture (32 MiB on a
 4096 × 2048 map) each time a zone appeared or cleared. It now sends the rectangle the
-discs changed, and `pnpm bench:render` checks that the result draws exactly as a full
+discs changed, and `bun run bench:render` checks that the result draws exactly as a full
 send does. On a software rasteriser the cost is dominated by rebuilding the mipmaps, so
 the saving shows only on a real GPU.
 
@@ -526,7 +526,7 @@ the renderer on the same machine. A one-off quick run of the largest map with a
 single unit instead of 10,000 took 26.3 ms per frame instead of 183 ms, so in
 software almost all of the frame goes to the tiny unit triangles, which are
 smaller than a pixel when the whole world is on screen. Frame rate budgets
-will be checked with `pnpm bench:render -- --gpu` on a laptop and with
+will be checked with `bun run bench:render -- --gpu` on a laptop and with
 `--serve` on a phone; this section will be updated with those runs.
 
 The simplest measure on a phone needs no computer: open the game with `?perf`
@@ -539,15 +539,15 @@ visit nothing.
 
 ### Full game rules
 
-`pnpm sim` plays a whole game with the real rules: a generated map of
+`bun run sim` plays a whole game with the real rules: a generated map of
 2048×1024 tiles with several continents, scripted players that each send a
 third of their troops every ten ticks, and `createGame` driven by a
 `TurnClock`. It is the measure that counts once players touch: the synthetic
 workload above has no attacks between players and no encirclement.
 
 ```sh
-pnpm sim -- --width 2048 --height 1024 --players 16 --ticks 6000 --interval 10
-pnpm sim -- --budget 30   # exits with an error when the tick p95 is over 30 ms
+bun run sim -- --width 2048 --height 1024 --players 16 --ticks 6000 --interval 10
+bun run sim -- --budget 30   # exits with an error when the tick p95 is over 30 ms
 ```
 
 CI runs the 16-player game for 3,000 ticks on every push with `--budget 30`,
@@ -637,10 +637,10 @@ game ([protocol](protocol.md)). [`bench/server`](../bench/server) checks that
 it keeps that pace with many full games:
 
 ```sh
-pnpm load -- --spawn-server                           # 20 games × 16 players, 30 min
-pnpm load -- --spawn-server --games 20 --players 16 --minutes 2
-pnpm load -- --games 20 --players 16 --minutes 30 --url ws://localhost:8080/ws
-pnpm load -- --spawn-server --public --json load.json
+bun run load -- --spawn-server                           # 20 games × 16 players, 30 min
+bun run load -- --spawn-server --games 20 --players 16 --minutes 2
+bun run load -- --games 20 --players 16 --minutes 30 --url ws://localhost:8080/ws
+bun run load -- --spawn-server --public --json load.json
 ```
 
 Each simulated player speaks the protocol like the browser: one player per
@@ -682,10 +682,10 @@ production.
 ### Finding the breaking point
 
 ```sh
-pnpm load -- --spawn-server --heap-mib 512 --client-procs 4 --ramp 50,100,200,300 --minutes 5
-pnpm load -- --spawn-server --games 50 --minutes 3 --rejoin-storm 60
-pnpm load -- --spawn-server --games 50 --minutes 3 --rejoin-storm 120 --rejoin-from-zero
-pnpm load -- --spawn-server --games 50 --minutes 30 --slow-clients 10
+bun run load -- --spawn-server --heap-mib 512 --client-procs 4 --ramp 50,100,200,300 --minutes 5
+bun run load -- --spawn-server --games 50 --minutes 3 --rejoin-storm 60
+bun run load -- --spawn-server --games 50 --minutes 3 --rejoin-storm 120 --rejoin-from-zero
+bun run load -- --spawn-server --games 50 --minutes 30 --slow-clients 10
 ```
 
 - **`--ramp a,b,c`** adds games to the same server step by step, each step
@@ -719,7 +719,7 @@ pnpm load -- --spawn-server --games 50 --minutes 30 --slow-clients 10
   of a local socket hold the first megabytes, so the run must last long
   enough to fill them.
 
-A 10-second run of 2 games of 8 players is part of `pnpm test`
+A 10-second run of 2 games of 8 players is part of `bun run test`
 ([`bench/test/load.test.ts`](../bench/test/load.test.ts)): every client must
 receive every turn in order, and the p95 interval must stay under 300 ms.
 
@@ -728,7 +728,7 @@ receive every turn in order, and the p95 interval must stay under 300 ms.
 Measured on 2026-10-23 with Node 22.22.0 on the same 4-core Intel Xeon
 Processor at 2.10 GHz (cloud VM, 16 GB) as above, with the server and the
 320 clients on the same machine, using
-`pnpm load -- --spawn-server --games 20 --players 16 --minutes <n>`.
+`bun run load -- --spawn-server --games 20 --players 16 --minutes <n>`.
 
 | Run    | Games × players | Turns per client | Lost or reordered | Desyncs | Orders sent / seen | Interval p50 | p95      | p99      | max      | Order latency p50 / p95 / max |
 | ------ | --------------- | ---------------: | ----------------: | ------: | -----------------: | -----------: | -------- | -------- | -------- | ----------------------------- |
@@ -763,7 +763,7 @@ never throw and that every accepted binary frame is the canonical encoding of
 what it decodes to. It then opens about a thousand connections to a running
 server, 1 to 6 frames each, until 4,000 more such frames are sent, checking that `/healthz` still
 answers and that a game in progress on the same server keeps receiving its
-turns every 100 ms. The generator is seeded; `FUZZ_SEED=<n> pnpm test` tries
+turns every 100 ms. The generator is seeded; `FUZZ_SEED=<n> bun run test` tries
 other inputs.
 
 It found one crash: a decoding error quotes the client's input, and a
@@ -787,5 +787,5 @@ server. Reasons are now cut to 123 bytes.
 6. Bring 64-player games under budget: keep each attack's front line between
    ticks instead of rescanning the player's whole border, and share one border
    scan between the attacks of the same player.
-7. Run `pnpm load` against the production deployment, behind its reverse
+7. Run `bun run load` against the production deployment, behind its reverse
    proxy, from a machine other than the server's.

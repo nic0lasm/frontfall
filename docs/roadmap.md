@@ -267,7 +267,7 @@ Until v0.4, every deployment restarted the server and ended every game in progre
 
 1. On a mid-range phone, a first solo game on World is played to the end screen by touch alone, with every action of the keyboard reachable.
 2. The interface fits a screen 360 pixels wide in portrait and landscape, with no control under 44 pixels.
-3. The game holds 30 frames per second on World on three real phones, one of them a three-year-old Android, measured with `pnpm bench:render -- --serve`.
+3. The game holds 30 frames per second on World on three real phones, one of them a three-year-old Android, measured with `bun run bench:render -- --serve`.
 4. Settings (language, sound, reduced motion, colour-blind palette, graphics quality) are in one panel and kept between visits.
 5. A player can report another player from the game, and the server operator can ban a player from an address or a token without a redeploy.
 6. The browsers and devices that are supported are listed, each tested by hand on a real device before every tag.

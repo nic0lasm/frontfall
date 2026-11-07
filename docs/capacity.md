@@ -8,7 +8,7 @@ The server never simulates a game: it relays orders and sends every player one t
 
 ## Measured, 29 October 2026
 
-Bench: `pnpm load -- --spawn-server --players 16 --ramp 50,100,200,300,350 --minutes 2 --order-interval 1000 --client-procs 3 --heap-mib 512` ([performance.md](performance.md#server-load)). Private games of 16 players, each sending one order a second, which is more than people do. Machine: 4 × Xeon at 2.1 GHz, Node 22; the server runs in its own process with the heap of the image, the simulated players in three others.
+Bench: `bun run load -- --spawn-server --players 16 --ramp 50,100,200,300,350 --minutes 2 --order-interval 1000 --client-procs 3 --heap-mib 512` ([performance.md](performance.md#server-load)). Private games of 16 players, each sending one order a second, which is more than people do. Machine: 4 × Xeon at 2.1 GHz, Node 22; the server runs in its own process with the heap of the image, the simulated players in three others.
 
 | Players | Server CPU, one core | Memory (RSS) | Event loop p99 | Turn late by, p95 | Order to turn, p95 |
 | ------: | -------------------: | -----------: | -------------: | ----------------: | -----------------: |

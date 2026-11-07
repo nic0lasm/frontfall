@@ -1,5 +1,6 @@
 dist
 coverage
 pnpm-lock.yaml
-# Written by pnpm golden
+bun.lock
+# Written by bun run golden
 packages/engine/test/replays/

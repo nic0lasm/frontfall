@@ -40,6 +40,8 @@ export const REFUSALS: Partial<Record<ClickOutcome, MessageKey>> = {
   shore: "click.shore",
   allyNear: "click.allyNear",
   disabled: "click.disabled",
+  startTaken: "click.startTaken",
+  startNear: "click.startNear",
 };
 
 const NOTES: Record<ClickNote, MessageKey> = {

@@ -23,7 +23,7 @@ import {
 import { PROTOCOL_VERSION } from "@frontfall/protocol";
 
 /**
- * `pnpm golden`: writes the golden replays of packages/engine/test/replays.
+ * `bun run golden`: writes the golden replays of packages/engine/test/replays.
  * Each one is a desync report of a scripted game whose hashes are the
  * reference every runtime must reach. Run it after a change that is meant to
  * alter games, a balance value above all, and commit the files it writes.

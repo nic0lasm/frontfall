@@ -241,7 +241,11 @@ export type ClickRefusal =
   /** A missile's blast would reach an ally's or a teammate's land (R-UNIT-05). */
   | "allyNear"
   /** Left out of this game by its host (R-MODE-03). */
-  | "disabled";
+  | "disabled"
+  /** In the spawn phase, land another player already holds (R-SPAWN-02). */
+  | "startTaken"
+  /** In the spawn phase, too close to another player's start (R-SPAWN-02). */
+  | "startNear";
 
 /** Something to know about an order that was sent all the same. */
 export type ClickNote =

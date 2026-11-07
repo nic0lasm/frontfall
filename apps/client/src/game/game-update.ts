@@ -3,16 +3,18 @@ import {
   blastRadius,
   StructureKind,
   allianceOf,
+  allianceState,
   alliesOf,
   truceMatesOf,
   tributePrice,
   atWar,
-  canRenew,
   cityLimit,
+  capitalFalls,
+  capitalOf,
   capitalThreat,
   cityShare,
+  doctrineOf,
   structureCount,
-  isReady,
   launchSilo,
   missileCost,
   missileTile,
@@ -21,8 +23,12 @@ import {
   quickAllowedAt,
   sameTeam,
   structureCost,
+  structureState,
+  takeDiplomacyEvents,
+  takeMissileEvents,
   troopGrowth,
   warshipCost,
+  workShareOf,
   type Game,
 } from "@frontfall/engine";
 import type {
@@ -56,7 +62,7 @@ function diplomacy(game: Game, you: number): DiplomacyView {
       return {
         id,
         ticksLeft: until - tick,
-        renewable: alliance !== undefined && canRenew(game, alliance),
+        renewable: alliance !== undefined && allianceState(game, alliance) === "renewable",
         renewing:
           alliance !== undefined && (you === alliance.a ? alliance.renewA : alliance.renewB),
       };
@@ -107,7 +113,7 @@ function moods(game: Game, you: number): DiplomacyView["moods"] {
 }
 
 function diplomacyEvents(game: Game): DiplomacyEvent[] {
-  return game.diplomacyEvents.splice(0).map(({ type, a, b, phrase, tile, gold, landmark }) => {
+  return takeDiplomacyEvents(game).map(({ type, a, b, phrase, tile, gold, landmark }) => {
     const event: DiplomacyEvent = { type, a, b };
     if (phrase !== undefined) event.phrase = phrase;
     if (tile !== undefined) event.tile = tile;
@@ -128,24 +134,26 @@ function diplomacyEvents(game: Game): DiplomacyEvent[] {
  */
 export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): GameUpdate {
   const territory = game.territory;
-  const players = game.players().map((player) => ({
-    id: player.id,
-    name: player.name,
-    troops: player.troops,
-    cap: populationCap(game, player),
-    gold: player.gold,
-    workShare: player.workShare,
-    tiles: territory.tileCount(player.id),
-    alive: player.alive,
-    ...(player.capital === undefined ? {} : { capital: player.capital }),
-    ...(game.cityStates.has(player.id) ? { cityState: true as const } : {}),
-    // R-DOCTRINE-03: the choices stay private until play starts.
-    ...(game.rules.doctrines &&
-    player.doctrine !== 0 &&
-    (game.phase === "play" || player.id === you)
-      ? { doctrine: player.doctrine }
-      : {}),
-  }));
+  const players = game.players().map((player) => {
+    const capital = capitalOf(game, player.id);
+    const doctrine = doctrineOf(game, player.id);
+    return {
+      id: player.id,
+      name: player.name,
+      troops: player.troops,
+      cap: populationCap(game, player),
+      gold: player.gold,
+      workShare: workShareOf(game, player.id),
+      tiles: territory.tileCount(player.id),
+      alive: player.alive,
+      ...(capital === undefined ? {} : { capital }),
+      ...(game.cityStates.has(player.id) ? { cityState: true as const } : {}),
+      // R-DOCTRINE-03: the choices stay private until play starts.
+      ...(game.rules.doctrines && doctrine !== 0 && (game.phase === "play" || player.id === you)
+        ? { doctrine }
+        : {}),
+    };
+  });
   const update: GameUpdate = {
     ...(game.rules.doctrines ? { doctrines: true as const } : {}),
     you: you,
@@ -212,9 +220,8 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
         costPercent: game.balance.falloutCostPercent,
       };
     }),
-    missileEvents: game.missileEvents
-      .splice(0)
-      .map(({ type, id, player, size, from, to, tile, by, site }) => ({
+    missileEvents: takeMissileEvents(game).map(
+      ({ type, id, player, size, from, to, tile, by, site }) => ({
         type,
         id,
         player,
@@ -224,13 +231,14 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
         tile,
         by,
         ...(site === undefined ? {} : { site }),
-      })),
+      }),
+    ),
     structures: game.structures.map((structure) => ({
       id: structure.id,
       player: structure.player,
       type: STRUCTURE_TYPES[structure.kind],
       tile: structure.tile,
-      ready: isReady(game, structure),
+      ready: structureState(game, structure) !== "building",
     })),
     build: {
       cityCost: structureCost(game, you, StructureKind.City),
@@ -271,7 +279,7 @@ export function gameUpdate(game: Game, you: number, labelSpace: LabelSpace): Gam
   }
   if (game.rules.capitals) {
     update.capitals = {
-      falls: game.capitalFalls.map(({ tick, player, by }) => ({ tick, player, by })),
+      falls: capitalFalls(game).map(({ tick, player, by }) => ({ tick, player, by })),
       threat: capitalThreat(game, you),
       standsIn: Math.max(
         0,

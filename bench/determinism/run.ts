@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -42,6 +43,22 @@ const hex = (hash: number): string => hash.toString(16).padStart(8, "0");
 
 await timed("Node, first run", () => playScenario(new Uint8Array(bytes), manifest, ticks));
 await timed("Node, second run", () => playScenario(new Uint8Array(bytes), manifest, ticks));
+
+// Bun is another engine than V8: the same scenario in its own process (the server's
+// production runtime may move to it), compared with the Node runs below.
+await timed("Bun", () => {
+  const out = execFileSync(
+    process.env.BUN_PATH ?? "bun",
+    [
+      fileURLToPath(new URL("bun-scenario.ts", import.meta.url)),
+      fileURLToPath(maps),
+      values.map,
+      String(ticks),
+    ],
+    { encoding: "utf8", maxBuffer: 1 << 24 },
+  );
+  return JSON.parse(out) as ScenarioResult;
+});
 
 const server = await createServer({
   root: fileURLToPath(new URL(".", import.meta.url)),

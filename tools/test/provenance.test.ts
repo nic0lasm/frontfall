@@ -52,6 +52,16 @@ describe("provenance check", () => {
     expect(line("a.ts", "const names = ['Sam'];")).toEqual([]);
   });
 
+  it("does not read the lock files, only at the root", () => {
+    const line = (file: string, text: string) =>
+      checkAddedLine({ sha: "b".repeat(40), file, line: 3, text });
+    const name = `${company.toLowerCase()}-x`;
+    expect(line("bun.lock", `"${name}": ["a"]`)).toEqual([]);
+    expect(line("pnpm-lock.yaml", `${name}:`)).toEqual([]);
+    expect(line("bun.lockb", name)).toHaveLength(1);
+    expect(line("sub/bun.lock", name)).toHaveLength(1);
+  });
+
   it("reads added lines with their file and number", () => {
     const log = [
       `commit ${"c".repeat(40)}`,

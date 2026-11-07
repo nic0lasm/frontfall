@@ -10,7 +10,7 @@ import {
   encodeTurnsFrame,
 } from "../src/binary.ts";
 import { PROTOCOL_VERSION } from "../src/messages.ts";
-import { ORDER_KINDS } from "../src/orders.ts";
+import { ORDER_KINDS, type Order } from "../src/orders.ts";
 
 const bytes = (...values: number[]) => new Uint8Array(values);
 
@@ -202,5 +202,38 @@ describe("order kinds", () => {
         "doctrine",
       ],
     });
+  });
+
+  // The bytes of one order frame of each kind: its code, then its fields in
+  // order, as varints. A change here is a change to the wire format.
+  const frames: [Order, number[]][] = [
+    [{ type: "spawn", tile: 70_000 }, [2, 0, 0xf0, 0xa2, 0x04]],
+    [{ type: "attack", target: 300, troops: 5 }, [2, 1, 0xac, 0x02, 5]],
+    [{ type: "retreat", attack: 3 }, [2, 2, 3]],
+    [{ type: "embark", target: 70_000, troops: 900 }, [2, 3, 0xf0, 0xa2, 0x04, 0x84, 0x07]],
+    [{ type: "build", structure: 1, tile: 300 }, [2, 4, 1, 0xac, 0x02]],
+    [{ type: "demolish", tile: 5 }, [2, 5, 5]],
+    [{ type: "ally", target: 2 }, [2, 6, 2]],
+    [{ type: "betray", target: 3 }, [2, 7, 3]],
+    [{ type: "embargo", target: 4, on: 1 }, [2, 8, 4, 1]],
+    [{ type: "warship", port: 300 }, [2, 9, 0xac, 0x02]],
+    [{ type: "patrol", ship: 7, tile: 70_000 }, [2, 10, 7, 0xf0, 0xa2, 0x04]],
+    [{ type: "missile", target: 300, size: 1 }, [2, 11, 0xac, 0x02, 1]],
+    [
+      { type: "gift", target: 7, troops: 0, gold: 2 ** 40 + 3 },
+      [2, 12, 7, 0, 0x83, 0x80, 0x80, 0x80, 0x80, 0x20],
+    ],
+    [{ type: "quick", target: 3, phrase: 11 }, [2, 13, 3, 11]],
+    [{ type: "work", share: 40 }, [2, 14, 40]],
+    [{ type: "tribute", target: 2 }, [2, 15, 2]],
+    [{ type: "doctrine", pick: 3 }, [2, 16, 3]],
+  ];
+
+  it("are pinned to their bytes, one frame of each kind", () => {
+    expect(frames.map(([order]) => order.type)).toEqual(ORDER_KINDS.map((kind) => kind.type));
+    for (const [order, frame] of frames) {
+      expect(encodeOrderFrame(order), order.type).toEqual(bytes(...frame));
+      expect(decodeFrame(bytes(...frame)), order.type).toEqual({ kind: "order", order });
+    }
   });
 });

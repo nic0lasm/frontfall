@@ -47,8 +47,8 @@ Everything else is welcome, but these three are what the summary counts.
 The one figure that matters is how many games are played to the end. The game already counts it, with no name and no cookie (see [privacy.md](privacy.md)): a game is **finished** when it ends on the end screen, won or lost, and **abandoned** when the player goes back to the menu, closes the tab or loses the connection. From the repository:
 
 ```sh
-pnpm playtest-report 2026-11-04   # games counted from this day (UTC) on
-pnpm playtest-report              # since the server began counting
+bun run playtest-report 2026-11-04   # games counted from this day (UTC) on
+bun run playtest-report              # since the server began counting
 ```
 
 It reads `https://nclsmgr.com/frontfall/api/stats` (set `FRONTFALL_URL` for another server) and prints, per mode, the games played, finished and abandoned, the share finished, the games left within two minutes and the thumbs. Before the v1.0 playtest, with all versions mixed, 28 of 54 games were finished (52 %): 26 of 44 solo games and 1 of 8 private ones. A good result for v1.0 is more than 60 % of solo games finished and no rise in games left within two minutes.

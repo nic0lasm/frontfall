@@ -6,6 +6,7 @@ import { detExp, mulDiv } from "./integer-math.ts";
 import { LandmarkEffect, withLandmarks } from "./landmarks.ts";
 import { SeaRoutes } from "./sea-routes.ts";
 import { spawnSettings } from "./spawn.ts";
+import { writable } from "./state/lists.ts";
 import { StructureKind, isReady, type Structure } from "./structures.ts";
 
 /** A trade ship sailing from one port to another (R-UNIT-03). */
@@ -29,7 +30,7 @@ export interface TradeShip {
  * milliseconds' worth: on World, one search reaches most of the sea and
  * would stall a tick for some 50 ms at once. It decides on which tick a
  * route opens, so it is part of the simulation: changing it changes every
- * game with ports, and the golden replays with it (`pnpm golden`).
+ * game with ports, and the golden replays with it (`bun run golden`).
  */
 const SEARCH_TILES_PER_TICK = 25_000;
 
@@ -104,6 +105,17 @@ export function tradeWeights(lengths: readonly number[], allied: readonly boolea
 }
 
 /**
+ * R-UNIT-04: the trade ship at `index` of `game.tradeShips` changes hands with
+ * its cargo, taken by a warship, and leaves the sea; returns it. The warship
+ * rules call it; the trade ships are this module's to change (ADR 0010).
+ */
+export function takeTradeShip(game: Game, index: number): Readonly<TradeShip> {
+  const [taken] = writable(game, "tradeShips").splice(index, 1);
+  if (!taken) throw new RangeError(`no trade ship at ${String(index)}`);
+  return taken;
+}
+
+/**
  * Trade (R-BUILD-02, R-UNIT-03, R-DIPLO-05). A port opens once built and
  * finds its routes to every open port within B-TRADE-RANGE of sea. Every
  * B-TRADE-INTERVAL after it opened, a port with fewer than B-TRADE-MAX of its
@@ -117,11 +129,11 @@ export function tradeWeights(lengths: readonly number[], allied: readonly boolea
 export function installTrade(game: Game): void {
   const { balance } = game;
   const routes = new SeaRoutes(game, tradeRange(game), SEARCH_TILES_PER_TICK);
-  const ships = game.tradeShips;
+  const ships = writable(game, "tradeShips");
   /** Rolls each port has missed since its last ship, by port id: every miss makes the next roll likelier (R-UNIT-03). */
   const rejections = new Map<number, number>();
   /** Ready ports by tile, rebuilt every tick. */
-  const ports = new Map<number, Structure>();
+  const ports = new Map<number, Readonly<Structure>>();
 
   // Routes follow from the order ports got them in: searched again in that order, they are the same.
   game.persist("trade", {

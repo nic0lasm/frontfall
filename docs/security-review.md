@@ -37,7 +37,7 @@ On the public server Caddy replaces this policy for `/frontfall*` with a longer 
 
 - **Server, in production:** `ws`, `zod` and `nodemailer`, none with dependencies of its own. They are bundled into `server.mjs`, and the image carries no `node_modules`, so supply-chain risk is limited to the build. `nodemailer` is the largest and the only one near user data (the destination address, filtered by a strict pattern before use; file and URL access are disabled).
 - **Client:** `three`, a font package and the two internal packages. All are bundled.
-- Dependabot and `pnpm audit` cover advisories. This review did not look up advisories itself.
+- Dependabot and `bun audit` cover advisories. This review did not look up advisories itself.
 
 ## Checked and found sound
 

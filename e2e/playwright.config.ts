@@ -109,7 +109,7 @@ const local = {
   ],
 };
 
-/** Runs against the production build (`pnpm build` first), or against E2E_BASE_URL. */
+/** Runs against the production build (`bun run build` first), or against E2E_BASE_URL. */
 export default defineConfig({
   testDir: "tests",
   // Shards are cut test by test, not file by file, so that one long file cannot keep a runner busy.

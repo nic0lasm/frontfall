@@ -265,6 +265,8 @@
   "click.shore": "This port has no open water next to it for a warship.",
   "click.allyNear": "Too close to an ally: the blast would reach their land.",
   "click.disabled": "Left out of this game.",
+  "click.startTaken": "Another player already holds this land: start on free land.",
+  "click.startNear": "Too close to another player's start: pick a tile farther away.",
   "click.warships": "You have as many warships as you may own.",
   "click.noShip": "You have no warship yet: click one of your ports to buy one, then click water to send it there.",
   "click.noWarship": "None of your warships can sail there: pick water linked by sea to one of them, and not too far.",

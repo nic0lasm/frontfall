@@ -38,9 +38,9 @@ const CONTENT_MARKERS: readonly RegExp[] = [
 const GAME_WORDS = join("\\b(nu", "kes?|nu", "clear|hydro", "gen|mi", "rvs?|open", "front\\w*)\\b");
 const GAME_ACRONYM = new RegExp(["\\bS", "AMs?\\b"].join(""));
 const SOURCE_FILE = /\.(ts|js|mjs|cjs|json|html|css)$/;
-/** Files that name what they check for. */
+/** Files that name what they check for, and the lock files (older ranges still hold pnpm's). */
 const EXEMPT_FILE =
-  /^tools\/(src\/provenance[^/]*|test\/(provenance|words)[^/]*)\.ts$|^pnpm-lock\.yaml$/;
+  /^tools\/(src\/provenance[^/]*|test\/(provenance|words)[^/]*)\.ts$|^(pnpm-lock\.yaml|bun\.lock)$/;
 
 export interface CommitInfo {
   readonly sha: string;

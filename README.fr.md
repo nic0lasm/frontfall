@@ -109,27 +109,26 @@ flowchart LR
 | Schémas zod                 | Chaque message est validé à l'arrivée, des deux côtés                                                          |
 | Un seul petit conteneur     | Système de fichiers en lecture seule, utilisateur non root, image multi-arch analysée avant chaque publication |
 
-Chaque choix est justifié dans une fiche de décision d'architecture, dans [docs/adr](docs/adr/), et les budgets de durée de tick, de temps de rendu et de mémoire imposés au moteur et au rendu sont dans [docs/performance.md](docs/performance.md) (en anglais). Les messages échangés sur la WebSocket sont décrits dans [docs/protocol.md](docs/protocol.md) (en anglais). Les cartes sont générées à partir des données [Natural Earth](https://www.naturalearthdata.com/), du domaine public, par `pnpm maps` ([docs/maps.md](docs/maps.md), en anglais), au format décrit dans [docs/map-format.md](docs/map-format.md) (en anglais).
+Chaque choix est justifié dans une fiche de décision d'architecture, dans [docs/adr](docs/adr/), et les budgets de durée de tick, de temps de rendu et de mémoire imposés au moteur et au rendu sont dans [docs/performance.md](docs/performance.md) (en anglais). Les messages échangés sur la WebSocket sont décrits dans [docs/protocol.md](docs/protocol.md) (en anglais). Les cartes sont générées à partir des données [Natural Earth](https://www.naturalearthdata.com/), du domaine public, par `bun run maps` ([docs/maps.md](docs/maps.md), en anglais), au format décrit dans [docs/map-format.md](docs/map-format.md) (en anglais).
 
 ## Lancer en local
 
-Prérequis : Node.js 24 LTS et pnpm 10, fourni par `corepack enable`.
+Prérequis : Node.js 24 LTS et Bun 1.4.
 
 ```sh
 git clone https://github.com/nic0lasm/frontfall.git
 cd frontfall
-corepack enable
-pnpm install
-pnpm dev        # client sur http://localhost:5173, serveur sur :8080
+bun install
+bun run dev        # client sur http://localhost:5173, serveur sur :8080
 ```
 
-| Commande             | Rôle                                                      |
-| -------------------- | --------------------------------------------------------- |
-| `pnpm test`          | Tests unitaires (Vitest)                                  |
-| `pnpm test:coverage` | Tests avec couverture ; la CI échoue sous 90 % des lignes |
-| `pnpm lint`          | ESLint avec règles typées                                 |
-| `pnpm typecheck`     | TypeScript en mode strict, pour chaque paquet             |
-| `pnpm build`         | Client de production et serveur empaqueté                 |
+| Commande                | Rôle                                                      |
+| ----------------------- | --------------------------------------------------------- |
+| `bun run test`          | Tests unitaires (Vitest)                                  |
+| `bun run test:coverage` | Tests avec couverture ; la CI échoue sous 90 % des lignes |
+| `bun run lint`          | ESLint avec règles typées                                 |
+| `bun run typecheck`     | TypeScript en mode strict, pour chaque paquet             |
+| `bun run build`         | Client de production et serveur empaqueté                 |
 
 ### Héberger son propre serveur
 
@@ -148,7 +147,7 @@ Frontfall se construit en public et toute contribution est bienvenue, quelle que
 1. **Jouez à la version en cours** et [signalez ce qui casse](https://github.com/nic0lasm/frontfall/issues/new/choose).
 2. **Choisissez une première tâche** parmi les issues marquées [`good first issue`](https://github.com/nic0lasm/frontfall/labels/good%20first%20issue) et laissez un commentaire pour que personne ne fasse le travail en double.
 3. **Discutez avant de construire** quoi que ce soit d'important dans les [Discussions](https://github.com/nic0lasm/frontfall/discussions), catégorie Ideas.
-4. **Ouvrez une pull request** en suivant [CONTRIBUTING.md](CONTRIBUTING.md) (en anglais). La CI lance les mêmes vérifications que `pnpm test:coverage`, `pnpm lint` et `pnpm build`.
+4. **Ouvrez une pull request** en suivant [CONTRIBUTING.md](CONTRIBUTING.md) (en anglais). La CI lance les mêmes vérifications que `bun run test:coverage`, `bun run lint` et `bun run build`.
 
 Les failles de sécurité se signalent en privé, comme l'explique [SECURITY.md](SECURITY.md). Chaque participant respecte le [code de conduite](CODE_OF_CONDUCT.md).
 

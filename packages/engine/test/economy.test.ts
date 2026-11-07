@@ -5,6 +5,7 @@ import { Game, type Player } from "../src/game.ts";
 import { StructureKind } from "../src/structures.ts";
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { writable } from "../src/state/lists.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
@@ -49,7 +50,7 @@ describe("economy", () => {
       [1, 2],
       [2, 7],
     ] as const) {
-      game.structures.push({
+      writable(game, "structures").push({
         id,
         player: 1,
         kind: StructureKind.City,

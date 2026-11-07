@@ -1,5 +1,5 @@
 /**
- * Game server for `pnpm load -- --spawn-server`, run in a child process so its
+ * Game server for `bun run load -- --spawn-server`, run in a child process so its
  * CPU time and memory are measured apart from the simulated clients'.
  */
 import { tmpdir } from "node:os";

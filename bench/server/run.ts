@@ -26,7 +26,7 @@ import {
 import type { ServerRequest, ServerStats } from "./serve.ts";
 
 const { values } = parseArgs({
-  // `pnpm load -- --games 2` forwards the separator too.
+  // `bun run load -- --games 2` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     games: { type: "string", default: "20" },

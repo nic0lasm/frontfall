@@ -25,7 +25,7 @@ Game mechanics are ideas and can be shared. Code, art, maps, sounds and text are
 
   ```sh
   git clone --depth 1 https://github.com/openfrontio/OpenFrontIO.git /tmp/reference
-  pnpm clean-room --reference /tmp/reference --base origin/main
+  bun run clean-room --reference /tmp/reference --base origin/main
   rm -rf /tmp/reference
   ```
 

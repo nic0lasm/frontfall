@@ -6,7 +6,7 @@ import { createServer } from "vite";
 import type { RenderResult } from "./page.ts";
 
 const { values } = parseArgs({
-  // `pnpm bench -- --quick` forwards the separator too.
+  // `bun run bench -- --quick` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     // Use the machine's GPU instead of the SwiftShader software rasteriser.

@@ -1,5 +1,5 @@
 /**
- * A share of the simulated players for `pnpm load -- --client-procs <n>`,
+ * A share of the simulated players for `bun run load -- --client-procs <n>`,
  * run in a child process and driven by pool.ts.
  */
 import { LoadSession, type SessionOptions } from "./load.ts";

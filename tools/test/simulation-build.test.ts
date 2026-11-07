@@ -9,6 +9,7 @@ function tree(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "simulation-"));
   for (const dir of [
     "packages/engine/src",
+    "packages/contracts/src",
     "packages/protocol/src",
     "apps/client/public/maps",
     "apps/client/src/game",
@@ -25,15 +26,17 @@ function tree(files: Record<string, string>): string {
 const BASE = {
   "packages/engine/src/game.ts": "export const a = 1;\n",
   "packages/engine/src/bots/bots.ts": "export const b = 2;\n",
+  "packages/contracts/src/orders.ts": "export const o = 5;\n",
   "packages/protocol/src/index.ts": "export const c = 3;\n",
   "apps/client/public/maps/world.json": "{}\n",
   "apps/client/src/game/simulation.ts": "export const d = 4;\n",
 };
 
 describe("simulation build", () => {
-  it("covers the engine, the protocol, the maps and the client's setup of a game", () => {
+  it("covers the engine, the contracts, the protocol, the maps and the client's setup of a game", () => {
     const files = simulationFiles();
     expect(files).toContain("packages/engine/src/balance.ts");
+    expect(files).toContain("packages/contracts/src/orders.ts");
     expect(files).toContain("packages/protocol/src/index.ts");
     expect(files).toContain("apps/client/public/maps/world.bin");
     expect(files).toContain("apps/client/src/game/simulation.ts");
@@ -55,6 +58,11 @@ describe("simulation build", () => {
     ).not.toBe(base);
     expect(
       simulationBuild(tree({ ...BASE, "apps/client/public/maps/world.json": "{ }\n" })),
+    ).not.toBe(base);
+    expect(
+      simulationBuild(
+        tree({ ...BASE, "packages/contracts/src/orders.ts": "export const o = 6;\n" }),
+      ),
     ).not.toBe(base);
     expect(
       simulationBuild(

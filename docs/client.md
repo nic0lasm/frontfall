@@ -134,7 +134,7 @@ After every 50th tick the worker hashes the game state and the page reports
 it, so the server can tell a client out of step (`desync`). The worker keeps
 every turn with orders and every hash it sent; on a desync the notice offers
 "Download a report", a `DesyncReport` (docs/engine.md) that
-`pnpm sim -- --replay` plays again to find the first tick that differs. Games
+`bun run sim -- --replay` plays again to find the first tick that differs. Games
 on generated maps have no report. A ring shows under the pointer as soon as it
 presses the map, and becomes the answer to the click once the worker reads
 it. Until its turn comes back, an online order's ring pulses on its target. Once a game starts, the tab keeps its seat token in session storage and the

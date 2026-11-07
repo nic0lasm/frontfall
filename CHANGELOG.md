@@ -4,6 +4,11 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Changed
+
+- **A regular state hash (engine).** The values that belong to one rule (the work share, the doctrine, the capital and the capitals that fell, the pressure on a front, truces and the end of an embargo placed after an attack) move out of the players, attacks, alliances and embargoes into parts kept by their rules, and the state hash now follows the snapshot value for value: every list with its length, every path in full, each rule's part only in games that play with it. Games play exactly as before (the pinned dumps of the state are unchanged), but every hash changes. As with any change of the engine, the simulation build changes too, so a page of 1.0 is sent away to reload; snapshots saved before (format 5) are refused and the game is played again from its turns, and the golden replays are rebuilt. Snapshots are now format 6.
+- **Every order checked before it runs (engine).** An attack on land that does not touch the player's, or on a player out of the game, a landing with no coast of the player's within reach by sea, a retreat of an attack that is not the player's or has no troops left, and a start on another player's land or too close to their start are now refused with a reason, where they were accepted and then silently dropped. A game played from the same turns ends the same; what changes is what the interface and the scripted players are told: a start too close is refused on the click, with a message in English and French, rather than sent for nothing.
+
 ## [1.0.0] - 2026-11-05
 
 Frontfall comes out of beta: the complete game on the flat map. The 3D globe follows in v1.1.

@@ -9,18 +9,18 @@ import { centile } from "./combat.ts";
 import { summarize, type BalanceSummary } from "./summary.ts";
 
 /**
- * `pnpm balance`: plays the same setup on many seeds, bots and nations only,
+ * `bun run balance`: plays the same setup on many seeds, bots and nations only,
  * several games at a time, and prints what balance.md is tuned on: how long
  * a game lasts, who wins against their fair share, income from troops and
  * from trade, and missiles. Every game is deterministic, so a run gives the
  * same figures on any machine.
  *
- *   pnpm balance -- --map world --bots normal:8 --seeds 1-8
- *   pnpm balance -- --map world --bots normal:4,hard:4 --nations normal --casual
- *   pnpm balance -- --map world --bots normal:0 --nations hard --average
- *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule capitals
- *   pnpm balance -- --map europe --bots hard:11 --set tradeMax=50 --json out.json
- *   pnpm balance -- --map world --bots normal:0 --nations normal --average --rule collapsingFronts
+ *   bun run balance -- --map world --bots normal:8 --seeds 1-8
+ *   bun run balance -- --map world --bots normal:4,hard:4 --nations normal --casual
+ *   bun run balance -- --map world --bots normal:0 --nations hard --average
+ *   bun run balance -- --map world --bots normal:0 --nations normal --average --rule capitals
+ *   bun run balance -- --map europe --bots hard:11 --set tradeMax=50 --json out.json
+ *   bun run balance -- --map world --bots normal:0 --nations normal --average --rule collapsingFronts
  */
 const { values } = parseArgs({
   args: process.argv.slice(2).filter((arg) => arg !== "--"),

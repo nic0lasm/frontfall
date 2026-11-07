@@ -9,6 +9,7 @@ import {
   airDefenseRadius,
   blastRadius,
   missileTile,
+  takeMissileEvents,
   type Missile,
 } from "../src/missiles.ts";
 import { captureCost } from "../src/attacks.ts";
@@ -17,6 +18,7 @@ import { StructureKind, airDefenseShare, disableBit, structureCost } from "../sr
 import { Terrain, TileKind } from "../src/terrain.ts";
 import { NEUTRAL } from "../src/territory/territory-map.ts";
 import { WorldGrid } from "../src/world-grid.ts";
+import { writable } from "../src/state/lists.ts";
 
 const balance: Balance = {
   ...DEFAULT_BALANCE,
@@ -213,7 +215,7 @@ describe("missiles (R-UNIT-05)", () => {
   it("tell interfaces how each one ended, with where it came from and where it went", () => {
     const { game, grid, silo, step } = newGame();
     const target = grid.index(50, 10);
-    game.missileEvents.length = 0;
+    takeMissileEvents(game);
     step([{ player: 1, order: launch(target) }]);
     const id = (game.missiles[0] as Missile).id;
     expect(game.missileEvents).toEqual([]);
@@ -242,7 +244,7 @@ describe("missiles (R-UNIT-05)", () => {
       { player: 1, order: { type: "ally", target: 3 } },
       { player: 3, order: { type: "ally", target: 1 } },
     ]);
-    game.missileEvents.length = 0;
+    takeMissileEvents(game);
     while (game.missiles.length > 0) step();
     expect(game.missileEvents.map((e) => e.type)).toEqual(["spared"]);
   });
@@ -380,7 +382,7 @@ describe("air defense (R-BUILD-05)", () => {
     const { game, grid, silo, step } = defended(100);
     const target = grid.index(52, 12);
     const defense = game.structures.find((s) => s.kind === StructureKind.AirDefense);
-    game.missileEvents.length = 0;
+    takeMissileEvents(game);
     step([{ player: 1, order: launch(target) }]);
     const id = (game.missiles[0] as Missile).id;
     while (game.missiles.length > 0) step();
@@ -418,7 +420,7 @@ describe("air defense (R-BUILD-05)", () => {
       { player: 3, order: { type: "ally", target: 1 } },
     ]);
     allied.run(2);
-    allied.game.structures.splice(
+    writable(allied.game, "structures").splice(
       allied.game.structures.findIndex(
         (s) => s.player === 2 && s.kind === StructureKind.AirDefense,
       ),
@@ -484,7 +486,7 @@ describe("mosque (R-BUILD-09)", () => {
     // Each air defense costs one B-AIR-DEFENSE-COST more than the last.
     expect(structureCost(game, 1, StructureKind.AirDefense)).toBe(1000);
     expect(structureCost(game, 1, StructureKind.Mosque)).toBe(2 * 1000);
-    game.structures.push({
+    writable(game, "structures").push({
       id: 99,
       player: 1,
       kind: StructureKind.Mosque,
@@ -507,7 +509,7 @@ describe("nations and missiles (R-BOT-12)", () => {
     const adaCity = grid.index(15, 10);
     // Cities placed by hand: this small map supports one each.
     const city = (player: number, tile: number) =>
-      game.structures.push({
+      writable(game, "structures").push({
         id: game.nextStructureId++,
         player,
         kind: StructureKind.City,
@@ -546,7 +548,7 @@ describe("nations and missiles (R-BOT-12)", () => {
       // Cy may come to lead once the nation's attacks eat into Ada.
       [3, grid.index(30, 10)],
     ] as const) {
-      game.structures.push({
+      writable(game, "structures").push({
         id: game.nextStructureId++,
         player,
         kind: StructureKind.City,

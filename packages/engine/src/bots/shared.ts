@@ -1,8 +1,16 @@
 import { captureCost } from "../attacks.ts";
 import { soldiers } from "../economy.ts";
 import { reachableCoasts } from "../boats.ts";
-import { allianceOf, alliesOf, canRenew, isAllied, isTraitor, sameTeam } from "../diplomacy.ts";
-import { Disable, type Game, type Player } from "../game.ts";
+import {
+  allianceOf,
+  allianceState,
+  alliesOf,
+  isAllied,
+  isTraitor,
+  sameTeam,
+} from "../diplomacy.ts";
+import { Disable } from "@frontfall/contracts";
+import type { Game, Player } from "../game.ts";
 import { isqrt, mulDiv } from "../integer-math.ts";
 import {
   StructureKind,
@@ -81,7 +89,7 @@ export function scanBorder(game: Game, bot: Player, accept: OwnerFilter = anyone
       }
       const enemy = game.player(owner);
       if (!enemy?.alive || !accept(owner)) continue;
-      const density = soldiers(enemy);
+      const density = soldiers(game, enemy);
       if (scan.enemy < 0 || density < scan.enemyDensity) {
         scan.enemy = tile;
         scan.enemyDensity = density;
@@ -245,7 +253,7 @@ export function sail(
   let atSea = 0;
   for (const boat of game.boats) if (boat.player === bot.id) atSea++;
   if (atSea >= balance.boatMax) return false;
-  const ownDensity = soldiers(bot);
+  const ownDensity = soldiers(game, bot);
   // A coast just along the player's own shore is better reached by land.
   const elsewhere = (_: number, distance: number) => distance >= SEA_MIN_DISTANCE;
   let target = -1;
@@ -260,7 +268,7 @@ export function sail(
     }
     const enemy = game.player(owner);
     if (!enemy?.alive || isAllied(game, bot.id, owner) || !accept(owner)) continue;
-    const density = soldiers(enemy);
+    const density = soldiers(game, enemy);
     if (density * 100 > ownDensity * boldnessPercent) continue;
     // The ship must at least pay for the beach.
     if (troops <= captureCost(game, coast, enemy)) continue;
@@ -329,7 +337,9 @@ export function answerAlliances(
   }
   for (const ally of alliesOf(game, bot.id)) {
     const alliance = allianceOf(game, bot.id, ally);
-    if (!alliance || !canRenew(game, alliance) || !worth(ally)) continue;
+    if (alliance === undefined || allianceState(game, alliance) !== "renewable" || !worth(ally)) {
+      continue;
+    }
     // Its vote stands until the other side's comes.
     if (bot.id === alliance.a ? alliance.renewA : alliance.renewB) continue;
     game.apply(bot.id, { type: "ally", target: ally });

@@ -2,19 +2,22 @@
 
 FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Bun installs and runs the scripts; Node runs the build tools that need it and, in the next stage, the server.
+RUN npm install --global bun@1.4.4
+COPY package.json bun.lock ./
 COPY apps/client/package.json apps/client/
 COPY apps/server/package.json apps/server/
+COPY packages/contracts/package.json packages/contracts/
 COPY packages/engine/package.json packages/engine/
 COPY packages/protocol/package.json packages/protocol/
 COPY tools/package.json tools/
 COPY e2e/package.json e2e/
-RUN pnpm install --frozen-lockfile
+COPY bench/package.json bench/
+RUN bun install --frozen-lockfile
 COPY . .
 # Both builds embed the simulation build (docs/protocol.md); FRONTFALL_VERSION, the commit, is for /healthz.
 ARG FRONTFALL_VERSION=dev
-RUN FRONTFALL_VERSION=$FRONTFALL_VERSION pnpm --filter @frontfall/client --filter @frontfall/server build
+RUN FRONTFALL_VERSION=$FRONTFALL_VERSION bun run --filter @frontfall/client --filter @frontfall/server build
 
 FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS run
 # Commit the image was built from, reported by /healthz.

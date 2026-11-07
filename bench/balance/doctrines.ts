@@ -7,14 +7,14 @@ import { Doctrine, type BotDifficulty } from "@frontfall/engine";
 import type { BalanceSetup, GameReport } from "./game.ts";
 
 /**
- * `pnpm balance:doctrines`: plays the same human-like player once per
+ * `bun run balance:doctrines`: plays the same human-like player once per
  * doctrine in every game, the doctrines dealt to the seats in turn so that
  * each one holds each seat equally often, and prints how often each doctrine
  * wins and how much land it holds against its fair share (R-DOCTRINE-06).
  * The guardrail of #118: no doctrine above 1.5 times its fair share.
  *
- *   pnpm balance:doctrines -- --map world --nations normal --seeds 1-60
- *   pnpm balance:doctrines -- --map world --nations normal --seeds 1-1000 --jobs 8 --control
+ *   bun run balance:doctrines -- --map world --nations normal --seeds 1-60
+ *   bun run balance:doctrines -- --map world --nations normal --seeds 1-1000 --jobs 8 --control
  */
 const { values } = parseArgs({
   args: process.argv.slice(2).filter((arg) => arg !== "--"),

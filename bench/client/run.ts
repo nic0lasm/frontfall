@@ -9,14 +9,14 @@ import { measureSizes, type SizeBudget } from "./size.ts";
 
 /**
  * The client's performance budget (docs/performance.md), on the production
- * build (`pnpm build` first). The download sizes are checked against
+ * build (`bun run build` first). The download sizes are checked against
  * budget.json and fail the command when over. With --trend, a solo game on
  * World is also started in headless Chromium, served by the real game server,
  * and its load times and frame rate are reported: on software rendering they
  * only show a trend, so they never fail the command.
  */
 const { values } = parseArgs({
-  // `pnpm perf:client -- --trend` forwards the separator too.
+  // `bun run perf:client -- --trend` forwards the separator too.
   args: process.argv.slice(2).filter((arg) => arg !== "--"),
   options: {
     trend: { type: "boolean", default: false },

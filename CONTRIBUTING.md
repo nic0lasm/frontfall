@@ -20,23 +20,26 @@ v1.0 is out. Fixes and polish for it are welcome in [v1.0.x](https://github.com/
 ## Set up
 
 ```sh
-corepack enable
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
 
-The repository is a pnpm workspace:
+The repository is a Bun workspace:
 
-| Path                | Contents                                    |
-| ------------------- | ------------------------------------------- |
-| `packages/engine`   | Deterministic simulation, no dependencies   |
-| `packages/protocol` | Message schemas shared by client and server |
-| `apps/server`       | Lobbies, turn relay, static file server     |
-| `apps/client`       | Browser client, Three.js rendering          |
-| `tools`             | Repository checks, clean-room scan          |
-| `e2e`               | Playwright tests of the built game          |
+| Path                 | Contents                                                                  |
+| -------------------- | ------------------------------------------------------------------------- |
+| `packages/engine`    | Deterministic simulation, depends on contracts only                       |
+| `packages/contracts` | The order spec and the constants the engine and the protocol share        |
+| `packages/protocol`  | Message schemas shared by client and server                               |
+| `apps/server`        | Lobbies, turn relay, static file server                                   |
+| `apps/client`        | Browser client, Three.js rendering                                        |
+| `tools`              | Repository checks, clean-room scan                                        |
+| `bench`              | Benchmarks, performance gate, balance campaign, load and determinism runs |
+| `e2e`                | Playwright tests of the built game                                        |
 
 Design documents live in `docs/`: the game rules ([rules.md](docs/rules.md)), their numbers ([balance.md](docs/balance.md)) and the architecture decisions ([adr/](docs/adr/)).
+
+For how the packages fit together and how to add an order, a rule or a screen, read the [architecture guide](docs/architecture.md).
 
 ## Clean room
 
@@ -58,7 +61,7 @@ ESLint enforces the first three rules, and the engine compiles without browser o
 
 Golden replays in `packages/engine/test/replays/` pin the state hash of scripted games every 50 ticks, and the hash covers every balance value. A change that alters how games play out, a rule in `packages/engine` or any value in `balance.ts`, therefore fails the bench tests and the Determinism job with the first tick that differs. When that change is meant:
 
-1. Run `pnpm golden`, which writes the replays again.
+1. Run `bun run golden`, which writes the replays again.
 2. Update the pinned hash in `packages/engine/test/hash.test.ts` if it changed.
 3. Commit the new replay files with the change, and say in the changelog how games change.
 
@@ -69,7 +72,7 @@ A replay that fails after a change not meant to alter games, a refactor or a spe
 1. Branch from `next`, where finished work lands before a release (`main` is what is deployed): `feat/…`, `fix/…`, `docs/…`, `chore/…`.
 2. Keep the change focused; split unrelated work into separate pull requests.
 3. Title in [Conventional Commits](https://www.conventionalcommits.org/) form, for example `feat(engine): add troop growth`. CI checks it.
-4. Make sure `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage` and `pnpm build` pass. CI runs the same commands, plus the end-to-end tests (`pnpm build && pnpm test:e2e`, after a one-time `pnpm --filter @frontfall/e2e exec playwright install chromium firefox`; Firefox runs headed, so without a display `--project root --project prefix` runs Chromium alone; CI splits the suite over six runners with `--shard=1/6` to `--shard=6/6`, which work locally too) and the clean-room scan. A pre-commit hook formats and lints the files you stage.
+4. Make sure `bun run format:check`, `bun run lint`, `bun run typecheck`, `bun run test:coverage` and `bun run build` pass. CI runs the same commands, plus the end-to-end tests (`bun run build && bun run test:e2e`, after a one-time `bunx --cwd e2e playwright install chromium firefox`; Firefox runs headed, so without a display `--project root --project prefix` runs Chromium alone; CI splits the suite over six runners with `--shard=1/6` to `--shard=6/6`, which work locally too) and the clean-room scan. A pre-commit hook formats and lints the files you stage.
 5. Fill in the template. Say how you checked the change, and separate what you **verified** (a test, a measurement, something you saw in game) from what is a **hypothesis** (a reasoned guess you could not confirm). Reviewers rely on that distinction.
 
 Pull requests are squash-merged once CI is green and a maintainer has approved.
@@ -94,4 +97,4 @@ Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 CI and CodeQL run on every pushed branch, and a branch is merged, by squashing a pull request or by fast-forwarding `main`, only once both have passed on it. Force-pushes and deletion of `main` are blocked, and its history stays linear.
 
-When `main` has moved since the branch went green, rebase it. If the rebase is clean, run `pnpm typecheck && pnpm lint && pnpm test` locally; when they pass, the branch can be fast-forwarded without waiting for CI to run again on the rebased commit. Watch the run on `main` after the push and fix it straight away if it fails. A branch that only changes documentation is merged as soon as it is rebased.
+When `main` has moved since the branch went green, rebase it. If the rebase is clean, run `bun run typecheck && bun run lint && bun run test` locally; when they pass, the branch can be fast-forwarded without waiting for CI to run again on the rebased commit. Watch the run on `main` after the push and fix it straight away if it fails. A branch that only changes documentation is merged as soon as it is rebased.

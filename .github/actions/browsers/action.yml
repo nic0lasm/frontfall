@@ -6,12 +6,12 @@ runs:
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-all-${{ hashFiles('pnpm-lock.yaml') }}
+        key: playwright-${{ runner.os }}-all-${{ hashFiles('bun.lock') }}
     # The 120 MB of packages come from a mirror that is sometimes slow: keep them between runs.
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/apt-archives
-        key: playwright-apt-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        key: playwright-apt-${{ runner.os }}-${{ hashFiles('bun.lock') }}
     - name: Install the browsers and their system packages
       shell: bash
       run: |
@@ -19,7 +19,7 @@ runs:
         sudo cp -n ~/apt-archives/*.deb /var/cache/apt/archives/ 2>/dev/null || true
         # A slow download is stopped and resumed: the packages already fetched stay in the cache.
         for attempt in 1 2 3; do
-          if timeout -k 10 300 pnpm --filter @frontfall/e2e exec playwright install --with-deps chromium firefox webkit; then
+          if timeout -k 10 300 bunx --cwd e2e --no-install playwright install --with-deps chromium firefox webkit; then
             installed=true
             break
           fi

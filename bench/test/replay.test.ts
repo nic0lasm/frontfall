@@ -80,7 +80,7 @@ function run(changed: DesyncReport) {
   return { code, out };
 }
 
-describe("pnpm sim --replay", () => {
+describe("bun run sim --replay", () => {
   it("plays a report back to the client's own hashes", () => {
     const { code, out } = run(report);
     expect(code).toBe(0);
@@ -113,6 +113,10 @@ describe("pnpm sim --replay", () => {
   });
 
   it("refuses a report of another format version", () => {
-    expect(() => run({ ...report, version: 1 as 2 })).toThrow(/unsupported report version 1/);
+    for (const version of [1, 2]) {
+      expect(() => run({ ...report, version: version as typeof DESYNC_REPORT_VERSION })).toThrow(
+        `unsupported report version ${String(version)}`,
+      );
+    }
   });
 });
