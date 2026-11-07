@@ -109,7 +109,7 @@ flowchart LR
 | zod schemas            | Every message is validated on arrival, on both sides                                |
 | Single small container | Read-only filesystem, non-root user, multi-arch image scanned before every release  |
 
-Each choice is argued in an architecture decision record under [docs/adr](docs/adr/), and the tick, frame and memory budgets the engine and renderer are held to are in [docs/performance.md](docs/performance.md). The messages exchanged over the WebSocket are described in [docs/protocol.md](docs/protocol.md). Maps are generated from public-domain [Natural Earth](https://www.naturalearthdata.com/) data by `pnpm maps` ([docs/maps.md](docs/maps.md)), in the format of [docs/map-format.md](docs/map-format.md).
+For a map of the repository and how to extend it, see the [architecture guide](docs/architecture.md). Each choice is argued in an architecture decision record under [docs/adr](docs/adr/), and the tick, frame and memory budgets the engine and renderer are held to are in [docs/performance.md](docs/performance.md). The messages exchanged over the WebSocket are described in [docs/protocol.md](docs/protocol.md). Maps are generated from public-domain [Natural Earth](https://www.naturalearthdata.com/) data by `pnpm maps` ([docs/maps.md](docs/maps.md)), in the format of [docs/map-format.md](docs/map-format.md).
 
 ## Run it locally
 
