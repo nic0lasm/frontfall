@@ -4,6 +4,14 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Changed
+
+- **The language picker lists only complete languages.** A language still being translated can be merged without showing up for players, and `docs/translating.md` explains how to add one. Thanks to Priyansh-Tyagi (#174).
+
+### For self-hosters and contributors
+
+- **The provenance check keeps an outside author** when the owner commits and integrates the change.
+
 ## [1.0.3] - 2026-11-10
 
 ### Changed
