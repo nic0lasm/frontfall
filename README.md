@@ -36,7 +36,7 @@ Play solo against bots, or online with friends through an invitation link or in 
   <img src="docs/assets/gameplay.gif" alt="Time-lapse of a World game: one empire spreads across Eurasia while the others grow around it" width="100%">
 </p>
 
-New here? [About the game and how to play](https://nclsmgr.com/frontfall/about.html), or press H in a game.
+New here? [About the game and how to play](https://nclsmgr.com/frontfall/about.html), or press H in a game. Played a game? Tell me what you thought in the [playtest](https://github.com/nic0lasm/frontfall/discussions/173).
 
 ## Supported browsers
 
@@ -154,9 +154,13 @@ Security issues are reported privately, as described in [SECURITY.md](SECURITY.m
 
 ## Community
 
-- [Discussions](https://github.com/nic0lasm/frontfall/discussions): questions, ideas, map proposals, development notes. French is welcome too.
-- [Releases](https://github.com/nic0lasm/frontfall/releases): what changed in each version, in plain words. Watch the repository with "Custom > Releases" to be notified.
-- [CHANGELOG.md](CHANGELOG.md): every merged change, newest first.
+Frontfall gets better when people play it and tell me what they think. You don't need to write code to help.
+
+- The [playtest](https://github.com/nic0lasm/frontfall/discussions/173) is one game and three questions.
+- [Show and tell](https://github.com/nic0lasm/frontfall/discussions/categories/show-and-tell) is for games and screenshots you're proud of, [Ideas](https://github.com/nic0lasm/frontfall/discussions/categories/ideas) for maps and rules you'd like to see. French is welcome too.
+- Tasks waiting for someone are labelled [help wanted](https://github.com/nic0lasm/frontfall/labels/help%20wanted). [Good first issue](https://github.com/nic0lasm/frontfall/labels/good%20first%20issue) is the gentlest start.
+- [Releases](https://github.com/nic0lasm/frontfall/releases) say what changed in each version, in plain words. Watch the repository with "Custom > Releases" to be notified.
+- [CHANGELOG.md](CHANGELOG.md) lists every merged change, newest first.
 
 If you like where this is going, a star helps other players find the project.
 

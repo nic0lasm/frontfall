@@ -36,7 +36,7 @@ Jouez en solo contre des bots, ou en ligne entre amis par un lien d'invitation o
   <img src="docs/assets/gameplay.gif" alt="Accéléré d'une partie sur le Monde : un empire s'étend sur l'Eurasie pendant que les autres grandissent autour" width="100%">
 </p>
 
-Nouveau ? [Présentation et comment jouer](https://nclsmgr.com/frontfall/about.fr.html), ou appuyez sur H en partie.
+Nouveau ? [Présentation et comment jouer](https://nclsmgr.com/frontfall/about.fr.html), ou appuyez sur H en partie. Une partie jouée ? Dites-moi ce que vous en avez pensé dans le [playtest](https://github.com/nic0lasm/frontfall/discussions/173).
 
 ## Navigateurs pris en charge
 
@@ -154,9 +154,13 @@ Les failles de sécurité se signalent en privé, comme l'explique [SECURITY.md]
 
 ## Communauté
 
-- [Discussions](https://github.com/nic0lasm/frontfall/discussions) : questions, idées, propositions de cartes, notes de développement. Le français y est bienvenu.
-- [Releases](https://github.com/nic0lasm/frontfall/releases) : ce qui change à chaque version, en clair. Suivez le dépôt avec « Watch > Custom > Releases » pour être prévenu.
-- [CHANGELOG.md](CHANGELOG.md) : chaque changement fusionné, du plus récent au plus ancien.
+Frontfall s'améliore quand on y joue et qu'on me dit ce qu'on en pense. Pas besoin de coder pour aider.
+
+- Le [playtest](https://github.com/nic0lasm/frontfall/discussions/173), c'est une partie et trois questions.
+- [Show and tell](https://github.com/nic0lasm/frontfall/discussions/categories/show-and-tell) pour les parties et captures dont vous êtes fiers, [Idées](https://github.com/nic0lasm/frontfall/discussions/categories/ideas) pour les cartes et règles que vous aimeriez voir. Le français y est bienvenu.
+- Les tâches qui attendent quelqu'un portent l'étiquette [help wanted](https://github.com/nic0lasm/frontfall/labels/help%20wanted). Les [good first issues](https://github.com/nic0lasm/frontfall/labels/good%20first%20issue) sont le plus simple pour commencer.
+- Les [releases](https://github.com/nic0lasm/frontfall/releases) disent ce qui change à chaque version, en clair. Suivez le dépôt avec « Watch > Custom > Releases » pour être prévenu.
+- [CHANGELOG.md](CHANGELOG.md) liste chaque changement fusionné, du plus récent au plus ancien.
 
 Si la direction vous plaît, une étoile aide d'autres joueurs à trouver le projet.
 
