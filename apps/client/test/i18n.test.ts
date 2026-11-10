@@ -248,6 +248,19 @@ describe("applyTranslations", () => {
     expect(LANGUAGES.map((lang) => lang.id).sort()).toEqual(Object.keys(catalogues).sort());
     expect(LANGUAGES.find((lang) => lang.id === "fr")?.label).toBe("Français");
   });
+
+  it("lists a language only once its catalogue is complete", async () => {
+    const { pickableLanguages } = await load();
+    const picked = pickableLanguages({
+      en: { complete: true },
+      de: { complete: true },
+      es: { complete: false },
+    });
+    expect(picked).toEqual([
+      { id: "en", label: "English" },
+      { id: "de", label: "Deutsch" },
+    ]);
+  });
 });
 
 describe("hard-coded text", () => {

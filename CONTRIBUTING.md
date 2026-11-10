@@ -36,7 +36,7 @@ The repository is a pnpm workspace:
 | `tools`             | Repository checks, clean-room scan          |
 | `e2e`               | Playwright tests of the built game          |
 
-Design documents live in `docs/`: the game rules ([rules.md](docs/rules.md)), their numbers ([balance.md](docs/balance.md)) and the architecture decisions ([adr/](docs/adr/)).
+Design documents live in `docs/`: the game rules ([rules.md](docs/rules.md)), their numbers ([balance.md](docs/balance.md)) and the architecture decisions ([adr/](docs/adr/)). To add a language, see [translating.md](docs/translating.md).
 
 ## Clean room
 

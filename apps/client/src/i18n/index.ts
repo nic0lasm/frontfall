@@ -8,16 +8,17 @@ export type PluralKey = {
 
 export type Params = Readonly<Record<string, string | number>>;
 
-type Catalogue = Readonly<Record<MessageKey, string>>;
+// A catalogue still being translated may lack keys, but cannot have extra ones.
+type Catalogue = Readonly<Partial<Record<MessageKey, string>>>;
 
 /**
  * Each catalogue is its own chunk: a page downloads the language it shows,
  * and another one only when the player picks it (bench/client/budget.json).
  */
 const CATALOGUES = {
-  en: () => import("./en.json").then((module) => module.default),
-  fr: () => import("./fr.json").then((module) => module.default),
-} satisfies Record<string, () => Promise<Catalogue>>;
+  en: { complete: true, load: () => import("./en.json").then((module) => module.default) },
+  fr: { complete: true, load: () => import("./fr.json").then((module) => module.default) },
+} satisfies Record<string, { complete: boolean; load: () => Promise<Catalogue> }>;
 
 export type Language = keyof typeof CATALOGUES;
 
@@ -25,14 +26,22 @@ const loaded: Partial<Record<Language, Catalogue>> = {};
 
 /** Downloads the catalogue of `lang`, the current language by default, if not yet there. */
 export async function loadLanguage(lang: Language = current): Promise<void> {
-  loaded[lang] ??= await CATALOGUES[lang]();
+  loaded[lang] ??= await CATALOGUES[lang].load();
 }
 
-/** Supported languages, each named in itself so a lost player can find their own. */
-export const LANGUAGES: readonly { readonly id: Language; readonly label: string }[] = [
-  { id: "en", label: "English" },
-  { id: "fr", label: "Français" },
-];
+/** The complete languages, each named in itself so a lost player can find their own. */
+export function pickableLanguages<Id extends string>(
+  catalogues: Record<Id, { complete: boolean }>,
+): { id: Id; label: string }[] {
+  return (Object.entries(catalogues) as [Id, { complete: boolean }][])
+    .filter(([, { complete }]) => complete)
+    .map(([id]) => {
+      const name = new Intl.DisplayNames([id], { type: "language" }).of(id) ?? id;
+      return { id, label: name.charAt(0).toLocaleUpperCase(id) + name.slice(1) };
+    });
+}
+
+export const LANGUAGES = pickableLanguages(CATALOGUES);
 
 const STORAGE_KEY = "frontfall.language";
 
@@ -46,7 +55,7 @@ export function detectLanguage(tags: readonly string[]): Language {
 }
 
 function isLanguage(value: unknown): value is Language {
-  return typeof value === "string" && Object.hasOwn(CATALOGUES, value);
+  return LANGUAGES.some((lang) => lang.id === value);
 }
 
 // Storage can be missing or throw on access (private mode, blocked cookies):
