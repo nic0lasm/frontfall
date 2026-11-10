@@ -73,8 +73,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/protocol
       nodemailer:
-        specifier: ^10.3.1
-        version: 10.3.1
+        specifier: ^10.4.0
+        version: 10.4.0
       ws:
         specifier: ^8.22.1
         version: 8.22.1
@@ -1026,8 +1026,8 @@ packages:
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
-  nodemailer@10.3.1:
-    resolution: {integrity: sha512-uF0AFsJC07Y1vdW7p580DKAnh7rAO+4UPSSB3mDCPNDufoiaOebV6JmrzpxB14OjEEEiBsNdYoM2Y+fN8M7BBA==}
+  nodemailer@10.4.0:
+    resolution: {integrity: sha512-fyy6r4Q5euRJ9Qr3Cts9K7SZrfe9zmz9oLOYiAR02MEJRDRci+99y0OoYBYBgpLffOqkkjXrB/d26VfiMje/kA==}
     engines: {node: '>=20.0.0'}
 
   obug@3.0.0:
@@ -2046,7 +2046,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  nodemailer@10.3.1: {}
+  nodemailer@10.4.0: {}
 
   obug@3.0.0: {}
 
