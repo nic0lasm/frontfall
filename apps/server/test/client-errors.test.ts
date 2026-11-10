@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   ClientErrors,
   clientErrorsFile,
+  groupId,
   loadClientErrors,
   MAX_GROUPS,
   saveClientErrors,
@@ -54,6 +55,55 @@ describe("ClientErrors", () => {
       browsers: { chromium: 1, safari: 1 },
       screens: { online: 2 },
     });
+  });
+
+  it("keeps apart the errors from code outside the game's own, by kind", () => {
+    const errors = new ClientErrors();
+    const bare: ErrorReport = {
+      kind: "error",
+      release: "1.0.0",
+      type: "exception",
+      browser: "chromium",
+      device: "desktop",
+      screen: "menu",
+    };
+    const own = errors.record(bare, NOW);
+    const hidden = errors.record({ ...bare, from: "hidden" }, NOW);
+    const extension = errors.record({ ...bare, from: "extension" }, NOW);
+    expect(new Set([own, hidden, extension]).size).toBe(3);
+    // Without an origin the id is what it always was, so groups kept before keep theirs.
+    expect(own).toBe(groupId("exception", "", ""));
+    expect(errors.record({ ...bare, from: "hidden", browser: "safari" }, NOW)).toBe(hidden);
+    const groups = errors.read(NOW, 1).groups;
+    expect(groups.find((group) => group.id === hidden)).toMatchObject({
+      from: "hidden",
+      recent: 2,
+      browsers: { chromium: 1, safari: 1 },
+    });
+    expect(groups.find((group) => group.id === own)).toMatchObject({ from: "" });
+  });
+
+  it("reads groups kept before the origin existed", () => {
+    const errors = new ClientErrors();
+    const stored = JSON.stringify({
+      version: 1,
+      groups: {
+        abc123def456: {
+          type: "exception",
+          message: "",
+          where: "",
+          first: "2026-10-29",
+          last: "2026-10-29",
+          days: { "2026-10-29": 4 },
+          releases: { "0.9.5": 4 },
+          browsers: { safari: 4 },
+          devices: { phone: 4 },
+          screens: { menu: 4 },
+        },
+      },
+    });
+    expect(errors.restore(stored)).toBe(true);
+    expect(errors.read(NOW, 7).groups[0]).toMatchObject({ id: "abc123def456", from: "" });
   });
 
   it("counts reports without the newer fields as unknown", () => {

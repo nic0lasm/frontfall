@@ -24,6 +24,8 @@ const Group = z.object({
   type: z.string(),
   message: z.string(),
   where: z.string(),
+  /** Which kind of code outside the game's own the error came from; empty for the game's own. */
+  from: z.string().default(""),
   first: z.string(),
   last: z.string(),
   days: Counts,
@@ -41,6 +43,8 @@ export interface ErrorGroupView {
   type: string;
   message: string;
   where: string;
+  /** `hidden`, `extension` or `foreign` for code outside the game's own; empty for the game's own. */
+  from: string;
   /** Reports in the days asked for. */
   recent: number;
   /** Reports in the 30 days kept. */
@@ -70,8 +74,10 @@ function add(counts: Record<string, number>, value: string, capped = true): void
 }
 
 /** Short id of a group, the same across restarts and servers. */
-export function groupId(type: string, message: string, where: string): string {
-  return createHash("sha256").update(`${type}\n${message}\n${where}`).digest("hex").slice(0, 12);
+export function groupId(type: string, message: string, where: string, from = ""): string {
+  // Without an origin the text is what it always was, so groups kept before keep their id.
+  const text = from ? `${type}\n${message}\n${where}\n${from}` : `${type}\n${message}\n${where}`;
+  return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
 export class ClientErrors {
@@ -82,7 +88,8 @@ export class ClientErrors {
     // Scrubbed again: the page cannot be trusted to have done it.
     const message = report.message ? scrubMessage(report.message) : "";
     const where = report.where ?? "";
-    const id = groupId(report.type, message, where);
+    const from = report.from ?? "";
+    const id = groupId(report.type, message, where, from);
     const day = dayOf(now);
     let group = this.groups.get(id);
     if (!group) {
@@ -92,6 +99,7 @@ export class ClientErrors {
         type: report.type,
         message,
         where,
+        from,
         first: day,
         last: day,
         days: {},

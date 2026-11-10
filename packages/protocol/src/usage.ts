@@ -125,6 +125,10 @@ export type BrowserFamily = z.infer<typeof BrowserFamily>;
 export const ErrorScreen = z.enum(["menu", "lobby", "solo", "online", "replay"]);
 export type ErrorScreen = z.infer<typeof ErrorScreen>;
 
+/** Which kind of code an error came from when it was not the game's own. */
+export const ErrorOrigin = z.enum(["hidden", "extension", "foreign"]);
+export type ErrorOrigin = z.infer<typeof ErrorOrigin>;
+
 export const ErrorReport = z
   .object({
     kind: z.literal("error"),
@@ -140,6 +144,13 @@ export const ErrorReport = z
       .string()
       .regex(/^[\w.-]{1,80}:\d{1,7}:\d{1,7}$/)
       .optional(),
+    /**
+     * Only for an error that does not come from the game's own code, and
+     * nothing more than which kind: a script the browser hides (`hidden`), a
+     * browser extension (`extension`), or a script of another address
+     * (`foreign`). No address, no message.
+     */
+    from: ErrorOrigin.optional(),
     browser: BrowserFamily.optional(),
     device: Device.optional(),
     screen: ErrorScreen.optional(),

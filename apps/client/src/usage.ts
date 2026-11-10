@@ -2,6 +2,7 @@ import {
   scrubMessage,
   type BrowserFamily,
   type ClientErrorType,
+  type ErrorOrigin,
   type ErrorScreen,
   type Device,
   type FeedbackReason,
@@ -106,6 +107,22 @@ export function whereOf(source: string | undefined, origin: string): string | un
     return `${file}:${line}:${column}`;
   }
   return undefined;
+}
+
+/**
+ * Which kind of code an error came from, when it was not the game's own: a
+ * script the browser hides (it gave no address), a browser extension, or a
+ * script of another address. Undefined for an error of the game's own code.
+ */
+export function originOf(
+  source: string | undefined,
+  where: string | undefined,
+): ErrorOrigin | undefined {
+  if (where !== undefined || source === undefined) return undefined;
+  if (source === "") return "hidden";
+  return /(?:^|[\s(@])(?:chrome|moz|safari|safari-web|ms-browser)-extension:\/\//.test(source)
+    ? "extension"
+    : "foreign";
 }
 
 /** What a game report says about the game itself, known when it starts. */
@@ -334,12 +351,14 @@ export class Usage {
     const where = whereOf(message ? source?.split(message).join("") : source, this.env.origin);
     const own = source === undefined || where !== undefined;
     const text = message && own ? scrubMessage(message) : "";
+    const from = originOf(source, where);
     this.send({
       kind: "error",
       release: RELEASE,
       type,
       ...(text ? { message: text } : {}),
       ...(where ? { where } : {}),
+      ...(from ? { from } : {}),
       browser: browserOf(this.env.userAgent),
       device: deviceOf(this.env.coarsePointer, this.env.screenSide),
       screen: this.screen,

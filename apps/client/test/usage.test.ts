@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   browserOf,
   deviceOf,
+  originOf,
   Usage,
   whereOf,
   type GameFacts,
@@ -172,9 +173,42 @@ describe("Usage", () => {
       kind: "error",
       release: "0.0.0",
       type: "exception",
+      from: "extension",
       ...context,
     });
     for (const { body } of sent) expect(parseUsageReport(body).ok).toBe(true);
+  });
+});
+
+describe("originOf", () => {
+  it("says nothing of an error from the game's own code", () => {
+    expect(originOf("index-Ab12.js:1:2045", "index-Ab12.js:1:2045")).toBeUndefined();
+    expect(originOf(undefined, undefined)).toBeUndefined();
+  });
+
+  it("tells a hidden script, an extension and a script of another address apart", () => {
+    expect(originOf("", undefined)).toBe("hidden");
+    expect(originOf("chrome-extension://abc/content.js:1:2", undefined)).toBe("extension");
+    expect(originOf("moz-extension://abc/content.js:1:2", undefined)).toBe("extension");
+    expect(originOf("g@safari-web-extension://abc/a.js:3:4", undefined)).toBe("extension");
+    expect(originOf("https://evil.example/a.js:1:1", undefined)).toBe("foreign");
+  });
+
+  it("sends only the kind, never the address or the message", () => {
+    const { env, sent, reports } = environment();
+    const usage = new Usage(env);
+    usage.error("exception", "Script error.", "");
+    usage.error("exception", "secret", "https://evil.example/a.js:1:1");
+    expect(reports()[0]).toMatchObject({ type: "exception", from: "hidden" });
+    expect(reports()[1]).toMatchObject({ type: "exception", from: "foreign" });
+    for (const report of reports()) {
+      expect(report.message).toBeUndefined();
+      expect(report.where).toBeUndefined();
+    }
+    for (const { body } of sent) {
+      expect(body).not.toContain("evil.example");
+      expect(parseUsageReport(body).ok).toBe(true);
+    }
   });
 });
 

@@ -120,7 +120,7 @@ export function usageInbox(
             type: report.type,
             release: report.release,
             message,
-            group: groupId(report.type, message, report.where ?? ""),
+            group: groupId(report.type, message, report.where ?? "", report.from ?? ""),
           });
         }
         end(204);

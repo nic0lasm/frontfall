@@ -328,7 +328,7 @@ admin GET 'errors?days=30'      # everything kept
 }
 ```
 
-`where` names a file of the release's build: `pnpm build` at that release's tag gives the same file, and the line and column point into it. The `client_error` lines of the log carry the same `group`. `errors` on `/status` and in `/api/stats` count the reports by kind only.
+`where` names a file of the release's build: `pnpm build` at that release's tag gives the same file, and the line and column point into it. An error from code outside the game's own has neither message nor `where`: its `from` says which kind, `hidden` (the browser gave no address, as for a script of another site), `extension` or `foreign`, and is empty for the game's own. Such groups are not a bug of the game; many of them on one browser point at an extension or an in-app browser. The `client_error` lines of the log carry the same `group`. `errors` on `/status` and in `/api/stats` count the reports by kind only.
 
 ## Usage counts
 
