@@ -30,11 +30,23 @@ describe("provenance check", () => {
     ).toEqual([]);
   });
 
-  it("refuses another author or committer", () => {
+  it("refuses another committer, and an author naming a tool", () => {
     const found = checkCommit(
-      commit({ author: "A <a@example.org>", committer: `${tool} <n@example.org>` }),
+      commit({ author: `${tool} <a@example.org>`, committer: `${tool} <n@example.org>` }),
     );
     expect(found.map((v) => v.where)).toEqual(["author", "committer"]);
+    expect(
+      checkCommit(commit({ author: "A <a@example.org>", committer: "B <b@example.org>" })).map(
+        (v) => v.where,
+      ),
+    ).toEqual(["author", "committer"]);
+  });
+
+  it("keeps an outside author when the owner is the committer", () => {
+    expect(checkCommit(commit({ author: "Priyansh <p@example.org>" }))).toEqual([]);
+    expect(checkCommit(commit({ author: `${tool} <p@example.org>` })).map((v) => v.where)).toEqual([
+      "author",
+    ]);
   });
 
   it("refuses co-author and session trailers", () => {

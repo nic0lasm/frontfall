@@ -1,8 +1,9 @@
 /**
  * Provenance check: who wrote a commit, and what it carries.
  *
- * Every commit of a range must be written and committed under the project's
- * public address (or by Dependabot, or merged by GitHub), carry no co-author
+ * Every commit of a range must be committed under the project's public address
+ * (or by Dependabot, or merged by GitHub) and written by it, or by an outside
+ * contributor whose commit the owner integrated, carry no co-author
  * or session trailer, and add no marker of the tooling around it. The
  * patterns are assembled from pieces so that this file passes its own check.
  */
@@ -65,11 +66,21 @@ export interface Violation {
 const allowed = (identity: string): boolean =>
   ALLOWED_IDENTITIES.some((rule) => rule.test(identity));
 
+/** Names of tools and companies an identity may not carry, even as an outside author. */
+const TOOL_IDENTITIES: readonly RegExp[] = [join("cla", "ude"), join("anth", "ropic")];
+
+/**
+ * An outside contributor keeps the authorship of a commit the owner integrates:
+ * any author is accepted when the committer is allowed, unless it names a tool.
+ */
+const authorAllowed = (author: string, committer: string): boolean =>
+  allowed(author) || (allowed(committer) && !TOOL_IDENTITIES.some((rule) => rule.test(author)));
+
 /** The problems of one commit's identities and message. */
 export function checkCommit(commit: CommitInfo): Violation[] {
   const found: Violation[] = [];
   const short = commit.sha.slice(0, 7);
-  if (!allowed(commit.author)) {
+  if (!authorAllowed(commit.author, commit.committer)) {
     found.push({ sha: short, where: "author", reason: "identity not allowed" });
   }
   if (!allowed(commit.committer)) {
