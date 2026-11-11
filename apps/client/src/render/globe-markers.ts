@@ -12,11 +12,22 @@ export interface GlobeMarkersOptions {
   readonly sides?: number;
   /** Drawn after layers with a lower order, over them. */
   readonly order: number;
+  /**
+   * A map token instead of a flat shape, as on the flat map: a dark disc with
+   * a soft shadow, ringed in the marker's colour, with a white glyph of
+   * `sides` sides in the middle.
+   */
+  readonly token?: boolean;
 }
 
 const vertexShader = /* glsl */ `
   uniform float unitScale;
   out vec3 vColor;
+#ifdef TOKEN
+  in float glyph;
+  out vec2 vUv;
+  out float vGlyph;
+#endif
 
   void main() {
     // The instance's translation is the marker's point on the unit sphere.
@@ -25,6 +36,10 @@ const vertexShader = /* glsl */ `
     // A marker in flight is above the surface: its distance from the middle is 1 plus its altitude.
     float radius = length(centre);
     vColor = instanceColor;
+#ifdef TOKEN
+    vUv = uv;
+    vGlyph = glyph;
+#endif
     // Behind the horizon: out of the clip volume. The planet writes no depth.
     if (dot(normal, cameraPosition) < 1.0) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
@@ -41,9 +56,35 @@ const vertexShader = /* glsl */ `
 const fragmentShader = /* glsl */ `
   in vec3 vColor;
   layout(location = 0) out highp vec4 outColor;
+#ifdef TOKEN
+  in vec2 vUv;
+  in float vGlyph;
+  uniform float sides;
+#endif
 
   void main() {
+#ifdef TOKEN
+    vec2 p = vUv * 2.0 - 1.0;
+    float r = length(p);
+    float aa = max(fwidth(r) * 1.2, 1e-3);
+    float disc = 1.0 - smoothstep(0.8 - aa, 0.8, r);
+    float ring = smoothstep(0.58 - aa, 0.58, r);
+    // A regular polygon of 'sides' sides, a point up.
+    float sector = 6.2831853 / sides;
+    float a = atan(p.x, p.y);
+    float poly = cos(floor(0.5 + a / sector) * sector - a) * r;
+    float glyphMask = 1.0 - smoothstep(0.34 - aa, 0.34, poly);
+    // A short shadow to the south-east, under the disc.
+    float shadow = (1.0 - smoothstep(0.55, 1.0, length(p - vec2(0.1, -0.14)))) * 0.45;
+    vec3 ink = vec3(0.012, 0.02, 0.032);
+    vec3 color = mix(ink, vColor, ring);
+    color = mix(color, vec3(0.92, 0.9, 0.86) * vGlyph, glyphMask * (1.0 - ring));
+    float alpha = max(disc, shadow * (1.0 - disc));
+    if (alpha < 0.01) discard;
+    outColor = linearToOutputTexel(vec4(color * disc, alpha));
+#else
     outColor = linearToOutputTexel(vec4(vColor, 1.0));
+#endif
   }
 `;
 
@@ -59,17 +100,29 @@ export class GlobeMarkers {
   private readonly unitScale = { value: 1 };
   /** Radians of the planet per row of tiles. */
   private readonly rowAngle: number;
+  /** Brightness of each token's glyph: 1 when built, less while being built. */
+  private readonly glyphs: THREE.InstancedBufferAttribute | undefined;
 
   constructor(readonly options: GlobeMarkersOptions) {
     this.rowAngle = Math.PI / options.worldHeight;
-    const geometry = new THREE.CircleGeometry(options.size / 2, options.sides ?? 8, Math.PI / 2);
+    const token = options.token === true;
+    const geometry = token
+      ? new THREE.PlaneGeometry(options.size, options.size)
+      : new THREE.CircleGeometry(options.size / 2, options.sides ?? 8, Math.PI / 2);
+    if (token) {
+      this.glyphs = new THREE.InstancedBufferAttribute(new Float32Array(options.capacity), 1);
+      this.glyphs.setUsage(THREE.DynamicDrawUsage);
+      geometry.setAttribute("glyph", this.glyphs);
+    }
     const material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       vertexShader,
       fragmentShader,
-      uniforms: { unitScale: this.unitScale },
+      defines: token ? { TOKEN: 1 } : {},
+      uniforms: { unitScale: this.unitScale, sides: { value: options.sides ?? 8 } },
       depthTest: false,
       depthWrite: false,
+      transparent: token,
     });
     this.mesh = new THREE.InstancedMesh(geometry, material, options.capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -100,6 +153,13 @@ export class GlobeMarkers {
     this.mesh.setColorAt(index, this.color.set(color));
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Brightness of token `index`'s glyph, 1 for a finished building. */
+  setGlyph(index: number, brightness: number): void {
+    if (!this.glyphs) return;
+    this.glyphs.setX(index, brightness);
+    this.glyphs.needsUpdate = true;
   }
 
   /** Places marker `index` at a point of space around the unit sphere: its direction is the ground it is over, its length 1 plus its altitude. */

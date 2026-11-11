@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
-import { TerritoryLayer } from "../src/render/territory-layer.ts";
+import { seaDepths, TerritoryLayer } from "../src/render/territory-layer.ts";
 
 function layer(width = 256, height = 4, maxOwner = 3): TerritoryLayer {
   return new TerritoryLayer({
@@ -308,5 +308,41 @@ describe("TerritoryLayer", () => {
       up: [0, 1, 0],
     });
     territory.dispose();
+  });
+});
+
+describe("seaDepths", () => {
+  it("is zero everywhere on a map without bathymetry", () => {
+    const terrain = new Uint8Array([0, 0, 1, 0]);
+    expect([...seaDepths(terrain, undefined, 2, false)]).toEqual([0, 0, 0, 0]);
+    expect([...seaDepths(terrain, new Uint8Array(4), 2, false)]).toEqual([0, 0, 0, 0]);
+  });
+
+  it("turns the depth bands of the water into a smooth slope, land counting as shelf", () => {
+    // One row: land on the west, the shelf, then the abyss to the east.
+    const width = 40;
+    const terrain = new Uint8Array(width);
+    const relief = new Uint8Array(width);
+    terrain[0] = 1;
+    relief[0] = 12;
+    for (let x = 20; x < width; x++) relief[x] = 24;
+    const depths = seaDepths(terrain, relief, width, false);
+    expect(depths[0]).toBe(0);
+    expect(depths[width - 1]).toBe(255);
+    // No step between neighbours larger than the blur allows.
+    for (let x = 1; x < width; x++) {
+      expect(Math.abs((depths[x] as number) - (depths[x - 1] as number))).toBeLessThan(60);
+      expect(depths[x] as number).toBeGreaterThanOrEqual(depths[x - 1] as number);
+    }
+  });
+
+  it("wraps the blur across the seam of a map that wraps", () => {
+    const width = 20;
+    const terrain = new Uint8Array(width);
+    const relief = new Uint8Array(width);
+    relief[0] = 24;
+    const depths = seaDepths(terrain, relief, width, true);
+    expect(depths[width - 1]).toBe(depths[1]);
+    expect(depths[width - 1] as number).toBeGreaterThan(0);
   });
 });

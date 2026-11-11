@@ -128,6 +128,9 @@ const fragmentShader = /* glsl */ `
 #ifdef SPHERE
   in vec3 vRay;
   uniform vec3 eye;
+  uniform vec3 rayForward;
+  uniform vec3 rayRight;
+  uniform vec3 rayUp;
 #else
   in vec2 vTile;
 #endif
@@ -154,6 +157,9 @@ const fragmentShader = /* glsl */ `
   uniform uint highlight;
   uniform uint hovered;
   uniform sampler2D heightMap;
+  /** Depth of the sea from the map's bathymetry, 0 on the shelf to 1 in the abyss; land reads 0. */
+  uniform sampler2D depthMap;
+  uniform bool hasDepth;
   uniform vec2 viewport;
 
   /** The column on the map, across the seam of a map that wraps; a float division, as % is undefined below 0. */
@@ -261,9 +267,18 @@ const fragmentShader = /* glsl */ `
    * north-west in the forests. Hashes alone, no texture read; a factor on the albedo, 1 where
    * nothing is added.
    */
-  vec3 closeGround(vec2 at, float forest, float hm, float ice, float pixel) {
+  vec3 closeGround(vec2 at, float forest, float hm, float ice, float arid, float pixel) {
     vec3 m = vec3(1.0);
-    float plain = (1.0 - forest) * (1.0 - smoothstep(0.15, 0.4, hm)) * (1.0 - ice);
+    float open = (1.0 - forest) * (1.0 - smoothstep(0.15, 0.4, hm)) * (1.0 - ice);
+    // Farmland comes in broad patches of the green plains, with open meadow between them; none in the deserts.
+    float plain = open * (1.0 - arid) * smoothstep(0.32, 0.5, nz(at * 0.045 + 21.0));
+    float sand = open * arid;
+    if (sand > 0.01) {
+      // Dunes: long ripples bent by the wind, a lit and a shaded side.
+      float ripple = sin(dot(at, vec2(0.78, 0.62)) * 1.2 + 9.0 * nz(at * 0.09 + 5.0));
+      float field = smoothstep(0.3, 0.7, nz(at * 0.06 + 13.0));
+      m *= 1.0 + sand * (0.08 * ripple * field + 0.06 * (nz(at * 0.5) - 0.5));
+    }
     if (plain > 0.01) {
       // Blocks about four tiles across, turned and bent, each cut once along its length or its width.
       vec2 q = mat2(0.94, 0.34, -0.34, 0.94) * at * 0.26 + 0.9 * vec2(nz(at * 0.07), nz(at * 0.07 + 7.0));
@@ -284,7 +299,7 @@ const fragmentShader = /* glsl */ `
       float hedge = (1.0 - smoothstep(hedgeWidth, 2.5 * hedgeWidth, edge)) * step(0.35, h1);
       float furrowFade = 1.0 - smoothstep(0.025, 0.05, pixel);
       float furrow = 1.0 + 0.035 * furrowFade * sin(((across ? f.y : f.x) + h1) * 90.0);
-      vec3 fields = crop * (0.93 + 0.14 * h1) * furrow * (1.0 - 0.22 * hedge);
+      vec3 fields = crop * (0.93 + 0.14 * h1) * furrow * (1.0 - 0.16 * hedge);
       m = mix(m, fields, plain);
     }
     float treeFade = 1.0 - smoothstep(0.04, 0.09, pixel);
@@ -335,10 +350,12 @@ const fragmentShader = /* glsl */ `
    * The low-frequency inputs (warp, bend, broad) are worked out once a pixel and shared by its three samples.
    */
   float reliefH(vec2 p, vec2 warp, vec2 bend, float broad, float lod, float pixel, out float raw, out float base) {
-    raw = heightCubic(p + warp, lod + 0.6);
+    // Close up the spline reads the full-size heights: between two mip levels its taps fall out of step and draw stairs.
+    raw = heightCubic(p + warp, lod + 0.6 * smoothstep(0.35, 0.9, pixel));
     float h = raw + (broad - 0.5) * 0.3 * smoothstep(0.05, 0.4, raw);
     base = h;
     float m = smoothstep(0.30, 0.68, h);
+    float h0 = h;
     float f1 = smoothstep(2.5, 7.0, 9.0 / pixel);
     float f2 = smoothstep(2.5, 7.0, 4.0 / pixel);
     // Ridges only where there are mountains, hills only on the foothills.
@@ -352,10 +369,12 @@ const fragmentShader = /* glsl */ `
       float r2 = 1.0 - abs(2.0 * n2 - 1.0);
       r2 = r2 * r2;
       h += (0.2 * r1 * f1 * (0.55 + 0.9 * broad) + 0.06 * r2 * f2) * m;
-    } else if (h > 0.08) {
-      // Rolling hills inside a raised region, not a flat dome.
-      float rise = smoothstep(0.08, 0.35, h);
-      h += ((nz(p * 0.09 + 2.0) - 0.5) * 0.09 * f1 + (nz(p * 0.33 + 4.0) - 0.5) * 0.05 * f2) * rise;
+    }
+    // Rolling hills inside a raised region, not a flat dome; handed over to the
+    // ridges gradually, as a sudden switch drew a thin bright line along the foot of every range.
+    if (h0 > 0.08 && m < 1.0) {
+      float rise = smoothstep(0.08, 0.35, h0);
+      h += ((nz(p * 0.09 + 2.0) - 0.5) * 0.09 * f1 + (nz(p * 0.33 + 4.0) - 0.5) * 0.05 * f2) * rise * (1.0 - m);
     }
     return h;
   }
@@ -384,11 +403,39 @@ const fragmentShader = /* glsl */ `
 
 #ifdef SPHERE
   /** The halo of air around the planet seen past its edge: false where the ray passes too far for it. */
+  /**
+   * Where the sun stands, seen from the planet: over the viewer's left
+   * shoulder, so the face turned to the camera is lit and the far limb falls
+   * into a soft shade, whatever way the globe is turned.
+   */
+  vec3 sunDirection() {
+    return normalize(-0.75 * normalize(rayForward) + 0.5 * normalize(rayUp) - 0.45 * normalize(rayRight));
+  }
+
+  /** The sky around the planet: blue-black, with sparse stars fixed to the planet's frame. */
+  vec3 space(vec3 ray) {
+    vec2 sc = vec2(atan(ray.z, ray.x), asin(clamp(ray.y, -1.0, 1.0))) * 90.0;
+    vec3 sky = vec3(0.0016, 0.0028, 0.0058);
+    vec2 cell = floor(sc);
+    float h = hs(cell + 3.1);
+    if (h > 0.965) {
+      // A pixel's size in these units, from the camera's field of view: no derivatives off the planet.
+      float pxSize = 180.0 * length(rayUp) / (length(rayForward) * max(viewport.y, 1.0));
+      vec2 d = (sc - cell - (0.15 + 0.7 * vec2(hs(cell + 7.7), hs(cell + 1.3)))) / max(pxSize, 1e-4);
+      float bright = pow((h - 0.965) / 0.035, 4.0);
+      vec3 tint = mix(vec3(0.7, 0.8, 1.0), vec3(1.0, 0.88, 0.72), hs(cell + 5.0));
+      sky += tint * exp(-dot(d, d) * 0.9) * (0.06 + 1.2 * bright);
+    }
+    return sky;
+  }
+
   bool atmosphere(vec3 origin, vec3 ray, out vec4 shade) {
-    float miss = length(origin - dot(origin, ray) * ray);
-    float halo = 1.0 - (miss - 1.0) / ${String(HALO_WIDTH)};
-    shade = linearToOutputTexel(vec4(mix(vec3(0.02, 0.035, 0.055), vec3(0.30, 0.55, 1.0), halo * halo * 0.55), 1.0));
-    return halo > 0.0;
+    vec3 nearest = origin - dot(origin, ray) * ray;
+    float halo = clamp(1.0 - (length(nearest) - 1.0) / ${String(HALO_WIDTH)}, 0.0, 1.0);
+    // Brighter on the side of the sun, faint on the other.
+    float lit = 0.3 + 0.9 * max(dot(normalize(nearest), sunDirection()), 0.0);
+    shade = linearToOutputTexel(vec4(mix(space(ray), vec3(0.30, 0.55, 1.0), min(1.0, halo * halo * 0.6 * lit)), 1.0));
+    return true;
   }
 #endif
 
@@ -752,7 +799,9 @@ const fragmentShader = /* glsl */ `
       albedo = mix(albedo, srgb3(214.0, 220.0, 228.0), max(hm * snow * 0.8, ice * 0.5));
       // Close up, fields, crowns and stones, faded in before they could shimmer.
       float close = 1.0 - smoothstep(0.08, 0.18, pixel);
-      if (close > 0.0) albedo *= mix(vec3(1.0), closeGround(at, forest, hm, ice, pixel) * (1.0 - bare) + vec3(bare), close);
+      // Sand and dry steppe: reddish, not green.
+      float arid = smoothstep(1.02, 1.25, base.r / max(base.g, 1e-3)) * (1.0 - forest);
+      if (close > 0.0) albedo *= mix(vec3(1.0), closeGround(at, forest, hm, ice, arid, pixel) * (1.0 - bare) + vec3(bare), close);
       // Warm light on the slopes facing the sun, cool shade in the folds: depth without chrome.
       vec3 tint = mix(vec3(0.9, 0.94, 1.04), vec3(1.05, 1.0, 0.9), smoothstep(0.7, 1.25, shade));
       landColor = albedo * shade * mix(vec3(1.0), tint, 0.35 + 0.65 * hm);
@@ -760,26 +809,42 @@ const fragmentShader = /* glsl */ `
       landColor *= 1.0 + 0.2 * (1.0 - smoothstep(0.0, max(0.3, 1.6 * pixel), coastIn));
     }
 
-    // Sea: four tones of depth, a slow swell, surf and two waves creeping in.
+    // Sea: the map's own bathymetry (shelf, slope, deep, abyss), clear shallows
+    // along the shore, a slow swell, surf and a wave creeping in close up.
     vec3 seaColor = vec3(0.0);
     if (landCover < 1.0) {
-      seaColor = mix(srgb3(34.0, 112.0, 134.0), srgb3(18.0, 66.0, 92.0), smoothstep(0.0, max(1.4, 4.5 * pixel), depth));
       float shelfWidth = max(1.4, 4.5 * pixel);
-      seaColor = mix(seaColor, srgb3(12.0, 40.0, 62.0), smoothstep(0.5 * shelfWidth, 2.2 * shelfWidth + 3.0, depth));
-      seaColor = mix(seaColor, srgb3(7.0, 22.0, 38.0), smoothstep(8.0, 40.0, depth));
-      seaColor *= 1.0 - 0.32 * exp(-depth / max(0.4, 1.4 * pixel));
-      float swell = nz(at * 0.22 + t * vec2(0.05, 0.02)) + nz(at * 0.5 - t * vec2(0.03, 0.06)) - 1.0;
-      seaColor *= 1.0 + 0.16 * swell * (1.0 - smoothstep(0.25, 1.1, pixel)) * smoothstep(0.6, 4.0, depth);
+      float bathy = hasDepth ? textureLod(depthMap, at / worldSize, lod).r : 0.0;
+      float onShelf = hasDepth ? smoothstep(0.02, 0.5, bathy) : smoothstep(0.5 * shelfWidth, 2.2 * shelfWidth + 3.0, depth);
+      float abyss = hasDepth ? smoothstep(0.3, 1.0, bathy) : smoothstep(8.0, 40.0, depth);
+      vec3 shallow = srgb3(40.0, 124.0, 140.0);
+      vec3 shelf = srgb3(19.0, 70.0, 92.0);
+      seaColor = mix(shallow, shelf, smoothstep(0.0, shelfWidth, depth));
+      seaColor = mix(seaColor, srgb3(11.0, 40.0, 66.0), onShelf);
+      seaColor = mix(seaColor, srgb3(6.0, 20.0, 38.0), abyss);
+      // Large, slow patches of tone so the open sea is never one flat colour.
+      float tone = nz(at * 0.035 + 11.0) - 0.5;
+      seaColor *= 1.0 + 0.14 * tone * smoothstep(1.0, 6.0, depth);
+      seaColor *= 1.0 - 0.1 * exp(-depth / max(0.4, 1.4 * pixel));
+      // The swell, surf and waves cost noise: only where they can be seen.
+      float swellFade = (1.0 - smoothstep(0.25, 1.1, pixel)) * smoothstep(0.6, 4.0, depth);
+      if (swellFade > 0.0) {
+        float swell = nz(at * 0.22 + t * vec2(0.05, 0.02)) + nz(at * 0.5 - t * vec2(0.03, 0.06)) - 1.0;
+        seaColor *= 1.0 + 0.16 * swell * swellFade;
+      }
       float foamEdge = max(0.07, 1.25 * pixel);
-      float foamBreak = 0.55 + 0.9 * nz(at * 1.3 + t * vec2(0.12, 0.05));
-      float surf = (1.0 - smoothstep(0.35 * foamEdge, foamEdge, depth)) * min(1.0, foamBreak + 0.35);
-      surf *= mix(1.0, 0.55, smoothstep(0.5, 1.2, pixel));
       float spacing = max(0.55, 11.0 * pixel);
-      float phase = fract(depth / spacing - t * 0.11);
-      float wave = exp(-phase * 15.0) * smoothstep(0.0, 0.04, phase) * (1.0 - smoothstep(0.0, 2.6 * spacing, depth)) * smoothstep(0.25 * spacing, 0.7 * spacing, depth);
-      wave *= smoothstep(0.45, 0.95, foamBreak) * (1.0 - smoothstep(0.25, 0.8, pixel));
-      seaColor = mix(seaColor, foamColor * 1.05, clamp(surf * 0.85 + wave * 0.35, 0.0, 1.0));
-      seaColor += foamColor * 0.045 * exp(-depth / max(0.7, 1.6 * pixel));
+      if (depth < max(foamEdge, 2.6 * spacing)) {
+        float foamBreak = 0.55 + 0.9 * nz(at * 1.3 + t * vec2(0.12, 0.05));
+        float surf = (1.0 - smoothstep(0.35 * foamEdge, foamEdge, depth)) * min(1.0, foamBreak + 0.35);
+        surf *= mix(1.0, 0.55, smoothstep(0.5, 1.2, pixel));
+        float phase = fract(depth / spacing - t * 0.11);
+        float wave = exp(-phase * 15.0) * smoothstep(0.0, 0.04, phase) * (1.0 - smoothstep(0.0, 2.6 * spacing, depth)) * smoothstep(0.25 * spacing, 0.7 * spacing, depth);
+        // Only close up: farther out the wave read as a contour line around every coast.
+        wave *= smoothstep(0.45, 0.95, foamBreak) * (1.0 - smoothstep(0.12, 0.3, pixel));
+        seaColor = mix(seaColor, foamColor * 1.05, clamp(surf * 0.8 + wave * 0.3, 0.0, 1.0));
+      }
+      seaColor += foamColor * 0.03 * exp(-depth / max(0.7, 1.6 * pixel));
     }
     color = mix(seaColor, landColor, landCover);
 
@@ -878,15 +943,88 @@ const fragmentShader = /* glsl */ `
       if (!atmosphere(eye, ray, outColor)) discard;
       return;
     }
-    // Darker toward the rim, so the planet reads as round.
+    // Lit by the sun, darker toward the rim, so the planet reads as round.
+    vec3 sun = sunDirection();
     float facing = max(dot(point, -ray), 0.0);
-    color *= mix(0.45, 1.0, sqrt(facing));
+    float daylight = smoothstep(-0.3, 0.8, dot(point, sun));
+    color *= mix(0.42, 1.12, daylight) * mix(0.65, 1.0, sqrt(facing));
+    // The sun's glint on open water, seen from afar only: up close it would wash out a whole sea.
+    float glintCos = max(dot(point, normalize(sun - ray)), 0.0);
+    float glint = (pow(glintCos, 600.0) * 0.5 + pow(glintCos, 60.0) * 0.05) * (1.0 - landCover) * smoothstep(0.5, 1.3, pixel);
+    color += vec3(1.0, 0.9, 0.75) * glint;
     // The air seen along the ground at a grazing angle scatters blue light back.
-    color = mix(color, vec3(0.30, 0.55, 1.0), 0.5 * pow(1.0 - facing, 3.0));
+    color = mix(color, vec3(0.30, 0.55, 1.0), 0.5 * pow(1.0 - facing, 3.0) * (0.35 + 0.65 * daylight));
   #endif
     outColor = linearToOutputTexel(vec4(color, 1.0));
   }
 `;
+
+/** Deepest water band of the map format (maps.md, Relief and depth): more than 4,000 m. */
+const ABYSS_BAND = 24;
+
+/**
+ * Depth of every tile of water from the map's bands, 0 on the shelf to 255 in
+ * the abyss, for the sea's colour; land is 0, so a shore is shelf. All zeros
+ * on a map without bathymetry, which then shades its sea by the distance to
+ * the coast.
+ */
+export function seaDepths(
+  terrain: Uint8Array,
+  relief: Uint8Array | undefined,
+  width: number,
+  wrapsX: boolean,
+): Uint8Array {
+  const depths = new Uint8Array(terrain.length);
+  if (!relief) return depths;
+  let any = false;
+  for (let tile = 0; tile < terrain.length; tile++) {
+    if (terrain[tile] !== 0) continue;
+    const band = relief[tile] as number;
+    if (band > 0) {
+      depths[tile] = Math.min(255, Math.round((band * 255) / ABYSS_BAND));
+      any = true;
+    }
+  }
+  // The bands are steps a tile wide: three passes of a box blur turn them
+  // into slopes a few tiles wide, smooth at every zoom.
+  if (any) for (let pass = 0; pass < 3; pass++) boxBlur(depths, width, wrapsX, DEPTH_BLUR);
+  return depths;
+}
+
+/** Radius in tiles of each pass of the depth's blur. */
+const DEPTH_BLUR = 2;
+
+/** A box blur of `radius` tiles across rows then down columns, in place; columns wrap if the map does. */
+function boxBlur(values: Uint8Array, width: number, wrapsX: boolean, radius: number): void {
+  const height = values.length / width;
+  const span = 2 * radius + 1;
+  const line = new Uint16Array(Math.max(width, height) + 2 * radius);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let i = -radius; i < width + radius; i++) {
+      const x = wrapsX ? (i + width) % width : Math.min(width - 1, Math.max(0, i));
+      line[i + radius] = values[row + x] as number;
+    }
+    let sum = 0;
+    for (let i = 0; i < span; i++) sum += line[i] as number;
+    for (let x = 0; x < width; x++) {
+      values[row + x] = Math.round(sum / span);
+      sum += (line[x + span] ?? 0) - (line[x] as number);
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    for (let i = -radius; i < height + radius; i++) {
+      const y = Math.min(height - 1, Math.max(0, i));
+      line[i + radius] = values[y * width + x] as number;
+    }
+    let sum = 0;
+    for (let i = 0; i < span; i++) sum += line[i] as number;
+    for (let y = 0; y < height; y++) {
+      values[y * width + x] = Math.round(sum / span);
+      sum += (line[y + span] ?? 0) - (line[y] as number);
+    }
+  }
+}
 
 /**
  * Draws ownership for the whole world in one draw call: owners live in a
@@ -911,6 +1049,9 @@ export class TerritoryLayer {
   readonly takenAtTexture: THREE.DataTexture;
   /** The height the ground is lit from, one byte a tile, filtered smooth (terrain-colors). */
   readonly heightTexture: THREE.DataTexture;
+  /** Depth of the sea from the map's bathymetry, filtered like the ground. */
+  readonly depthTexture: THREE.DataTexture;
+  private readonly hasDepth: boolean;
   private readonly takenAt: Float32Array;
   /** The globe camera's rays, read by the shader on a sphere. */
   private readonly rays = {
@@ -984,6 +1125,15 @@ export class TerritoryLayer {
     );
     this.groundTexture.colorSpace = THREE.SRGBColorSpace;
     this.wrapsX = wrapsX;
+    const depths = seaDepths(terrain, options.relief, width, wrapsX);
+    this.hasDepth = depths.some((value) => value > 0);
+    this.depthTexture = new THREE.DataTexture(
+      this.hasDepth ? depths : new Uint8Array(1),
+      this.hasDepth ? width : 1,
+      this.hasDepth ? height : 1,
+      THREE.RedFormat,
+      THREE.UnsignedByteType,
+    );
 
     // Long ago: nothing fades on the first frame.
     this.takenAt = new Float32Array(width * height).fill(-1e6);
@@ -1005,6 +1155,7 @@ export class TerritoryLayer {
       this.ownerTexture,
       this.groundTexture,
       this.heightTexture,
+      this.depthTexture,
       this.takenAtTexture,
       this.paletteTexture,
     ]) {
@@ -1018,7 +1169,7 @@ export class TerritoryLayer {
     // The ground and its height are filtered: smooth between tile centres, and
     // averaged over the tiles under a pixel when zoomed out.
     if (!options.flat) {
-      for (const texture of [this.groundTexture, this.heightTexture]) {
+      for (const texture of [this.groundTexture, this.heightTexture, this.depthTexture]) {
         texture.magFilter = THREE.LinearFilter;
         texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.generateMipmaps = true;
@@ -1036,6 +1187,8 @@ export class TerritoryLayer {
         owners: { value: this.ownerTexture },
         ground: { value: this.groundTexture },
         heightMap: { value: this.heightTexture },
+        depthMap: { value: this.depthTexture },
+        hasDepth: { value: this.hasDepth },
         viewport: { value: new THREE.Vector2(1, 1) },
         takenAt: { value: this.takenAtTexture },
         palette: { value: this.paletteTexture },
@@ -1432,6 +1585,7 @@ export class TerritoryLayer {
     this.ownerTexture.dispose();
     this.groundTexture.dispose();
     this.heightTexture.dispose();
+    this.depthTexture.dispose();
     this.takenAtTexture.dispose();
     this.paletteTexture.dispose();
   }

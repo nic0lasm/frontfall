@@ -26,14 +26,15 @@ const HALO_COLOR = "#F4F8FC";
 const SHOT_COLOR = "#FFD27A";
 const STRUCTURE_CAPACITY = 1024;
 const MISSILE_CAPACITY = 256;
-const STRUCTURE_MIN_PIXELS = 9;
+/** Size of a structure's token on screen, in CSS pixels: never a speck far out, never a slab up close. */
+const STRUCTURE_MIN_PIXELS = 14;
+const STRUCTURE_MAX_PIXELS = 30;
 
 /** Space around the planet: the brand's ink, darker than the deep sea. */
 const SPACE = "#05090E";
 
 interface StructureMarkers {
-  readonly outline: GlobeMarkers;
-  readonly fill: GlobeMarkers;
+  readonly tokens: GlobeMarkers;
   readonly size: number;
 }
 
@@ -48,6 +49,7 @@ export class GlobeView implements Renderer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(GLOBE_FOV, 1, 0.001, 100);
+  private readonly bufferSize = new THREE.Vector2();
   private readonly territory: TerritoryLayer;
   private readonly ships: GlobeMarkers;
   private readonly tradeShips: GlobeMarkers;
@@ -109,24 +111,29 @@ export class GlobeView implements Renderer {
     this.flashes = markers(SHIP_SIZES.warship.tiles, 8, 1.7, FLASH_CAPACITY);
     this.missiles = markers(SHIP_SIZES.missile.tiles, 4, 4, MISSILE_CAPACITY);
     this.heavyMissiles = markers(SHIP_SIZES.heavyMissile.tiles, 4, 4, MISSILE_CAPACITY);
+    const tokens = (sides: number, size: number): StructureMarkers => {
+      const layer = new GlobeMarkers({
+        worldWidth: options.width,
+        worldHeight: options.height,
+        capacity: STRUCTURE_CAPACITY,
+        size,
+        sides,
+        order: 3,
+        token: true,
+      });
+      this.scene.add(layer.mesh);
+      return { tokens: layer, size };
+    };
     this.structures = {
-      city: { outline: markers(5.5, 4, 2), fill: markers(4, 4, 3), size: 4 },
-      palace: {
-        outline: markers(7, 8, 2, STRUCTURE_CAPACITY),
-        fill: markers(5.5, 8, 3, STRUCTURE_CAPACITY),
-        size: 5.5,
-      },
-      mosque: {
-        outline: markers(7, 10, 2, STRUCTURE_CAPACITY),
-        fill: markers(5.5, 10, 3, STRUCTURE_CAPACITY),
-        size: 5.5,
-      },
-      fort: { outline: markers(6, 3, 2), fill: markers(4.5, 3, 3), size: 4.5 },
-      port: { outline: markers(5.5, 6, 2), fill: markers(4, 6, 3), size: 4 },
-      silo: { outline: markers(6, 5, 2), fill: markers(4.5, 5, 3), size: 4.5 },
-      airDefense: { outline: markers(5.5, 12, 2), fill: markers(4, 12, 3), size: 4 },
-      capital: { outline: markers(8.5, 5, 2), fill: markers(6.5, 5, 3), size: 6.5 },
-      landmark: { outline: markers(8, 3, 2), fill: markers(6, 3, 3), size: 6 },
+      city: tokens(4, 4),
+      palace: tokens(8, 5.5),
+      mosque: tokens(10, 5.5),
+      fort: tokens(3, 4.5),
+      port: tokens(6, 4),
+      silo: tokens(5, 4.5),
+      airDefense: tokens(12, 4),
+      capital: tokens(5, 6.5),
+      landmark: tokens(3, 6),
     };
   }
 
@@ -223,21 +230,15 @@ export class GlobeView implements Renderer {
       "capital",
       "landmark",
     ] as const) {
-      const { outline, fill } = this.structures[type];
+      const { tokens } = this.structures[type];
       let count = 0;
       for (const structure of structures) {
         if (structure.type !== type || count >= STRUCTURE_CAPACITY) continue;
-        outline.set(count, structure.x, structure.y, STRUCTURE_COLORS.outline);
-        fill.set(
-          count,
-          structure.x,
-          structure.y,
-          structure.ready ? STRUCTURE_COLORS.fill : STRUCTURE_COLORS.building,
-        );
+        tokens.set(count, structure.x, structure.y, structure.color ?? STRUCTURE_COLORS.fill);
+        tokens.setGlyph(count, structure.ready ? 1 : 0.5);
         count++;
       }
-      outline.count = count;
-      fill.count = count;
+      tokens.count = count;
     }
   }
 
@@ -268,6 +269,9 @@ export class GlobeView implements Renderer {
     this.camera.far = pose.distance + 2;
     this.camera.updateProjectionMatrix();
     this.territory.setGlobePose(globeRays(pose));
+    // The stars keep their size in device pixels.
+    this.renderer.getDrawingBufferSize(this.bufferSize);
+    this.territory.setViewport(this.bufferSize.x, this.bufferSize.y);
     this.territory.setTime(this.clock());
     this.territory.flush(this.renderer);
     // At the middle of the screen a row of tiles has the flat map's size.
@@ -279,10 +283,12 @@ export class GlobeView implements Renderer {
     this.flashes.setScale(shipScale(SHIP_SIZES.warship, tilesPerPixel) * 0.7);
     this.missiles.setScale(shipScale(SHIP_SIZES.missile, tilesPerPixel));
     this.heavyMissiles.setScale(shipScale(SHIP_SIZES.heavyMissile, tilesPerPixel));
-    for (const { outline, fill, size } of Object.values(this.structures)) {
-      const scale = Math.max(1, (STRUCTURE_MIN_PIXELS * tilesPerPixel) / size);
-      outline.setScale(scale);
-      fill.setScale(scale);
+    for (const { tokens, size } of Object.values(this.structures)) {
+      const pixels = Math.min(
+        STRUCTURE_MAX_PIXELS,
+        Math.max(STRUCTURE_MIN_PIXELS, size / tilesPerPixel),
+      );
+      tokens.setScale((pixels * tilesPerPixel) / size);
     }
     this.renderer.render(this.scene, this.camera);
     if (this.frames < 3) {
@@ -328,10 +334,7 @@ export class GlobeView implements Renderer {
     this.flashes.dispose();
     this.missiles.dispose();
     this.heavyMissiles.dispose();
-    for (const { outline, fill } of Object.values(this.structures)) {
-      outline.dispose();
-      fill.dispose();
-    }
+    for (const { tokens } of Object.values(this.structures)) tokens.dispose();
     this.renderer.dispose();
     // Switching views creates another context; browsers cap how many stay alive.
     this.renderer.forceContextLoss();

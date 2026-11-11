@@ -4,6 +4,16 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+### Changed
+
+- **Real oceans.** The sea now follows the sea floor of the map: light over the continental shelves, darker down the slopes, darkest over the abyss, with clear turquoise shallows along the shore. The rings that ran around every coast at middle zoom are gone.
+- **A finer ground up close.** Fields come in patches of the green plains, with open meadow between them, and the deserts get dunes instead of farmland. The thin bright lines along the foot of the ranges and the steps in the snow of the mountains are gone.
+- **A more beautiful globe.** The planet floats among stars, lit by a sun over your shoulder with a soft shade on its far side and a glint on the open sea. Buildings on the globe are round markers ringed in their owner's colour, as on the flat map, and keep a readable size at every zoom.
+
+### For self-hosters and contributors
+
+- **`pnpm --filter @frontfall/bench showcase`** draws a fixed scene on a published map (flat or `view=globe`) at chosen zooms, on a laptop and a phone, to compare two looks side by side and time a frame.
+
 ## [1.1.0] - 2026-11-11
 
 ### Added
