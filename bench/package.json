@@ -17,7 +17,8 @@
     "determinism": "tsx determinism/run.ts",
     "golden": "tsx determinism/golden.ts",
     "gate": "tsx gate/run.ts",
-    "client": "tsx client/run.ts"
+    "client": "tsx client/run.ts",
+    "showcase": "tsx showcase/shoot.ts"
   },
   "dependencies": {
     "@frontfall/engine": "workspace:*",
