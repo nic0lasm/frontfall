@@ -42,22 +42,22 @@ Nouveau ? [Présentation et comment jouer](https://nclsmgr.com/frontfall/about.f
 
 Chrome et Edge 111, Firefox 114 (121 pour l'affichage complet), Safari et iOS 16.4 ou plus récents, avec WebGL 2. La CI joue une partie dans Chromium, Firefox et WebKit à chaque changement. [Le tableau complet](docs/browsers.md) (en anglais) dit ce que demande chaque version et ce qui n'est qu'une hypothèse. Un navigateur qui ne peut pas faire tourner le jeu le dit, au lieu d'afficher une page blanche.
 
-Frontfall 1.0 est sortie de bêta : le jeu complet sur la carte plate. [La feuille de route](#feuille-de-route) dit ce qui vient ensuite.
+Frontfall 1.1 est sortie : le jeu complet sur la carte plate, et un globe 3D à activer. [La feuille de route](#feuille-de-route) dit ce qui vient ensuite.
 
 ## En un coup d'œil
 
-|                   |                                                                                                                                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Le jeu**        | Partir d'une case, dépasser ses voisins, tenir la carte. Parties courtes, sans installation.                                                                                                        |
-| **La différence** | La carte du Monde boucle d'est en ouest, et un globe 3D suivra en v1.1. Aucun bord où se cacher.                                                                                                    |
-| **État**          | La [v1.0](https://github.com/nic0lasm/frontfall/releases/tag/v1.0.0) est publiée, le jeu complet sur la carte plate ; le globe 3D suit en v1.1. [Chaque version](CHANGELOG.md) dit ce qui a changé. |
-| **Jouer**         | [nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/), ou votre propre serveur avec une image Docker.                                                                                             |
-| **Prérequis**     | Un navigateur récent compatible WebGL 2 ([lesquels](docs/browsers.md)). Un ordinateur reste le plus confortable.                                                                                    |
-| **Licence**       | MIT : libre d'y jouer, de le forker et de l'héberger.                                                                                                                                               |
+|                   |                                                                                                                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Le jeu**        | Partir d'une case, dépasser ses voisins, tenir la carte. Parties courtes, sans installation.                                                                                                          |
+| **La différence** | La carte du Monde boucle d'est en ouest, et un globe 3D est disponible en option (v1.1). Aucun bord où se cacher.                                                                                     |
+| **État**          | La [v1.1](https://github.com/nic0lasm/frontfall/releases/tag/v1.1.0) est publiée : le jeu complet sur la carte plate, avec le globe 3D en option. [Chaque version](CHANGELOG.md) dit ce qui a changé. |
+| **Jouer**         | [nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/), ou votre propre serveur avec une image Docker.                                                                                               |
+| **Prérequis**     | Un navigateur récent compatible WebGL 2 ([lesquels](docs/browsers.md)). Un ordinateur reste le plus confortable.                                                                                      |
+| **Licence**       | MIT : libre d'y jouer, de le forker et de l'héberger.                                                                                                                                                 |
 
 ## Feuille de route
 
-Le développement avance par versions jouables. Chacune se termine par quelque chose de jouable sur le serveur public. Toutes les versions avant la v1.0 étaient des bêtas ; la v1.0 est le jeu complet et soigné sur la carte plate, et le globe 3D suit en v1.1.
+Le développement avance par versions jouables. Chacune se termine par quelque chose de jouable sur le serveur public. Toutes les versions avant la v1.0 étaient des bêtas ; la v1.0 est le jeu complet et soigné sur la carte plate, et la v1.1 ajoute le globe 3D en option.
 
 | Version | Objectif                                                                                                  | État    |
 | ------- | --------------------------------------------------------------------------------------------------------- | ------- |
@@ -74,7 +74,7 @@ Le développement avance par versions jouables. Chacune se termine par quelque c
 | v0.9    | Fluide sur un portable modeste et un téléphone, clics rapides, sons et musique, serveur éprouvé en charge | Fait    |
 | v0.9.9  | Version candidate : dernières nouveautés, graphismes, performances, équilibrage et exploitation soignés   | Fait    |
 | v1.0    | Le jeu complet sur la carte plate, fin de la bêta, après une semaine sans incident                        | Fait    |
-| v1.1    | Globe 3D, et bascule entre carte et globe en cours de partie                                              | Prévu   |
+| v1.1    | Globe 3D, et bascule entre carte et globe en cours de partie                                              | Fait    |
 | v1.x    | Cartes de la communauté : cartes et traductions des joueurs, liens de replay, spectateurs                 | Prévu   |
 
 Le périmètre et les critères « jouable » de chaque version sont dans [docs/roadmap.md](docs/roadmap.md) (en anglais). Le travail ouvert est suivi dans les [milestones](https://github.com/nic0lasm/frontfall/milestones).

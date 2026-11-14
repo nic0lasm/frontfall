@@ -42,22 +42,22 @@ New here? [About the game and how to play](https://nclsmgr.com/frontfall/about.h
 
 Chrome and Edge 111, Firefox 114 (121 for the full look), Safari and iOS 16.4 or newer, with WebGL 2. CI plays the game in Chromium, Firefox and WebKit on every change. [The full table](docs/browsers.md) says what each version needs and what has only been assumed. A browser that cannot run the game says so instead of showing a blank page.
 
-Frontfall 1.0 is out of beta: the complete game on the flat map. [The roadmap](#roadmap) says what comes next.
+Frontfall 1.1 is out: the complete game on the flat map, and a 3D globe you can switch on. [The roadmap](#roadmap) says what comes next.
 
 ## At a glance
 
-|                  |                                                                                                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What it is**   | Spread from a single tile, outgrow your neighbours, hold the map. Short rounds, no install.                                                                                                 |
-| **The twist**    | The World map wraps east to west, and a 3D globe follows in v1.1. There is no edge to hide behind.                                                                                          |
-| **Status**       | [v1.0](https://github.com/nic0lasm/frontfall/releases/tag/v1.0.0) is out, the complete game on the flat map; the 3D globe follows in v1.1. [Every release](CHANGELOG.md) says what changed. |
-| **Play**         | [nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/), or your own server with one Docker image.                                                                                          |
-| **Requirements** | A recent browser with WebGL 2 ([which ones](docs/browsers.md)). Best on a desktop or laptop.                                                                                                |
-| **License**      | MIT, free to play, fork and host.                                                                                                                                                           |
+|                  |                                                                                                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What it is**   | Spread from a single tile, outgrow your neighbours, hold the map. Short rounds, no install.                                                                                                   |
+| **The twist**    | The World map wraps east to west, and a 3D globe is there if you want it (v1.1). There is no edge to hide behind.                                                                             |
+| **Status**       | [v1.1](https://github.com/nic0lasm/frontfall/releases/tag/v1.1.0) is out: the complete game on the flat map, with the 3D globe as an option. [Every release](CHANGELOG.md) says what changed. |
+| **Play**         | [nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/), or your own server with one Docker image.                                                                                            |
+| **Requirements** | A recent browser with WebGL 2 ([which ones](docs/browsers.md)). Best on a desktop or laptop.                                                                                                  |
+| **License**      | MIT, free to play, fork and host.                                                                                                                                                             |
 
 ## Roadmap
 
-Development runs in playable versions. Each one ends with something you can play on the public server. Every version before v1.0 was a beta; v1.0 is the complete, polished game on the flat map, and the 3D globe follows in v1.1.
+Development runs in playable versions. Each one ends with something you can play on the public server. Every version before v1.0 was a beta; v1.0 is the complete, polished game on the flat map, and v1.1 adds the 3D globe as an option.
 
 | Version | Goal                                                                                             | Status  |
 | ------- | ------------------------------------------------------------------------------------------------ | ------- |
@@ -74,7 +74,7 @@ Development runs in playable versions. Each one ends with something you can play
 | v0.9    | Smooth on a modest laptop and a phone, quick clicks, sound and music, a server tested under load | Done    |
 | v0.9.9  | Release candidate: the last new features, graphics, performance, balance and operations polished | Done    |
 | v1.0    | The complete game on the flat map, out of beta, after a week without incident                    | Done    |
-| v1.1    | 3D globe, and switching between map and globe during a game                                      | Planned |
+| v1.1    | 3D globe, and switching between map and globe during a game                                      | Done    |
 | v1.x    | Community maps: maps and translations from players, replay links, spectators                     | Planned |
 
 The scope and "playable when" checks of each version are in [docs/roadmap.md](docs/roadmap.md). Open work is tracked in [milestones](https://github.com/nic0lasm/frontfall/milestones).
