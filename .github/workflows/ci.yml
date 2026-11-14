@@ -250,7 +250,7 @@ jobs:
         run: |
           # A pull request is checked out as its merge commit, whose first parent is the base.
           if [ "$EVENT" = pull_request ]; then base=$(git rev-parse HEAD^1); else base=$(git merge-base HEAD origin/main || true); fi
-          if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ] || git diff --quiet "$base" HEAD -- packages/engine; then
+          if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ] || git diff --quiet "$base" HEAD -- packages/engine packages/contracts; then
             echo "No base to compare with, or the same engine as on $base: absolute budget only."
             pnpm perf:engine
             exit

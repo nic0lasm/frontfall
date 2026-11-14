@@ -14,13 +14,14 @@ const IMPRECISE_MATH = [
 ];
 
 /**
- * The simulation must produce identical results on every client, so the engine
- * may not use randomness, the clock or platform-dependent maths.
+ * The simulation must produce identical results on every client, so the engine,
+ * and the contracts it is built on, may not use randomness, the clock or
+ * platform-dependent maths.
  *
  * @type {import("eslint").Linter.Config}
  */
 export const determinism = {
-  files: ["packages/engine/**/*.ts"],
+  files: ["packages/engine/**/*.ts", "packages/contracts/**/*.ts"],
   rules: {
     "no-restricted-properties": [
       "error",

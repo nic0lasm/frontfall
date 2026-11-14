@@ -37,16 +37,26 @@ function violations(packageDir: string, allowed: string[]): string[] {
 }
 
 describe("package boundaries", () => {
-  it("keeps the engine free of any dependency", () => {
-    expect(violations("packages/engine", [])).toEqual([]);
+  it("lets the engine depend on the contracts only", () => {
+    expect(violations("packages/engine", ["@frontfall/contracts"])).toEqual([]);
     const manifest = JSON.parse(
       readFileSync(join(root, "packages/engine/package.json"), "utf8"),
     ) as Record<string, unknown>;
-    expect(manifest.dependencies).toBeUndefined();
+    expect(manifest.dependencies).toEqual({ "@frontfall/contracts": "workspace:*" });
   });
 
-  it("lets the protocol depend on zod only", () => {
-    expect(violations("packages/protocol", ["zod", "zod/mini"])).toEqual([]);
+  it("lets the protocol depend on zod and the contracts only", () => {
+    expect(violations("packages/protocol", ["zod", "zod/mini", "@frontfall/contracts"])).toEqual(
+      [],
+    );
+  });
+
+  it("keeps the contracts free of any dependency", () => {
+    expect(violations("packages/contracts", [])).toEqual([]);
+    const manifest = JSON.parse(
+      readFileSync(join(root, "packages/contracts/package.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(manifest.dependencies).toBeUndefined();
   });
 
   it("detects an import that reaches into an app", () => {

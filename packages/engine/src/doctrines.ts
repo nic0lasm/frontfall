@@ -1,3 +1,4 @@
+import { DOCTRINE_COUNT } from "@frontfall/contracts";
 import type { BotDifficulty } from "./bots/difficulty.ts";
 import type { Game, Player } from "./game.ts";
 import { mulDiv } from "./integer-math.ts";
@@ -15,8 +16,7 @@ export const Doctrine = {
 } as const;
 export type DoctrineCode = (typeof Doctrine)[keyof typeof Doctrine];
 
-/** Number of doctrines, the balanced one included. */
-export const DOCTRINE_COUNT = 4;
+export { DOCTRINE_COUNT };
 
 /** What a doctrine does to one rule, in percent: 100 changes nothing. */
 export interface DoctrineEffects {

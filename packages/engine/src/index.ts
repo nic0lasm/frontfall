@@ -1,4 +1,14 @@
 export {
+  DIFFICULTIES,
+  ORDER_SPEC,
+  ORDER_TYPES,
+  RuleBit,
+  TICK_RATE,
+  type Difficulty,
+  type OrderOf,
+  type OrderType,
+} from "@frontfall/contracts";
+export {
   captureCost,
   cheapestTile,
   collapseDepth,

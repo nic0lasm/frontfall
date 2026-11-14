@@ -1,12 +1,8 @@
+import { QUICK_MESSAGES } from "@frontfall/contracts";
 import { DiplomacyError, logEvent } from "./diplomacy.ts";
 import type { Game, Player } from "./game.ts";
 
-/**
- * Preset quick messages and emoji a player can send (R-DIPLO-07), by number
- * from 0. Their words belong to the interfaces; the engine only relays the
- * number, so no free text ever enters a game.
- */
-export const QUICK_MESSAGES = 12;
+export { QUICK_MESSAGES };
 
 /** Ticks a player waits between two quick messages, to anyone: 2 seconds. */
 export const QUICK_MESSAGE_TICKS = 20;

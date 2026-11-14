@@ -1,3 +1,15 @@
+import {
+  DISABLE_ALL,
+  Disable,
+  MAX_TEAMS,
+  NO_RULES,
+  OPERATOR_BONUS_ALL,
+  OperatorBonus,
+  RuleBit,
+  type GameRules,
+  type Order,
+  type Turn,
+} from "@frontfall/contracts";
 import type { Attack } from "./attacks.ts";
 import { DEFAULT_BALANCE, type Balance } from "./balance.ts";
 import type { Boat } from "./boats.ts";
@@ -18,42 +30,18 @@ import type { TradeShip } from "./trade.ts";
 import type { Fight, Warship } from "./warships.ts";
 import { MAX_PLAYER_ID, TerritoryMap } from "./territory/territory-map.ts";
 
-/** An order from a player, as relayed by the server in a turn. */
-export type Order =
-  | { type: "spawn"; tile: number }
-  | { type: "attack"; target: number; troops: number }
-  | { type: "retreat"; attack: number }
-  | { type: "embark"; target: number; troops: number }
-  /** `structure` is a StructureKind code. */
-  | { type: "build"; structure: number; tile: number }
-  | { type: "demolish"; tile: number }
-  /** `target` is a player id. */
-  | { type: "ally"; target: number }
-  | { type: "betray"; target: number }
-  /** `on`: 1 starts an embargo on player `target`, 0 lifts it. */
-  | { type: "embargo"; target: number; on: number }
-  /** Buys a warship at the player's port on tile `port`. */
-  | { type: "warship"; port: number }
-  /** Sends warship `ship` to patrol around water tile `tile`. */
-  | { type: "patrol"; ship: number; tile: number }
-  /** Launches a missile of `size` (a MissileSize code) at tile `target`. */
-  | { type: "missile"; target: number; size: number }
-  /** Sends player `target` troops and gold (R-DIPLO-06); either may be 0. */
-  | { type: "gift"; target: number; troops: number; gold: number }
-  /** Sends player `target` the preset quick message `phrase` (R-DIPLO-07). */
-  | { type: "quick"; target: number; phrase: number }
-  /** Puts `share` % of the troops at home to work (R-ECO-07). */
-  | { type: "work"; share: number }
-  /** Pays the price of a tribute to `target` for a truce (R-DIPLO-10). */
-  | { type: "tribute"; target: number }
-  /** Picks the doctrine `pick` (a Doctrine code) during the spawn phase (R-DOCTRINE-01). */
-  | { type: "doctrine"; pick: number };
-
-/** Every order accepted during one tick, in the order the server accepted them (R-FAIR-03). */
-export interface Turn {
-  tick: number;
-  orders: readonly { player: number; order: Order }[];
-}
+// Shared with the protocol through the contracts; exported here as before.
+export {
+  DISABLE_ALL,
+  Disable,
+  MAX_TEAMS,
+  NO_RULES,
+  OPERATOR_BONUS_ALL,
+  OperatorBonus,
+  type GameRules,
+  type Order,
+  type Turn,
+};
 
 export interface PlayerSetup {
   /** 1 to MAX_PLAYER_ID; 0 is the neutral owner. */
@@ -86,27 +74,11 @@ export interface GameSetup {
 }
 
 /**
- * What the operator of a server may give themselves in their private games,
- * to test (R-MODE-09), one bit each.
- */
-export const OperatorBonus = {
-  /** Twice the gold from troops, workers and the base income. */
-  Gold: 1 << 0,
-  /** Twice the population cap and twice the troop growth. */
-  Troops: 1 << 1,
-  /** Structures at half their price. */
-  Building: 1 << 2,
-  /** Land twice as costly to take from them. */
-  Defense: 1 << 3,
-} as const;
-/**
  * How much each operator's bonus does (R-MODE-09): twice the gold, troops and
  * defense, half the price. Not a balance value: it never applies to a game
  * anyone but the operator plays to win, and the balance digest stays as it was.
  */
 export const OPERATOR_FACTOR = 2;
-/** Every `OperatorBonus` bit. */
-export const OPERATOR_BONUS_ALL = 0xf;
 
 export interface OperatorBonuses {
   /** The player who has the bonuses. */
@@ -118,19 +90,6 @@ export interface OperatorBonuses {
 /** No operator's bonus at all. */
 export const NO_OPERATOR: OperatorBonuses = { player: 0, bonuses: 0 };
 
-/** Special rules a game can be played with (R-MODE-08), all off unless the setup turns them on. */
-export interface GameRules {
-  /** Capital mode (R-CAP): taking a player's capital conquers them. */
-  readonly capitals: boolean;
-  /** R-ATTACK-10: outnumbered fronts give way by stretches. */
-  readonly collapsingFronts: boolean;
-  /** R-DOCTRINE: each player picks one of three doctrines at the start. */
-  readonly doctrines: boolean;
-}
-
-/** A game with no special rule. */
-export const NO_RULES: GameRules = { capitals: false, collapsingFronts: false, doctrines: false };
-
 /** Marks the special rules in the state hash. */
 const RULES_TAG = 0x72756c65;
 /** Marks the operator's bonuses in the state hash (R-MODE-09). */
@@ -138,24 +97,12 @@ const OPERATOR_TAG = 0x6f706572;
 
 /** One bit per special rule that is on, for the state hash and the setup digest; 0 with none. */
 export function ruleBits(rules: GameRules): number {
-  return (rules.capitals ? 1 : 0) | (rules.collapsingFronts ? 2 : 0) | (rules.doctrines ? 4 : 0);
+  return (
+    (rules.capitals ? RuleBit.Capitals : 0) |
+    (rules.collapsingFronts ? RuleBit.CollapsingFronts : 0) |
+    (rules.doctrines ? RuleBit.Doctrines : 0)
+  );
 }
-
-/**
- * What a private game can leave out (R-MODE-03), one bit each: a structure
- * by its StructureKind code (bit `1 << kind`), and warships. A palace has no
- * bit of its own and goes with the cities, a mosque with the air defenses: ask `disableBit` for a kind's bit.
- */
-export const Disable = {
-  City: 1 << 0,
-  Fort: 1 << 1,
-  Port: 1 << 2,
-  Silo: 1 << 3,
-  AirDefense: 1 << 4,
-  Warships: 1 << 5,
-} as const;
-/** Every `Disable` bit. */
-export const DISABLE_ALL = 0x3f;
 
 /** What a game leaves out once its implications are added: warships are launched from ports (R-MODE-03). */
 export function leftOut(disabled: number): number {
@@ -198,9 +145,6 @@ export interface CapitalFall {
   /** Tile the capital stood on. */
   readonly tile: number;
 }
-
-/** Most teams a game can have (R-MODE-02). */
-export const MAX_TEAMS = 4;
 
 /**
  * Carries out one order that passed validation. Returns false when the order
