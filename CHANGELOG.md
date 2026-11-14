@@ -13,6 +13,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 ### For self-hosters and contributors
 
 - **`pnpm --filter @frontfall/bench showcase`** draws a fixed scene on a published map (flat or `view=globe`) at chosen zooms, on a laptop and a phone, to compare two looks side by side and time a frame.
+- **Tests that pin the state of the engine and the frames of every order.** Two busy games are pinned at several ticks by their hash, their snapshot and a dump of their state, a test changes every field of the state one at a time to check that the hash and the snapshot follow, and one order frame of each kind is pinned byte by byte. Thanks to MohammadBnei.
 
 ## [1.1.0] - 2026-11-11
 
