@@ -38,6 +38,8 @@ The repository is a pnpm workspace:
 
 Design documents live in `docs/`: the game rules ([rules.md](docs/rules.md)), their numbers ([balance.md](docs/balance.md)) and the architecture decisions ([adr/](docs/adr/)). To add a language, see [translating.md](docs/translating.md).
 
+For how the packages fit together and how to add an order, a rule or a screen, read the [architecture guide](docs/architecture.md).
+
 ## Clean room
 
 Frontfall is written from scratch. Gameplay work starts from [docs/rules.md](docs/rules.md); do not read other games' source code while working on Frontfall, and copy no code, assets, maps or text from them. Third-party assets must be public domain, CC0 or MIT-compatible, and listed in [CREDITS.md](CREDITS.md). The full policy, and the CI check that enforces it, are in [docs/clean-room.md](docs/clean-room.md).
