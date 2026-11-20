@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@frontfall/protocol": "workspace:*",
-    "nodemailer": "^10.5.0",
-    "ws": "^8.22.2",
+    "nodemailer": "^10.6.0",
+    "ws": "^8.23.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
