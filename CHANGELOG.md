@@ -4,6 +4,8 @@ Every release of Frontfall and what it changes in play, newest first. The format
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-22
+
 ### Changed
 
 - **Real oceans.** The sea now follows the sea floor of the map: light over the continental shelves, darker down the slopes, darkest over the abyss, with clear turquoise shallows along the shore. The rings that ran around every coast at middle zoom are gone.
