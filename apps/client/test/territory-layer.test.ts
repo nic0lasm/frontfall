@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
-import { seaDepths, TerritoryLayer } from "../src/render/territory-layer.ts";
+import { seaDepths, stampClock, stampOf, TerritoryLayer } from "../src/render/territory-layer.ts";
 
 function layer(width = 256, height = 4, maxOwner = 3): TerritoryLayer {
   return new TerritoryLayer({
@@ -89,13 +89,50 @@ describe("TerritoryLayer", () => {
     }).toThrow(RangeError);
   });
 
+  it("keeps when a tile changed hands in one byte that never reads as fresh once burnt out", () => {
+    // The shader's reading of a byte (ageOf), in seconds.
+    const age = (stamp: number, seconds: number) =>
+      stamp === 0 ? Infinity : ((((stampClock(seconds) - (stamp - 1)) % 255) + 255) % 255) / 128;
+    for (const at of [0, 0.3, 1.99, 2.5, 600.01, 3599.7]) {
+      const stamp = stampOf(at);
+      expect(stamp).toBeGreaterThanOrEqual(1);
+      expect(stamp).toBeLessThanOrEqual(255);
+      expect(age(stamp, at)).toBeLessThan(1 / 128);
+      expect(age(stamp, at + 0.08)).toBeCloseTo(0.08, 1);
+      expect(age(stamp, at + 1.5)).toBeCloseTo(1.5, 1);
+    }
+
+    const territory = layer(8, 2);
+    const bytes = territory.takenAtTexture.image.data as Uint8Array;
+    expect(bytes.every((value) => value === 0)).toBe(true);
+    territory.markChanged([1, 9], 10);
+    territory.markChanged([9], 11);
+    expect(bytes[1]).toBe(stampOf(10));
+    expect(bytes[9]).toBe(stampOf(11));
+    territory.flush();
+    territory.setTime(11.5);
+    expect(bytes[1]).toBe(stampOf(10));
+    territory.setTime(11.8);
+    // Tile 1 burnt out and is put back to "long ago" and sent again; tile 9 changed hands since.
+    expect(bytes[1]).toBe(0);
+    expect(bytes[9]).toBe(stampOf(11));
+    expect(territory.flush()).toBeGreaterThan(0);
+    territory.setTime(13);
+    expect(bytes[9]).toBe(0);
+    // A clock that starts again (a new game) clears what is left.
+    territory.markChanged([3], 40);
+    territory.setTime(1);
+    expect(bytes[3]).toBe(0);
+    territory.dispose();
+  });
+
   it("sizes the palette to the number of owners", () => {
     expect(layer(4, 2, 255).paletteTexture.image.height).toBe(1);
     expect(layer(4, 2, 256).paletteTexture.image.height).toBe(2);
   });
 
   it("accounts for its GPU memory, the ground's mipmaps included", () => {
-    expect(layer(512, 256, 64).gpuBytes()).toBe(Math.round(512 * 256 * (2 + 16 / 3 + 4)) + 256 * 4);
+    expect(layer(512, 256, 64).gpuBytes()).toBe(Math.round(512 * 256 * (2 + 16 / 3 + 1)) + 256 * 4);
   });
 
   it("draws the flat map from square tiles, without filtering or mipmaps", () => {
@@ -110,7 +147,7 @@ describe("TerritoryLayer", () => {
     expect(flat.mesh.material.defines).toEqual({ FLAT: 1 });
     expect(flat.groundTexture.magFilter).toBe(THREE.NearestFilter);
     expect(flat.groundTexture.generateMipmaps).toBe(false);
-    expect(flat.gpuBytes()).toBe(512 * 256 * 10 + 256 * 4);
+    expect(flat.gpuBytes()).toBe(512 * 256 * 7 + 256 * 4);
     expect(layer().groundTexture.magFilter).toBe(THREE.LinearFilter);
     flat.dispose();
   });

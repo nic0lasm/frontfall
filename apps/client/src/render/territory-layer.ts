@@ -56,6 +56,29 @@ const FRONT_COLOR = "#F25C2A";
 const FADE_SECONDS = 0.08;
 
 /**
+ * When a tile changed hands is kept in one byte: the time in 1/128 s, counted
+ * round a cycle of 255 values (about 2 s), with 0 for "long ago". A tile only
+ * glows for FRONT_SECONDS, so after STAMP_EXPIRY_SECONDS its byte goes back
+ * to 0, before the cycle comes round and it would look fresh again. On the
+ * largest map that is 8 MiB on the GPU and in memory instead of 32 for floats.
+ */
+const STAMP_RATE = 128;
+const STAMP_CYCLE = 255;
+const STAMP_EXPIRY_SECONDS = 1.75;
+
+/** The byte for a moment, between 1 and STAMP_CYCLE. */
+export function stampOf(seconds: number): number {
+  const step = Math.floor(seconds * STAMP_RATE);
+  return 1 + (((step % STAMP_CYCLE) + STAMP_CYCLE) % STAMP_CYCLE);
+}
+
+/** The shader's clock for those bytes: the moment in 1/128 s, round the cycle. */
+export function stampClock(seconds: number): number {
+  const steps = seconds * STAMP_RATE;
+  return ((steps % STAMP_CYCLE) + STAMP_CYCLE) % STAMP_CYCLE;
+}
+
+/**
  * The ground baked for a map's terrain, kept for as long as the map is: a renderer made
  * again for the same game, after the switch to the globe or to the lighter graphics,
  * takes it instead of baking it again, a second or more of the page's own thread.
@@ -143,6 +166,7 @@ const fragmentShader = /* glsl */ `
   uniform vec2 worldSize;
   uniform bool wrapsX;
   uniform float now;
+  uniform float stampNow;
   uniform float fadeSeconds;
   uniform float frontSeconds;
   uniform float frontMotion;
@@ -193,9 +217,16 @@ const fragmentShader = /* glsl */ `
     return sign(r) * r * r * coastReach;
   }
 
+  /** Seconds since a tile changed hands, from its byte (see STAMP_RATE); long ago is far off. */
+  float ageOf(ivec2 tile) {
+    float stamp = floor(texelFetch(takenAt, tile, 0).r * 255.0 + 0.5);
+    if (stamp < 0.5) return 1.0e6;
+    return mod(stampNow - (stamp - 1.0), 255.0) / 128.0;
+  }
+
   /** How bright a tile's front is: 1 when just taken, 0 once it has burnt out; the tile is already on the map. */
   float frontOf(ivec2 tile) {
-    float age = now - texelFetch(takenAt, tile, 0).r;
+    float age = ageOf(tile);
     return 1.0 - smoothstep(fadeSeconds, frontSeconds, age);
   }
 
@@ -700,7 +731,7 @@ const fragmentShader = /* glsl */ `
         owned = mix(owned, mix(ownerColor, vec3(1.0), 0.6), rim * dash);
       }
       owned = mix(owned, mix(lineColor * 0.5, ridgeColor, smoothstep(0.4 * contactWidth, 0.5 * contactWidth, contactDistance)), contact * dash);
-      float age = now - texelFetch(takenAt, tile, 0).r;
+      float age = ageOf(tile);
       // Land taken in the last moments marks the front of an attack, the
       // strongest signal on the map: its edge turns to ember and light stripes
       // that march along it, readable on any colour and without colour, and
@@ -729,7 +760,7 @@ const fragmentShader = /* glsl */ `
     float t = now * frontMotion;
     float coastIn = max(coast, 0.0);
     float depth = max(-coast, 0.0);
-    float age = now - texelFetch(takenAt, tile, 0).r;
+    float age = ageOf(tile);
     float fadeIn = smoothstep(0.0, fadeSeconds, age);
     // Direction of an attack here: out of the owner's land toward the border.
     float edgeL = min(pixel > ${String(VOTE_PIXEL)} ? min(ownerEdge, ownerWide) : ownerEdge, coastIn);
@@ -1045,14 +1076,16 @@ export class TerritoryLayer {
   readonly paletteTexture: THREE.DataTexture;
   /** Colour of the ground under each tile, with its coast sides in alpha. */
   readonly groundTexture: THREE.DataTexture;
-  /** When each tile last changed hands, in seconds on the layer's clock. */
+  /** When each tile last changed hands, a byte a tile (see STAMP_RATE). */
   readonly takenAtTexture: THREE.DataTexture;
   /** The height the ground is lit from, one byte a tile, filtered smooth (terrain-colors). */
   readonly heightTexture: THREE.DataTexture;
   /** Depth of the sea from the map's bathymetry, filtered like the ground. */
   readonly depthTexture: THREE.DataTexture;
   private readonly hasDepth: boolean;
-  private readonly takenAt: Float32Array;
+  private readonly takenAt: Uint8Array;
+  /** Tiles stamped recently, by batch, to put back to "long ago" before the cycle comes round. */
+  private readonly stamped: { tiles: Int32Array; seconds: number; stamp: number }[] = [];
   /** The globe camera's rays, read by the shader on a sphere. */
   private readonly rays = {
     eye: new THREE.Vector3(0, 0, 3),
@@ -1070,7 +1103,7 @@ export class TerritoryLayer {
   private readonly bandFirst: Int32Array;
   private readonly bandLast: Int32Array;
   /** Where a rectangle is gathered before it is sent (uploadBands). */
-  private sendScratch: { owners: Uint16Array; times: Float32Array } | undefined;
+  private sendScratch: { owners: Uint16Array; times: Uint8Array } | undefined;
   private readonly wrapsX: boolean;
   /** Ground colours as baked, to put back where fallout clears; made on first use. */
   private pristineGround: Uint8Array | undefined;
@@ -1136,15 +1169,14 @@ export class TerritoryLayer {
     );
 
     // Long ago: nothing fades on the first frame.
-    this.takenAt = new Float32Array(width * height).fill(-1e6);
+    this.takenAt = new Uint8Array(width * height);
     this.takenAtTexture = new THREE.DataTexture(
       this.takenAt,
       width,
       height,
       THREE.RedFormat,
-      THREE.FloatType,
+      THREE.UnsignedByteType,
     );
-    this.takenAtTexture.internalFormat = "R32F";
 
     const rows = Math.ceil((maxOwner + 1) / PALETTE_WIDTH);
     this.paletteData = new Uint8Array(PALETTE_WIDTH * rows * 4);
@@ -1195,6 +1227,7 @@ export class TerritoryLayer {
         worldSize: { value: new THREE.Vector2(width, height) },
         wrapsX: { value: wrapsX },
         now: { value: 0 },
+        stampNow: { value: 0 },
         fadeSeconds: { value: FADE_SECONDS },
         frontSeconds: { value: FRONT_SECONDS },
         frontMotion: { value: 1 },
@@ -1366,8 +1399,10 @@ export class TerritoryLayer {
 
   /** Seconds on the clock that fades new tiles in; set once per frame. */
   setTime(seconds: number): void {
-    const now = this.mesh.material.uniforms.now;
+    const { now, stampNow } = this.mesh.material.uniforms;
     if (now) now.value = seconds;
+    if (stampNow) stampNow.value = stampClock(seconds);
+    this.expireStamps(seconds);
   }
 
   /**
@@ -1377,15 +1412,47 @@ export class TerritoryLayer {
   markChanged(tiles: ArrayLike<number>, seconds?: number): void {
     const { width } = this.options;
     const { chunkWidth, dirtyChunks } = this;
+    if (seconds !== undefined) {
+      this.expireStamps(seconds);
+      const stamp = stampOf(seconds);
+      const kept = Int32Array.from(tiles);
+      for (let i = 0; i < kept.length; i++) this.takenAt[kept[i] as number] = stamp;
+      if (kept.length > 0) this.stamped.push({ tiles: kept, seconds, stamp });
+    }
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i] as number;
-      if (seconds !== undefined) this.takenAt[tile] = seconds;
       const x = tile % width;
       const y = (tile - x) / width;
       const mask = dirtyChunks[y] as number;
       if (mask === 0) this.dirtyRows[this.dirtyRowCount++] = y;
       dirtyChunks[y] = mask | (1 << Math.floor(x / chunkWidth));
     }
+  }
+
+  /**
+   * Puts the tiles stamped more than STAMP_EXPIRY_SECONDS ago back to "long
+   * ago", unless they changed hands again since, and queues them for upload.
+   */
+  private expireStamps(seconds: number): void {
+    const { stamped, takenAt } = this;
+    let done = 0;
+    while (done < stamped.length) {
+      const batch = stamped[done] as { tiles: Int32Array; seconds: number; stamp: number };
+      // A clock that goes back (a new game on the same layer) expires everything.
+      if (seconds - batch.seconds < STAMP_EXPIRY_SECONDS && seconds >= batch.seconds) break;
+      const { tiles, stamp } = batch;
+      let stale = 0;
+      for (let i = 0; i < tiles.length; i++) {
+        const tile = tiles[i] as number;
+        if (takenAt[tile] === stamp) {
+          takenAt[tile] = 0;
+          tiles[stale++] = tile;
+        }
+      }
+      done++;
+      this.markChanged(tiles.subarray(0, stale));
+    }
+    if (done > 0) stamped.splice(0, done);
   }
 
   /** Too many changes to track: upload the whole texture on the next frame. */
@@ -1499,15 +1566,15 @@ export class TerritoryLayer {
     // no row length or offsets to the driver: some (Safari's) go through the whole
     // source array, tens of milliseconds a frame on a large map, when they are used.
     const owners = this.ownerTexture.image.data as Uint16Array;
-    const times = this.takenAtTexture.image.data as Float32Array;
+    const times = this.takenAtTexture.image.data as Uint8Array;
     this.sendScratch ??= {
       owners: new Uint16Array(width * BAND_ROWS),
-      times: new Float32Array(width * BAND_ROWS),
+      times: new Uint8Array(width * BAND_ROWS),
     };
     const { owners: ownersOut, times: timesOut } = this.sendScratch;
     const sends = [
       { texture: this.ownerTexture, format: gl.RED_INTEGER, type: gl.UNSIGNED_SHORT },
-      { texture: this.takenAtTexture, format: gl.RED, type: gl.FLOAT },
+      { texture: this.takenAtTexture, format: gl.RED, type: gl.UNSIGNED_BYTE },
     ];
     let texels = 0;
     for (const band of dirtyBands) {
@@ -1576,7 +1643,7 @@ export class TerritoryLayer {
     const { width, height } = this.options;
     // Owners, ground colours with their mipmaps (a third more), and the time each tile changed hands.
     const ground = this.options.flat ? 4 : (4 * 4) / 3;
-    return Math.round(width * height * (2 + ground + 4)) + this.paletteData.byteLength;
+    return Math.round(width * height * (2 + ground + 1)) + this.paletteData.byteLength;
   }
 
   dispose(): void {

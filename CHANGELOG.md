@@ -9,6 +9,7 @@ Every release of Frontfall and what it changes in play, newest first. The format
 - **Real oceans.** The sea now follows the sea floor of the map: light over the continental shelves, darker down the slopes, darkest over the abyss, with clear turquoise shallows along the shore. The rings that ran around every coast at middle zoom are gone.
 - **A finer ground up close.** Fields come in patches of the green plains, with open meadow between them, and the deserts get dunes instead of farmland. The thin bright lines along the foot of the ranges and the steps in the snow of the mountains are gone.
 - **A more beautiful globe.** The planet floats among stars, lit by a sun over your shoulder with a soft shade on its far side and a glint on the open sea. Buildings on the globe are round markers ringed in their owner's colour, as on the flat map, and keep a readable size at every zoom.
+- **Lighter on graphics memory.** When each tile last changed hands is now kept in one byte instead of four: about 24 MiB less graphics memory and 24 MiB less memory on the largest map, with the same glow on the fronts.
 
 ### For self-hosters and contributors
 
