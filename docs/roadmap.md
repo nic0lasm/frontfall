@@ -1,6 +1,6 @@
 # Roadmap
 
-Frontfall is built in two phases. Phase 1 (v0.1 to v1.0) delivers the game on a flat map that wraps east to west, playable online at [nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/), and makes it steady and good to look at: deployments that do not cut games, balance tuned on real games, phones, a full visual redesign, rules of its own, performance under load, sound and a polished first visit. Phase 2 (v1.1 and after) puts the same game on a 3D globe, then opens it to community maps. The rules do not change between the two: the globe is a new view, not a new game.
+Frontfall is built in two phases. Phase 1 (v0.1 to v1.0) delivers the game on a flat map that wraps east to west, playable online at [nclsmgr.com/frontfall](https://nclsmgr.com/frontfall/), and makes it steady and good to look at: deployments that do not cut games, balance tuned on real games, phones, a full visual redesign, rules of its own, performance under load, sound and a polished first visit. Phase 2 (v1.1 and after) puts the same game on a 3D globe, then opens it to community maps. Phase 3 (v1.2 to v1.6) brings the game to Steam as a free desktop download. The rules do not change from one phase to the next: the globe is a new view and the desktop build a new way in, not a new game.
 
 The game was in beta until v1.0, and its page said so. v1.0 is the first version that is a complete, polished territory strategy game on the flat map, on a server that is run like a product. v0.9.9 is the last version with new features: after it, only fixes go in until v1.0.
 
@@ -16,10 +16,10 @@ The game ships as a series of playable versions instead of one release at the en
 | [v0.2 · Online with friends](#v02--online-with-friends)                | Share a link, two to eight friends join, and the same game plays out on every screen.                                                    | Shipped |      8 |  24 days |
 | [v0.3 · Deeper game](#v03--deeper-game)                                | Build cities and forts, ally and betray, face named nations, on a watched server.                                                        | Shipped |     12 |  24 days |
 | [v0.4 · Sea and missiles](#v04--sea-and-missiles)                      | Sail from ports, fight at sea, launch missiles, play in teams and watch replays.                                                         | Shipped |      6 |  19 days |
-| [v0.4.x · Fixes](#v04x--fixes)                                         | The same game, with the bugs players and testing found since `v0.4.0` fixed.                                                             | Current |      – |        – |
+| [v0.4.x · Fixes](#v04x--fixes)                                         | The same game, with the bugs players and testing found since `v0.4.0` fixed.                                                             | Shipped |      – |        – |
 | [v0.5 · Live and balanced](#v05--live-and-balanced)                    | Play through a release without losing your game, tell me what went wrong, and play a game tuned on yours.                                | Shipped |     17 |  29 days |
 | [v0.6 · Phones and comfort](#v06--phones-and-comfort)                  | Play a whole game on a phone with your fingers, and find every setting and action without the keyboard.                                  | Shipped |      9 |  13 days |
-| [v0.6.x · First minutes](#v06x--first-minutes)                         | Find the game's page, learn the basics as you play, face bots whose level is right and keep your data safe.                              | Next    |      – |        – |
+| [v0.6.x · First minutes](#v06x--first-minutes)                         | Find the game's page, learn the basics as you play, face bots whose level is right and keep your data safe.                              | Shipped |      – |        – |
 | [v0.7 · Look and feel](#v07--look-and-feel)                            | Play a game that is beautiful and readable: every building is recognised at a glance, with sound effects.                                | Shipped |      9 |  25 days |
 | [v0.8 · Own rules](#v08--own-rules)                                    | Choose special rules from a menu of their own: collapsing fronts and a capital-taking mode.                                              | Shipped |      6 |  18 days |
 | [v0.9 · Load, smoothness and polish](#v09--load-smoothness-and-polish) | Play smoothly on a modest laptop and a phone, with a quick response to every click, sound and music, and a server that holds under load. | Shipped |     14 |        – |
@@ -27,6 +27,11 @@ The game ships as a series of playable versions instead of one release at the en
 | [v1.0 · Out of beta](#v10--out-of-beta)                                | The complete, polished game on the flat map, online, balanced and run without interruptions. The beta label comes off.                   | Shipped |      5 |   5 days |
 | [v1.1 · 3D globe](#v11--3d-globe)                                      | The same game on a planet you can spin, and switch between the flat map and the globe mid-game.                                          | Shipped |      9 |  27 days |
 | [v1.x · Community maps](#v1x--community-maps)                          | Play maps and translations made by other players, share a replay by link and watch games as a spectator.                                 | Planned |      8 |  16 days |
+| [v1.2 · Desktop](#v12-to-v16--steam)                                   | Install the game on Windows, macOS or Linux and play solo offline, from the same code as the site.                                       | Planned |      6 |        – |
+| [v1.3 · Steamworks](#v12-to-v16--steam)                                | Sign in with Steam, earn achievements there, invite friends and play with a controller or on a Steam Deck.                               | Planned |      6 |        – |
+| [v1.4 · Steam page](#v12-to-v16--steam)                                | Find the game's page on Steam, with its pictures, trailer and texts, and join a playtest.                                                | Planned |      5 |        – |
+| [v1.5 · Steam candidate](#v12-to-v16--steam)                           | A build tested on many machines, a server load-tested for a launch, and support in place.                                                | Planned |      4 |        – |
+| [v1.6 · Launch](#v12-to-v16--steam)                                    | Download the game from Steam, for free.                                                                                                  | Planned |      1 |        – |
 
 M0 (foundations and specification) is done: repository, rules, CI, container image and deployment are in place.
 
@@ -49,7 +54,15 @@ flowchart LR
     V11["v1.1 · 3D globe"]
     V1x["v1.x · Community maps"]
   end
+  subgraph P3["Phase 3: Steam"]
+    V12["v1.2 · Desktop"]
+    V13["v1.3 · Steamworks"]
+    V14["v1.4 · Steam page"]
+    V15["v1.5 · Steam candidate"]
+    V16["v1.6 · Launch"]
+  end
   V01 --> V02 --> V03 --> V04 --> V05 --> V06 --> V07 --> V08 --> V09 --> V099 --> V10 --> V11 --> V1x
+  V11 --> V12 --> V13 --> V14 --> V15 --> V16
   V01 -. "rendering contracts" .-> V11
 ```
 
@@ -497,6 +510,49 @@ The trademark filing for the name and logo ([#135](https://github.com/nic0lasm/f
 Shipped as `v1.1.0`, with the flat map still the default and the globe an option (setting, toolbar button, G). Left for later: a World map at 4,096 x 2,048 (#59), which would multiply the maps' weight, and smoothing the borders of small lands when the globe turns zoomed far out (#64), which no measurement showed to matter.
 
 9 items, about 27 days. The spike of v0.3 already draws World on a sphere behind `?view=globe` and switches with G; what is left is listed in [ADR 0005](adr/0005-globe-spike.md).
+
+## v1.2 to v1.6 · Steam
+
+**Outcome.** Frontfall on Steam as a free game, built from the same code as the site: the web version stays as it is, within its download budget, and the desktop build adds the richer ground of the art direction, which is too heavy for a web page. Phones come after Steam.
+
+Each milestone is on GitHub with its issues; the list below is the plan, not a promise of dates.
+
+**v1.2 · Desktop**
+
+- [#187](https://github.com/nic0lasm/frontfall/issues/187) Package the client as a desktop app
+- [#188](https://github.com/nic0lasm/frontfall/issues/188) Solo games offline, with the build and maps bundled
+- [#189](https://github.com/nic0lasm/frontfall/issues/189) Let the server accept the desktop app's origin
+- [#190](https://github.com/nic0lasm/frontfall/issues/190) Desktop builds and installers for Windows, macOS and Linux in CI
+- [#191](https://github.com/nic0lasm/frontfall/issues/191) Sign the desktop builds
+- [#192](https://github.com/nic0lasm/frontfall/issues/192) Measure the desktop app on real machines and on a Steam Deck
+
+**v1.3 · Steamworks**
+
+- [#193](https://github.com/nic0lasm/frontfall/issues/193) Start the Steamworks SDK and the overlay
+- [#194](https://github.com/nic0lasm/frontfall/issues/194) Send achievements to Steamworks
+- [#195](https://github.com/nic0lasm/frontfall/issues/195) Sign in with Steam
+- [#196](https://github.com/nic0lasm/frontfall/issues/196) Rich presence, friend invitations and join a game
+- [#197](https://github.com/nic0lasm/frontfall/issues/197) Keep settings in Steam Cloud
+- [#198](https://github.com/nic0lasm/frontfall/issues/198) Playable with a controller and on a Steam Deck
+
+**v1.4 · Steam page**
+
+- [#199](https://github.com/nic0lasm/frontfall/issues/199) Store page visuals: capsules, banners, screenshots
+- [#200](https://github.com/nic0lasm/frontfall/issues/200) Trailer
+- [#201](https://github.com/nic0lasm/frontfall/issues/201) Store page texts, in English and French
+- [#202](https://github.com/nic0lasm/frontfall/issues/202) Legal pages and age rating for the store
+- [#203](https://github.com/nic0lasm/frontfall/issues/203) Steam Playtest
+
+**v1.5 · Steam candidate**
+
+- [#204](https://github.com/nic0lasm/frontfall/issues/204) Hardware test matrix
+- [#205](https://github.com/nic0lasm/frontfall/issues/205) Server load test before launch
+- [#206](https://github.com/nic0lasm/frontfall/issues/206) Reporting, account deletion and support
+- [#207](https://github.com/nic0lasm/frontfall/issues/207) Launch plan and announcement
+
+**v1.6 · Launch**
+
+- [#208](https://github.com/nic0lasm/frontfall/issues/208) Launch week watch and hotfix
 
 ## v1.x · Community maps
 
